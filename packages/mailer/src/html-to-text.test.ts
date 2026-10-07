@@ -30,3 +30,11 @@ describe("htmlToText", () => {
     ).toBe("Acme© 2026 — Acme’s");
   });
 });
+
+describe("htmlToText with linked images", () => {
+  it("labels the link with the image's alt text", () => {
+    expect(htmlToText('<a href="https://shop.test/p"><img src="p.png" alt="Red shoes"></a>')).toBe(
+      "Red shoes (https://shop.test/p)",
+    );
+  });
+});

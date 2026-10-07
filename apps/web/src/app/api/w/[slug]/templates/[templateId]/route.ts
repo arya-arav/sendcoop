@@ -2,9 +2,12 @@ import { updateTemplate } from "@sendcoop/db";
 import { htmlToText } from "@sendcoop/mailer";
 import { z } from "zod";
 import { jsonError, managerWorkspaceForApi } from "@/lib/api-auth";
+import { compileMjml } from "@/lib/compile-mjml";
 
 // Saves the visual editor's work. A route handler rather than a server
 // action: designs can be a few megabytes, above the server action limit.
+// The HTML that gets sent is compiled here from the MJML, not taken from
+// the browser.
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const MAX_CODE = 2 * 1024 * 1024;
@@ -17,7 +20,6 @@ const saveSchema = z.object({
     .max(100, "Keep the name under 100 characters."),
   design: z.record(z.string(), z.unknown()),
   mjml: z.string().max(MAX_CODE, "This design is too large."),
-  html: z.string().max(MAX_CODE, "This design is too large."),
 });
 
 export async function PUT(
@@ -40,7 +42,8 @@ export async function PUT(
   const parsed = saveSchema.safeParse(data);
   if (!parsed.success) return jsonError(400, parsed.error.issues[0]?.message ?? "Invalid design.");
 
-  const { name, design, mjml, html } = parsed.data;
+  const { name, design, mjml } = parsed.data;
+  const { html, errors, bytes, clipped } = await compileMjml(mjml);
   const saved = await updateTemplate(access.workspace.id, templateId, {
     name,
     design,
@@ -49,5 +52,6 @@ export async function PUT(
     text: htmlToText(html),
   });
   if (!saved) return jsonError(404, "Template not found.");
-  return Response.json({ ok: true });
+  // Saved either way; the editor shows what to fix.
+  return Response.json({ ok: true, warnings: errors.slice(0, 5), bytes, clipped });
 }

@@ -36,7 +36,9 @@ export function htmlToText(html: string): string {
     .replace(/<head[\s\S]*?<\/head>/gi, "")
     .replace(/<(style|script|title)[\s\S]*?<\/\1>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "")
-    // Links: "text (url)", or just the url when they're the same or it's an image link.
+    // Images become their alt text (first, so a linked image reads "alt (url)").
+    .replace(/<img\b[^>]*?alt\s*=\s*["']([^"']+)["'][^>]*>/gi, "$1")
+    // Links: "text (url)", or just the url when there's no text or it is the url.
     .replace(
       /<a\b[^>]*?href\s*=\s*["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi,
       (_, href: string, inner: string) => {
@@ -46,7 +48,6 @@ export function htmlToText(html: string): string {
         return !label || decode(label) === url ? url : `${label} (${url})`;
       },
     )
-    .replace(/<img\b[^>]*?alt\s*=\s*["']([^"']+)["'][^>]*>/gi, "$1")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<li\b[^>]*>/gi, "\n- ")
     .replace(/<\/(p|div|h[1-6]|tr|table|ul|ol|li|blockquote|section)>/gi, "\n\n")

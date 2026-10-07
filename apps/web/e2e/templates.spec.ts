@@ -19,10 +19,15 @@ test("a template is designed in the visual editor, saved and reloaded", async ({
 
   // Edit the text right on the canvas, and name the template
   const canvas = page.frameLocator(".gjs-frame");
-  await canvas.getByText("Write your message here.").dblclick();
+  await canvas.getByText("Your headline").dblclick();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.type("Summer sale starts Friday");
   await page.getByLabel("Template name").fill("Summer promo");
+
+  // Add a product block from the panel (clicking adds it after the selected section)
+  await expect(page.locator(".gjs-block", { hasText: "Footer" })).toBeVisible();
+  await page.locator(".gjs-block", { hasText: "Product" }).click();
+  await expect(canvas.getByText("Buy now")).toBeVisible();
   await expect(status).toHaveText("Unsaved changes");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(status).toHaveText("All changes saved");
@@ -44,5 +49,20 @@ test("a template is designed in the visual editor, saved and reloaded", async ({
     select html, text from templates where id = ${templateId}`;
   expect(saved!.html).toContain("Summer sale starts Friday");
   expect(saved!.html).toMatch(/<table[^>]*role="presentation"/);
-  expect(saved!.text).toBe("Summer sale starts Friday");
+  expect(saved!.html).toContain("Buy now");
+  expect(saved!.text).toContain("Summer sale starts Friday");
+  expect(saved!.text).toContain("Buy now (https://example.com/product)");
+
+  // The preview shows it at both sizes, with the checks passing
+  await page.getByRole("link", { name: "Summer promo" }).click();
+  await page.getByRole("link", { name: "Preview" }).click();
+  await expect(page.getByRole("heading", { name: "Summer promo" })).toBeVisible();
+  for (const check of ["Size", "Outlook", "Image descriptions", "Unsubscribe link"]) {
+    await expect(page.getByRole("heading", { name: check })).toBeVisible();
+  }
+  await expect(page.getByLabel("Needs attention")).toHaveCount(0);
+  await expect(
+    page.frameLocator('iframe[title="Phone preview"]').getByText("Summer sale starts Friday"),
+  ).toBeVisible();
+  await expect(page.getByText("Unsubscribe ({{unsubscribe_url}})")).toBeVisible();
 });

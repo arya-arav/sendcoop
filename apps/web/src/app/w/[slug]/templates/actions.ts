@@ -1,23 +1,35 @@
 "use server";
 
 import { createTemplate, deleteTemplate } from "@sendcoop/db";
+import { htmlToText } from "@sendcoop/mailer";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
-import { STARTER_MJML } from "./starter";
+import { appUrl } from "@/lib/app-url";
+import { compileMjml } from "@/lib/compile-mjml";
+import { emailFromBlocks } from "@/lib/email-blocks";
 
 const NO_PERMISSION = "Only workspace owners and admins can change templates.";
 
-/** Creates a blank visual template and opens it in the editor. */
+/** Creates a visual template from a simple layout and opens it in the editor. */
 export async function createTemplateAction(slug: string) {
   const { workspace, role } = await requireMemberWorkspace(slug);
   if (!canManage(role)) return { error: NO_PERMISSION };
+  const mjml = emailFromBlocks(`${appUrl()}/email`, [
+    "sc-header",
+    "sc-text",
+    "sc-button",
+    "sc-footer",
+  ]);
+  const { html } = await compileMjml(mjml);
   const template = await createTemplate(workspace.id, {
     name: "Untitled template",
     editor: "visual",
-    mjml: STARTER_MJML,
+    mjml,
+    html,
+    text: htmlToText(html),
   });
   redirect(`/w/${slug}/templates/${template.id}`);
 }

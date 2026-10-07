@@ -1,9 +1,8 @@
 import { getTemplate } from "@sendcoop/db";
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
+import { appUrl } from "@/lib/app-url";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { VisualEditor } from "./visual-editor";
@@ -21,27 +20,8 @@ export default async function TemplatePage({
   const template = await getTemplate(workspace.id, templateId);
   if (!template) notFound();
 
-  if (!canManage(role)) {
-    // Members can look but not edit: a preview, sandboxed (no scripts run).
-    return (
-      <div className="mx-auto grid max-w-4xl gap-4">
-        <Link
-          href={`/w/${slug}/templates`}
-          className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Templates
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">{template.name}</h1>
-        <iframe
-          title={`Preview of ${template.name}`}
-          sandbox=""
-          srcDoc={template.html}
-          className="h-[70dvh] w-full rounded-lg border bg-white"
-        />
-      </div>
-    );
-  }
+  // Members can look but not edit.
+  if (!canManage(role)) redirect(`/w/${slug}/templates/${template.id}/preview`);
 
   return (
     <VisualEditor
@@ -50,6 +30,7 @@ export default async function TemplatePage({
       initialName={template.name}
       design={template.design}
       mjml={template.mjml}
+      assets={`${appUrl()}/email`}
     />
   );
 }

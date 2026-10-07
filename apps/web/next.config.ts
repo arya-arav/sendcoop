@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
     "@sendcoop/storage",
   ],
   // BullMQ loads its Lua scripts from files at runtime, so it can't be bundled.
-  serverExternalPackages: ["bullmq", "@aws-sdk/client-sesv2"],
+  serverExternalPackages: ["bullmq", "@aws-sdk/client-sesv2", "mjml"],
 };
 
 export default nextConfig;
