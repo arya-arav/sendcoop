@@ -9,6 +9,7 @@ import {
   mapRow,
 } from "@sendcoop/db/imports";
 import { CircleAlert, CircleCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { FormError } from "@/components/form";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { saveMappingAction } from "./actions";
+import { saveMappingAction, startImportAction } from "./actions";
 
 const SKIP = "";
 
@@ -52,6 +53,8 @@ export function MappingForm({
   );
   const [listIds, setListIds] = useState<string[]>(initial.listIds);
   const [updateExisting, setUpdateExisting] = useState(initial.updateExisting);
+  const [consent, setConsent] = useState(false);
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -87,6 +90,20 @@ export function MappingForm({
           ? { ok: true, message: "Mapping saved." }
           : { ok: false, message: outcome.error },
       );
+    });
+  }
+
+  function start() {
+    startTransition(async () => {
+      const outcome = await startImportAction(slug, importId, {
+        columns: mapping,
+        listIds,
+        updateExisting,
+        consent,
+      });
+      if (outcome.ok)
+        router.refresh(); // the page switches to the progress view
+      else setResult({ ok: false, message: outcome.error });
     });
   }
 
@@ -250,7 +267,7 @@ export function MappingForm({
                     </TableCell>
                     <TableCell colSpan={3 + mappedFields.length} className="whitespace-normal">
                       <span className="text-sm text-destructive">
-                        Row {i + 1} will be skipped: {row.errors.join(" ")}
+                        Will be skipped: {row.errors.join(" ")}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -269,16 +286,33 @@ export function MappingForm({
       </section>
 
       {editable && (
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {result && !result.ok && <FormError message={result.message} />}
-          {result?.ok && (
-            <Badge variant="secondary" aria-live="polite">
-              {result.message} Importing arrives in the next update.
-            </Badge>
-          )}
-          <Button onClick={save} disabled={pending || Boolean(problem)}>
-            {pending ? "Saving…" : "Save mapping"}
-          </Button>
+        <div className="grid gap-4 border-t pt-6">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-primary"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <span>
+              Everyone in this file agreed to receive email from me. Importing people who
+              didn&apos;t opt in damages your sending reputation and breaks anti-spam law.
+            </span>
+          </label>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {result && !result.ok && <FormError message={result.message} />}
+            {result?.ok && (
+              <Badge variant="secondary" aria-live="polite">
+                {result.message}
+              </Badge>
+            )}
+            <Button variant="outline" onClick={save} disabled={pending || Boolean(problem)}>
+              Save for later
+            </Button>
+            <Button onClick={start} disabled={pending || Boolean(problem) || !consent}>
+              {pending ? "Starting…" : "Start import"}
+            </Button>
+          </div>
         </div>
       )}
     </div>

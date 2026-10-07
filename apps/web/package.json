@@ -15,6 +15,7 @@
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@sendcoop/db": "workspace:*",
+    "@sendcoop/queue": "workspace:*",
     "@sendcoop/redis": "workspace:*",
     "@sendcoop/storage": "workspace:*",
     "better-auth": "^1.7.7",

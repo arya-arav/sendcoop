@@ -87,7 +87,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
       - run: pnpm test:integration
-      - run: pnpm --filter @sendcoop/web build
+      - run: pnpm turbo run build --filter=@sendcoop/web --filter=@sendcoop/worker
       - run: pnpm test:e2e
         env:
           AUTH_RATE_LIMIT: disabled

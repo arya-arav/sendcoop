@@ -11,7 +11,8 @@
     "BETTER_AUTH_*",
     "AUTH_RATE_LIMIT",
     "PW_CHANNEL",
-    "CI"
+    "CI",
+    "STORAGE_DIR"
   ],
   "tasks": {
     "dev": {
@@ -24,6 +25,9 @@
     },
     "lint": {},
     "typecheck": {},
-    "test": {}
+    "test": {},
+    "test:integration": {
+      "cache": false
+    }
   }
 }

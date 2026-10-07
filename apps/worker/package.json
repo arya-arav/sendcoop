@@ -8,15 +8,25 @@
     "build": "tsup",
     "start": "node --env-file-if-exists=../../.env dist/index.js",
     "lint": "eslint .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@sendcoop/db": "workspace:*",
-    "@sendcoop/redis": "workspace:*"
+    "@sendcoop/queue": "workspace:*",
+    "@sendcoop/redis": "workspace:*",
+    "@sendcoop/storage": "workspace:*",
+    "bullmq": "^6.3.11",
+    "csv-parse": "^7.0.3",
+    "drizzle-orm": "^0.45.3",
+    "ioredis": "^6.0.0",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",
     "tsup": "^8.5.0",
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.3"
   }
 }

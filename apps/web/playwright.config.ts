@@ -20,11 +20,20 @@ export default defineConfig({
     channel: process.env.PW_CHANNEL || undefined,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    // CI runs the production build; locally reuse `pnpm dev` if it's already up.
-    command: isCI ? "pnpm start" : "pnpm dev",
-    url: "http://localhost:3000/api/health",
-    reuseExistingServer: !isCI,
-    timeout: 120_000,
-  },
+  // The web app and the worker (imports run there). CI runs production builds;
+  // locally an already-running `pnpm dev` is reused.
+  webServer: [
+    {
+      command: isCI ? "pnpm start" : "pnpm dev",
+      url: "http://localhost:3000/api/health",
+      reuseExistingServer: !isCI,
+      timeout: 120_000,
+    },
+    {
+      command: `pnpm --filter @sendcoop/worker ${isCI ? "start" : "dev"}`,
+      url: "http://localhost:3002/health",
+      reuseExistingServer: !isCI,
+      timeout: 60_000,
+    },
+  ],
 });

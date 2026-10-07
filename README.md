@@ -90,6 +90,8 @@ shadcn/ui (Base UI primitives) in `apps/web/src/components/ui`; add components w
 
 CSV uploads go to `POST /api/w/<slug>/imports` as a raw request body and stream to `@sendcoop/storage` (100 MB limit), so large files are never held in memory. The format (encoding, separator, header row) and a 10-row sample are detected at upload; the mapping page previews rows with the same rules (`@sendcoop/db/imports`) the import worker uses.
 
+Starting an import queues a BullMQ job; the worker streams the file, checks each row with the same rules, writes batches of 1,000 (`INSERT … ON CONFLICT`), saves progress after each batch and writes a CSV of skipped rows. Locally, a 500,000-row file imports in about 110 s (about 40 s when everyone already exists).
+
 Storage is a local folder in development (`STORAGE_DIR`, default: the OS temp dir). An S3-compatible driver replaces it before production.
 
 Health checks: `GET :3000/api/health`, `GET :3001/health`. Each reports Postgres and Redis, and returns 503 if either is down.

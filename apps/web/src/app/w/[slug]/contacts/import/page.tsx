@@ -18,6 +18,7 @@ import { CsvUploader } from "./csv-uploader";
 import { formatBytes, importStatusLabel } from "./format";
 
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
+const numberFormat = new Intl.NumberFormat("en");
 
 export default async function ImportPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -55,6 +56,7 @@ export default async function ImportPage({ params }: { params: Promise<{ slug: s
                   <TableHead className="pl-4">File</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Result</TableHead>
                   <TableHead className="pr-4">Uploaded</TableHead>
                 </TableRow>
               </TableHeader>
@@ -73,9 +75,22 @@ export default async function ImportPage({ params }: { params: Promise<{ slug: s
                       {formatBytes(item.fileSize)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={item.status === "failed" ? "destructive" : "secondary"}>
+                      <Badge
+                        variant={
+                          item.status === "failed"
+                            ? "destructive"
+                            : item.status === "completed"
+                              ? "outline"
+                              : "secondary"
+                        }
+                      >
                         {importStatusLabel[item.status]}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.status === "completed"
+                        ? `${numberFormat.format(item.createdCount)} added${item.errorCount ? `, ${numberFormat.format(item.errorCount)} skipped` : ""}`
+                        : "—"}
                     </TableCell>
                     <TableCell className="pr-4 text-muted-foreground">
                       {dateFormat.format(item.createdAt)}

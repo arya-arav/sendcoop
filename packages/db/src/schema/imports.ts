@@ -51,6 +51,10 @@ export const subscriberImports = pgTable(
     updatedCount: integer().notNull().default(0),
     skippedCount: integer().notNull().default(0),
     errorCount: integer().notNull().default(0),
+    // Bytes of the file read so far; progress = bytesProcessed / fileSize.
+    bytesProcessed: bigint({ mode: "number" }).notNull().default(0),
+    // CSV of skipped rows (row number, email, reason), when there were any.
+    errorReportKey: text(),
     error: text(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),

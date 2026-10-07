@@ -72,8 +72,8 @@ test("a CSV is uploaded, its columns mapped and previewed", async ({ page }) => 
   await expect(preview.getByRole("row").filter({ hasText: "priya@example.com" })).toContainText(
     "Pro",
   );
-  await expect(preview).toContainText("Row 2 will be skipped: “not-an-email” isn't a valid email.");
-  await expect(preview).toContainText("Row 3 will be skipped: Plan must be one of: Starter, Pro.");
+  await expect(preview).toContainText("Will be skipped: “not-an-email” isn't a valid email.");
+  await expect(preview).toContainText("Will be skipped: Plan must be one of: Starter, Pro.");
 
   // Not importing the Plan column makes row 3 valid
   await page.getByLabel("Import “Plan” as").selectOption("");
@@ -84,7 +84,7 @@ test("a CSV is uploaded, its columns mapped and previewed", async ({ page }) => 
   await expect(
     page.getByText("Choose which column holds the email address.").first(),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save mapping" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Save for later" })).toBeDisabled();
   await page.getByLabel("Import “E-mail Address” as").selectOption("email");
 
   // Each target can only be used once
@@ -93,7 +93,7 @@ test("a CSV is uploaded, its columns mapped and previewed", async ({ page }) => 
   // Save with a list and "update existing", then reload: everything persists
   await page.getByLabel("Imported leads").check();
   await page.getByLabel("Update existing subscribers").check();
-  await page.getByRole("button", { name: "Save mapping" }).click();
+  await page.getByRole("button", { name: "Save for later" }).click();
   await expect(page.getByText(/Mapping saved\./)).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Import “Plan” as")).toHaveValue("");

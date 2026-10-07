@@ -6,6 +6,7 @@ export * from "./custom-fields";
 export * from "./imports";
 export * from "./schema";
 export * from "./queries/custom-fields";
+export * from "./queries/import-batch";
 export * from "./queries/imports";
 export * from "./queries/lists";
 export * from "./queries/subscribers";
