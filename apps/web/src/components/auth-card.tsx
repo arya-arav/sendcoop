@@ -1,3 +1,5 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 export function AuthCard({
   title,
   subtitle,
@@ -13,14 +15,16 @@ export function AuthCard({
     <main className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <p className="mb-8 text-center text-lg font-semibold tracking-tight">Sendcoop</p>
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{subtitle}</p>}
-          <div className="mt-6">{children}</div>
-        </div>
-        {footer && (
-          <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">{footer}</p>
-        )}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+            </CardTitle>
+            {subtitle && <CardDescription>{subtitle}</CardDescription>}
+          </CardHeader>
+          <CardContent>{children}</CardContent>
+        </Card>
+        {footer && <p className="mt-6 text-center text-sm text-muted-foreground">{footer}</p>}
       </div>
     </main>
   );

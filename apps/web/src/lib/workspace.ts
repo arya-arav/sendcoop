@@ -1,4 +1,4 @@
-import { findMemberWorkspace } from "@sendcoop/db";
+import { findMemberWorkspace, setSessionActiveWorkspace } from "@sendcoop/db";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { requireSession } from "./session";
@@ -8,8 +8,13 @@ import { requireSession } from "./session";
  * so workspace slugs can't be probed. Cached per request for layouts and pages.
  */
 export const requireMemberWorkspace = cache(async (slug: string) => {
-  const { user } = await requireSession();
+  const { user, session } = await requireSession();
   const membership = await findMemberWorkspace(user.id, slug);
   if (!membership) notFound();
+
+  // Opening a workspace makes it the active one, so "/" and new tabs return here.
+  if (session.activeOrganizationId !== membership.workspace.id) {
+    await setSessionActiveWorkspace(session.id, membership.workspace.id);
+  }
   return { user, ...membership };
 });

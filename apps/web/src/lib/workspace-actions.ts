@@ -4,6 +4,7 @@ import { isWorkspaceSlugTaken } from "@sendcoop/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { slugCandidate, slugify } from "@/lib/slug";
 
 export type CreateWorkspaceState = { error: string | null };
 
@@ -25,16 +26,9 @@ export async function createWorkspace(
 }
 
 async function availableSlug(name: string) {
-  const base =
-    name
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "workspace";
-
+  const base = slugify(name);
   for (let attempt = 0; attempt < 5; attempt++) {
-    const slug = attempt === 0 ? base : `${base}-${Math.random().toString(36).slice(2, 6)}`;
+    const slug = slugCandidate(base, attempt);
     if (!(await isWorkspaceSlugTaken(slug))) return slug;
   }
   return null;

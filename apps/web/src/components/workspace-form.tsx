@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/form";
-import { createWorkspace } from "./actions";
+import { createWorkspace } from "@/lib/workspace-actions";
 
 export function WorkspaceForm({ suggestedName }: { suggestedName: string }) {
   const [state, action, pending] = useActionState(createWorkspace, { error: null });

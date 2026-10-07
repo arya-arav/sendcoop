@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
+import { Providers } from "@/components/providers";
+import { cn } from "@/lib/utils";
 import "./globals.css";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Sendcoop",
@@ -8,9 +13,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh bg-white text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
-        {children}
+    // next-themes sets the theme class on <html> before hydration.
+    <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+      <body className="min-h-dvh bg-background text-foreground antialiased">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

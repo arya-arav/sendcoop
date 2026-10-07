@@ -3,3 +3,5 @@ pnpm-lock.yaml
 dist
 .turbo
 packages/db/drizzle
+test-results
+playwright-report

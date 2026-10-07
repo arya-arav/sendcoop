@@ -28,6 +28,9 @@ export const auth = betterAuth({
   // Ids come from Postgres (uuidv7() column defaults).
   advanced: { database: { generateId: "uuid" } },
   telemetry: { enabled: false },
+  // Better Auth rate-limits auth endpoints in production (sign-in/up: 3 per 10s per IP).
+  // Browser tests run many signups from one IP, so CI turns it off for that job only.
+  ...(process.env.AUTH_RATE_LIMIT === "disabled" ? { rateLimit: { enabled: false } } : {}),
 
   emailAndPassword: {
     enabled: true,

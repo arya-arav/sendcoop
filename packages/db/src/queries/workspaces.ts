@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../client";
-import { memberships, workspaces } from "../schema";
+import { memberships, sessions, workspaces } from "../schema";
 
 /** The workspace with this slug, plus the user's role in it, or null if they aren't a member. */
 export async function findMemberWorkspace(userId: string, slug: string) {
@@ -30,4 +30,12 @@ export async function isWorkspaceSlugTaken(slug: string) {
     .where(eq(workspaces.slug, slug))
     .limit(1);
   return Boolean(row);
+}
+
+/** Remember the workspace a session last opened, so "/" returns there. */
+export async function setSessionActiveWorkspace(sessionId: string, workspaceId: string) {
+  await getDb()
+    .update(sessions)
+    .set({ activeWorkspaceId: workspaceId })
+    .where(eq(sessions.id, sessionId));
 }

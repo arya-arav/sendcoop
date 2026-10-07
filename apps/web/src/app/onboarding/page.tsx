@@ -2,7 +2,7 @@ import { listUserWorkspaces } from "@sendcoop/db";
 import { redirect } from "next/navigation";
 import { AuthCard } from "@/components/auth-card";
 import { requireSession } from "@/lib/session";
-import { WorkspaceForm } from "./workspace-form";
+import { WorkspaceForm } from "@/components/workspace-form";
 
 export default async function OnboardingPage() {
   const { user } = await requireSession();

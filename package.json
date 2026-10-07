@@ -17,7 +17,9 @@
     "services:logs": "docker compose logs -f",
     "db:generate": "pnpm --filter @sendcoop/db db:generate",
     "db:migrate": "pnpm --filter @sendcoop/db db:migrate",
-    "db:studio": "pnpm --filter @sendcoop/db db:studio"
+    "db:studio": "pnpm --filter @sendcoop/db db:studio",
+    "test": "turbo run test",
+    "test:e2e": "pnpm --filter @sendcoop/web test:e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

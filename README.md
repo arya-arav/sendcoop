@@ -62,4 +62,19 @@ Flow: `/signup` â†’ confirmation email (see Mailpit at http://localhost:8027) â†
 
 Set `BETTER_AUTH_SECRET` in `.env` (`openssl rand -base64 32`).
 
+## Tests
+
+```sh
+pnpm test                          # unit tests (Vitest)
+PW_CHANNEL=msedge pnpm test:e2e     # browser tests (Playwright) using installed Edge
+```
+
+Browser tests need `pnpm services:up` and migrations; they start `pnpm dev` unless it is already running. Without `PW_CHANNEL`, run `pnpm --filter @sendcoop/web exec playwright install chromium` once.
+
+CI (`.github/workflows/ci.yml`) runs format, lint, typecheck, unit tests and build, then the browser tests against a production build with Postgres, Redis and Mailpit service containers. `AUTH_RATE_LIMIT=disabled` is set for that job only, because many signups come from one IP.
+
+## UI
+
+shadcn/ui (Base UI primitives) in `apps/web/src/components/ui`; add components with `pnpm dlx shadcn@latest add <name>` from `apps/web`. The workspace shell (sidebar, switcher, account menu with light/dark/system theme) is in `src/components/shell`.
+
 Health checks: `GET :3000/api/health`, `GET :3001/health`. Each reports Postgres and Redis, and returns 503 if either is down.
