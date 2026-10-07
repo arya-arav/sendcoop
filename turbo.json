@@ -2,6 +2,17 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
   "globalDependencies": [".env"],
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "SMTP_*",
+    "MAIL_FROM",
+    "MAILPIT_URL",
+    "BETTER_AUTH_*",
+    "AUTH_RATE_LIMIT",
+    "PW_CHANNEL",
+    "CI"
+  ],
   "tasks": {
     "dev": {
       "cache": false,
