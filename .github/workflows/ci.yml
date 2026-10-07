@@ -49,6 +49,17 @@ jobs:
     name: Integration and browser tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Official Playwright image: Chromium and its system packages are preinstalled,
+    # so the job never depends on apt mirrors. Keep the tag in step with
+    # @playwright/test in apps/web/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    # Inside a job container, services are reached by name, not localhost.
+    env:
+      DATABASE_URL: postgres://sendcoop:sendcoop@postgres:5432/sendcoop
+      REDIS_URL: redis://redis:6379
+      SMTP_HOST: mailpit
+      MAILPIT_URL: http://mailpit:8025
     services:
       postgres:
         image: postgres:18-alpine
@@ -56,19 +67,16 @@ jobs:
           POSTGRES_USER: sendcoop
           POSTGRES_PASSWORD: sendcoop
           POSTGRES_DB: sendcoop
-        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U sendcoop -d sendcoop"
           --health-interval 5s --health-timeout 3s --health-retries 10
       redis:
         image: redis:8-alpine
-        ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 10
       mailpit:
         image: axllent/mailpit:latest
-        ports: ["1025:1025", "8025:8025"]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -77,24 +85,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The browser download is cached per Playwright version; system packages
-      # come from apt every run. Time-boxed so a stalled download fails fast.
-      - name: Get Playwright version
-        id: playwright
-        run: echo "version=$(pnpm --filter @sendcoop/web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 8
-        run: pnpm --filter @sendcoop/web exec playwright install --with-deps chromium
-      - name: Install Playwright system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        timeout-minutes: 8
-        run: pnpm --filter @sendcoop/web exec playwright install-deps chromium
       - run: pnpm db:migrate
       - run: pnpm test:integration
       - run: pnpm --filter @sendcoop/web build
