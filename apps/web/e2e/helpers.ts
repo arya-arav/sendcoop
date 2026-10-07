@@ -58,3 +58,32 @@ export async function logIn(page: Page, email: string, password = PASSWORD) {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Log in" }).click();
 }
+
+/** Newest link matching `pattern` in an email to `to`, waiting for it to arrive. */
+export async function emailLink(to: string, pattern: RegExp): Promise<string> {
+  let link: string | undefined;
+  await expect
+    .poll(
+      async () => {
+        const search = await fetch(
+          `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`,
+        ).then((r) => r.json());
+        const id = search.messages?.[0]?.ID;
+        if (!id) return undefined;
+        const message = await fetch(`${MAILPIT}/api/v1/message/${id}`).then((r) => r.json());
+        link = message.Text.match(pattern)?.[0];
+        return link;
+      },
+      { message: `email to ${to}`, timeout: 15_000 },
+    )
+    .toBeTruthy();
+  return link!;
+}
+
+/** How many emails have been sent to `to`. */
+export async function emailCount(to: string): Promise<number> {
+  const search = await fetch(
+    `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`,
+  ).then((r) => r.json());
+  return search.messages_count ?? 0;
+}

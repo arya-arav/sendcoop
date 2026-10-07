@@ -3,6 +3,7 @@
 import {
   BarChart3,
   FileText,
+  FormInput,
   Filter,
   LayoutDashboard,
   ListChecks,
@@ -32,6 +33,7 @@ const items: NavItem[] = [
   { title: "Contacts", path: "/contacts", icon: Users, ready: true },
   { title: "Lists", path: "/lists", icon: ListChecks, ready: true },
   { title: "Segments", path: "/segments", icon: Filter, ready: true },
+  { title: "Forms", path: "/forms", icon: FormInput, ready: true },
   { title: "Campaigns", path: "/campaigns", icon: Mail, ready: false },
   { title: "Automations", path: "/automations", icon: Workflow, ready: false },
   { title: "Templates", path: "/templates", icon: FileText, ready: false },
