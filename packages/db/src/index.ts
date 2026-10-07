@@ -1,7 +1,8 @@
-// Database client and schema (Drizzle tables are added in D3).
-// Apps import from "@sendcoop/db" so they never talk to Postgres directly.
+// Database client and schema. Apps import from "@sendcoop/db" so they never
+// talk to Postgres directly.
 
-export { getSql, pingDatabase } from "./client";
+export { getDb, getSql, pingDatabase, type Db } from "./client";
+export * from "./schema";
 
 export const SERVICE_NAMES = ["web", "worker", "edge"] as const;
 export type ServiceName = (typeof SERVICE_NAMES)[number];

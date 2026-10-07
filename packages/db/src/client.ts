@@ -1,4 +1,6 @@
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import * as schema from "./schema";
 
 // Reuse one pool per process; Next.js dev reloads modules, so keep it on globalThis.
 const globalForDb = globalThis as typeof globalThis & { __sendcoopSql?: postgres.Sql };
@@ -11,6 +13,12 @@ export function getSql(): postgres.Sql {
   }
   return globalForDb.__sendcoopSql;
 }
+
+export function getDb() {
+  return drizzle(getSql(), { schema, casing: "snake_case" });
+}
+
+export type Db = ReturnType<typeof getDb>;
 
 export async function pingDatabase(): Promise<boolean> {
   try {

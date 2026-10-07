@@ -35,12 +35,23 @@ All apps read the single `.env` at the repo root.
 pnpm install
 cp .env.example .env
 pnpm services:up    # start Postgres, Redis, Mailpit
+pnpm db:migrate     # apply database migrations
 pnpm dev          # start web, edge and worker together
 pnpm typecheck
 pnpm lint
 pnpm build
 pnpm format
 pnpm services:down  # stop them (data is kept)
+```
+
+## Database
+
+Schema lives in `packages/db/src/schema` (Drizzle, snake_case columns, UUIDv7 ids from Postgres 18).
+
+```sh
+pnpm db:generate --name <change>      # write a migration after editing the schema
+pnpm db:migrate                       # apply pending migrations
+pnpm db:studio                        # browse data
 ```
 
 Health checks: `GET :3000/api/health`, `GET :3001/health`. Each reports Postgres and Redis, and returns 503 if either is down.
