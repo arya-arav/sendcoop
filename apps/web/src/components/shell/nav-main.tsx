@@ -3,6 +3,7 @@
 import {
   BarChart3,
   FileText,
+  Filter,
   LayoutDashboard,
   ListChecks,
   type LucideIcon,
@@ -30,6 +31,7 @@ const items: NavItem[] = [
   { title: "Dashboard", path: "", icon: LayoutDashboard, ready: true },
   { title: "Contacts", path: "/contacts", icon: Users, ready: true },
   { title: "Lists", path: "/lists", icon: ListChecks, ready: true },
+  { title: "Segments", path: "/segments", icon: Filter, ready: true },
   { title: "Campaigns", path: "/campaigns", icon: Mail, ready: false },
   { title: "Automations", path: "/automations", icon: Workflow, ready: false },
   { title: "Templates", path: "/templates", icon: FileText, ready: false },

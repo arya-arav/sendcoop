@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { SegmentRules } from "../segments";
 import { workspaces } from "./auth";
 import { createdAt, id, updatedAt } from "./columns";
 
@@ -97,6 +98,23 @@ export const listMemberships = pgTable(
   (t) => [primaryKey({ columns: [t.listId, t.subscriberId] }), index().on(t.subscriberId)],
 );
 
+// Saved rule sets (see ../segments.ts); evaluated to SQL whenever they're used,
+// so a segment always reflects current data.
+export const segments = pgTable(
+  "segments",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    rules: jsonb().$type<SegmentRules>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("segments_workspace_name_unique").on(t.workspaceId, sql`lower(${t.name})`)],
+);
+
 // Free-form labels (e.g. "buyer", "clicked-keto"), lighter than lists; used
 // for filtering now and by segments and automations later.
 export const tags = pgTable(
@@ -155,4 +173,5 @@ export type SubscriberStatus = (typeof subscriberStatus.enumValues)[number];
 export type SubscriberSource = (typeof subscriberSource.enumValues)[number];
 export type CustomField = typeof customFields.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
+export type Segment = typeof segments.$inferSelect;
 export type CustomFieldType = (typeof customFieldType.enumValues)[number];

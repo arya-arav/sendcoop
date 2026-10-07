@@ -64,6 +64,13 @@
       "when": 1791407041761,
       "tag": "0008_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791408808364,
+      "tag": "0009_segments",
+      "breakpoints": true
     }
   ]
 }
