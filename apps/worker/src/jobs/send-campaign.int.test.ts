@@ -1,5 +1,6 @@
 import {
   addSendingDomain,
+  type Campaign,
   createCampaign,
   createList,
   createSendingServer,
@@ -7,6 +8,7 @@ import {
   getSql,
   queueCampaign,
   queuedMessageBatches,
+  type SendingLimits,
 } from "@sendcoop/db";
 import {
   type CampaignJob,
@@ -16,14 +18,13 @@ import {
   queueConnection,
   type SendBatchJob,
 } from "@sendcoop/queue";
-import { Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { prepareCampaign, sendBatch } from "./send-campaign";
+import { prepareCampaign, processSendBatch, sendBatch } from "./send-campaign";
 
-// The whole sending path with real Redis queues: 10,000 emails into Mailpit.
+// The whole sending path with real Redis queues and Mailpit.
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
-const RECIPIENTS = 10_000;
 const sql = getSql();
 const run = Date.now().toString(36);
 let ws: string;
@@ -37,7 +38,8 @@ beforeAll(async () => {
     new Worker<CampaignJob>(QUEUES.campaigns, (job) => prepareCampaign(job.data), {
       connection: queueConnection(),
     }),
-    new Worker<SendBatchJob>(QUEUES.sends, (job) => sendBatch(job.data), {
+    // Five batches at once, like production, to load the rate limiter.
+    new Worker<SendBatchJob>(QUEUES.sends, processSendBatch, {
       connection: queueConnection(),
       concurrency: 5,
     }),
@@ -51,6 +53,68 @@ afterAll(async () => {
   await sql.end();
 });
 
+let counter = 0;
+
+/** A server, domain and list with `recipients` subscribers, and a queued campaign. */
+async function setup(recipients: number, limits?: SendingLimits) {
+  const n = ++counter;
+  const domain = await addSendingDomain(ws, `mail.load-${run}-${n}.test`);
+  if (!domain.ok) throw new Error("setup");
+  const server = await createSendingServer(ws, {
+    name: `Mailpit ${n}`,
+    type: "smtp",
+    summary: "mailpit",
+    config: {
+      type: "smtp",
+      host: process.env.SMTP_HOST ?? "localhost",
+      port: Number(process.env.SMTP_PORT ?? 1026),
+      secure: false,
+    },
+    limits,
+  });
+  const list = await createList(ws, { name: `List ${n}`, description: null });
+  if (!list.ok) throw new Error("setup");
+
+  // The wanted recipients plus 200 unsubscribed people who must get nothing.
+  const prefix = `r${n}-${run}-`;
+  await sql`
+    insert into subscribers (workspace_id, email, status, subscribed_at)
+    select ${ws}, ${prefix} || g || '@example.com',
+           (case when g > ${recipients} then 'unsubscribed' else 'subscribed' end)::subscriber_status,
+           now()
+    from generate_series(1, ${recipients + 200}) g`;
+  await sql`
+    insert into list_memberships (list_id, subscriber_id)
+    select ${list.list.id}, id from subscribers where workspace_id = ${ws} and email like ${`${prefix}%`}`;
+
+  const subject = `Load test ${run} ${n}`;
+  const campaign = await createCampaign(ws, {
+    name: subject,
+    subject,
+    fromName: "Load",
+    fromLocal: "news",
+    replyTo: null,
+    html: "<p>Hello</p>",
+    text: "Hello",
+    sendingDomainId: domain.domain.id,
+    sendingServerId: server.id,
+    listId: list.list.id,
+    segmentId: null,
+  });
+  expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
+  return { campaign, subject };
+}
+
+async function runUntil(campaignId: string, done: (c: Campaign | null) => boolean) {
+  await enqueueCampaign({ campaignId, workspaceId: ws });
+  let current = await getCampaign(ws, campaignId);
+  while (!done(current)) {
+    await new Promise((r) => setTimeout(r, 250));
+    current = await getCampaign(ws, campaignId);
+  }
+  return current!;
+}
+
 async function mailpitCount(subject: string) {
   const query = encodeURIComponent(`subject:"${subject}"`);
   const result = (await fetch(`${MAILPIT}/api/v1/search?query=${query}&limit=1`).then((r) =>
@@ -61,70 +125,26 @@ async function mailpitCount(subject: string) {
 
 describe("sending a campaign", () => {
   it(
-    `delivers ${RECIPIENTS.toLocaleString("en")} emails through the queues to Mailpit`,
+    "delivers 10,000 emails through the queues to Mailpit",
     async () => {
-      const domain = await addSendingDomain(ws, `mail.load-${run}.test`);
-      if (!domain.ok) throw new Error("setup");
-      const server = await createSendingServer(ws, {
-        name: "Mailpit",
-        type: "smtp",
-        summary: "mailpit",
-        config: {
-          type: "smtp",
-          host: process.env.SMTP_HOST ?? "localhost",
-          port: Number(process.env.SMTP_PORT ?? 1026),
-          secure: false,
-        },
-      });
-      const list = await createList(ws, { name: "Everyone", description: null });
-      if (!list.ok) throw new Error("setup");
-
-      // 10,000 subscribed + 200 unsubscribed on the list; only the first get mail.
-      await sql`
-        insert into subscribers (workspace_id, email, status, subscribed_at)
-        select ${ws}, 'load' || g || '@example.com',
-               (case when g > ${RECIPIENTS} then 'unsubscribed' else 'subscribed' end)::subscriber_status,
-               now()
-        from generate_series(1, ${RECIPIENTS + 200}) g`;
-      await sql`
-        insert into list_memberships (list_id, subscriber_id)
-        select ${list.list.id}, id from subscribers where workspace_id = ${ws}`;
-
-      const subject = `Load test ${run}`;
-      const campaign = await createCampaign(ws, {
-        name: "Load test",
-        subject,
-        fromName: "Load",
-        fromLocal: "news",
-        replyTo: null,
-        html: "<p>Hello</p>",
-        text: "Hello",
-        sendingDomainId: domain.domain.id,
-        sendingServerId: server.id,
-        listId: list.list.id,
-        segmentId: null,
-      });
-      expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
-
+      const { campaign, subject } = await setup(10_000);
       const started = performance.now();
-      await enqueueCampaign({ campaignId: campaign.id, workspaceId: ws });
-      let current = await getCampaign(ws, campaign.id);
-      while (current?.status === "queued" || current?.status === "sending") {
-        await new Promise((r) => setTimeout(r, 500));
-        current = await getCampaign(ws, campaign.id);
-      }
+      const result = await runUntil(
+        campaign.id,
+        (c) => c?.status !== "queued" && c?.status !== "sending",
+      );
       const seconds = (performance.now() - started) / 1000;
       console.log(
-        `[load] ${RECIPIENTS} emails in ${seconds.toFixed(1)}s (${Math.round(RECIPIENTS / seconds)}/s)`,
+        `[load] 10000 emails in ${seconds.toFixed(1)}s (${Math.round(10_000 / seconds)}/s)`,
       );
 
-      expect(current).toMatchObject({
+      expect(result).toMatchObject({
         status: "sent",
-        recipientCount: RECIPIENTS,
-        sentCount: RECIPIENTS,
+        recipientCount: 10_000,
+        sentCount: 10_000,
         failedCount: 0,
       });
-      await expect.poll(() => mailpitCount(subject), { timeout: 30_000 }).toBe(RECIPIENTS);
+      await expect.poll(() => mailpitCount(subject), { timeout: 30_000 }).toBe(10_000);
 
       // Running a batch again sends nothing: every message is already sent.
       expect(await queuedMessageBatches(campaign.id)).toEqual([]);
@@ -136,8 +156,44 @@ describe("sending a campaign", () => {
         messageIds: [first!.id],
       });
       expect(again).toEqual({ sent: 0, failed: 0 });
-      expect(await mailpitCount(subject)).toBe(RECIPIENTS);
+      expect(await mailpitCount(subject)).toBe(10_000);
     },
     10 * 60_000,
   );
+
+  it("never sends more than the per-second limit, with five batches in parallel", async () => {
+    const { campaign } = await setup(150, { maxPerSecond: 25, maxPerHour: null, maxPerDay: null });
+    const started = performance.now();
+    const result = await runUntil(campaign.id, (c) => c?.status === "sent");
+    const seconds = (performance.now() - started) / 1000;
+
+    expect(result.sentCount).toBe(150);
+    // 150 at 25 per calendar second spans 6 seconds; starting late in the
+    // first one, that is just over 4 seconds of wall time at minimum.
+    expect(seconds).toBeGreaterThanOrEqual(4);
+    const perSecond = await sql<{ second: string; n: number }[]>`
+        select date_trunc('second', sent_at)::text as second, count(*)::int as n
+        from messages where campaign_id = ${campaign.id} group by 1 order by 1`;
+    console.log(`[limit] busiest second: ${Math.max(...perSecond.map((r) => r.n))} of 25`);
+    for (const row of perSecond) expect(row.n).toBeLessThanOrEqual(25);
+  }, 60_000);
+
+  it("stops at the hourly limit and postpones the rest until the next hour", async () => {
+    const { campaign } = await setup(100, { maxPerSecond: null, maxPerHour: 40, maxPerDay: null });
+    await runUntil(campaign.id, (c) => (c?.sentCount ?? 0) >= 40);
+    // Give any other batches time to hit the limit too.
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const current = await getCampaign(ws, campaign.id);
+    expect(current).toMatchObject({ status: "sending", sentCount: 40 });
+
+    const sends = new Queue(QUEUES.sends, { connection: queueConnection() });
+    const delayed = (await sends.getDelayed()).filter((j) => j.data.campaignId === campaign.id);
+    await sends.close();
+    expect(delayed.length).toBeGreaterThan(0);
+    const nextHour = Math.ceil(Date.now() / 3_600_000) * 3_600_000;
+    for (const job of delayed) {
+      expect(job.timestamp + (job.delay ?? 0)).toBeGreaterThanOrEqual(nextHour - 1000);
+    }
+  }, 60_000);
 });

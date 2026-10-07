@@ -123,6 +123,19 @@ export function ServerEditor({
           </>
         )}
 
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm font-medium">Sending limits</legend>
+          <p className="text-sm text-muted-foreground">
+            Match your provider&apos;s quota (a new Amazon SES account allows 14 per second and
+            50,000 per day). Leave blank for no limit.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {field("maxPerSecond", "Emails per second", { inputMode: "numeric" })}
+            {field("maxPerHour", "Emails per hour", { inputMode: "numeric" })}
+            {field("maxPerDay", "Emails per day", { inputMode: "numeric" })}
+          </div>
+        </fieldset>
+
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={save} disabled={pending}>
             {pending ? "Saving…" : editing ? "Save changes" : "Add server"}

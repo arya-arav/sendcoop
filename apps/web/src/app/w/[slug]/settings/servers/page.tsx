@@ -58,7 +58,8 @@ export default async function ServersPage({ params }: { params: Promise<{ slug: 
               <TableRow>
                 <TableHead className="pl-4">Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="pr-4">Connection</TableHead>
+                <TableHead>Connection</TableHead>
+                <TableHead className="pr-4">Limits</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -72,7 +73,16 @@ export default async function ServersPage({ params }: { params: Promise<{ slug: 
                   <TableCell>
                     <Badge variant="secondary">{s.type === "ses" ? "Amazon SES" : "SMTP"}</Badge>
                   </TableCell>
-                  <TableCell className="pr-4 text-muted-foreground">{s.summary}</TableCell>
+                  <TableCell className="text-muted-foreground">{s.summary}</TableCell>
+                  <TableCell className="pr-4 text-muted-foreground">
+                    {[
+                      s.maxPerSecond && `${s.maxPerSecond}/s`,
+                      s.maxPerHour && `${s.maxPerHour}/h`,
+                      s.maxPerDay && `${s.maxPerDay}/day`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "None"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

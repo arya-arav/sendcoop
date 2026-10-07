@@ -49,6 +49,9 @@ export default async function ServerPage({
           region: String(c.region ?? ""),
           accessKeyId: String(c.accessKeyId ?? ""),
           secretAccessKey: "",
+          maxPerSecond: server.maxPerSecond?.toString() ?? "",
+          maxPerHour: server.maxPerHour?.toString() ?? "",
+          maxPerDay: server.maxPerDay?.toString() ?? "",
         }}
       />
       <TestEmailPanel

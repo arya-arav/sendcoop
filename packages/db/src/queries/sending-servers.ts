@@ -11,6 +11,9 @@ const viewColumns = {
   name: sendingServers.name,
   type: sendingServers.type,
   summary: sendingServers.summary,
+  maxPerSecond: sendingServers.maxPerSecond,
+  maxPerHour: sendingServers.maxPerHour,
+  maxPerDay: sendingServers.maxPerDay,
   createdAt: sendingServers.createdAt,
   updatedAt: sendingServers.updatedAt,
 };
@@ -20,8 +23,17 @@ export type SendingServerView = {
   name: string;
   type: SendingServerType;
   summary: string;
+  maxPerSecond: number | null;
+  maxPerHour: number | null;
+  maxPerDay: number | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type SendingLimits = {
+  maxPerSecond: number | null;
+  maxPerHour: number | null;
+  maxPerDay: number | null;
 };
 
 export type SendingServerInput = {
@@ -29,6 +41,7 @@ export type SendingServerInput = {
   type: SendingServerType;
   summary: string;
   config: Record<string, unknown>;
+  limits?: SendingLimits;
 };
 
 export async function listSendingServers(workspaceId: string): Promise<SendingServerView[]> {
@@ -59,6 +72,7 @@ export async function createSendingServer(workspaceId: string, input: SendingSer
       type: input.type,
       summary: input.summary,
       configEncrypted: encryptSecret(JSON.stringify(input.config)),
+      ...input.limits,
     })
     .returning(viewColumns);
   return row!;
@@ -75,6 +89,7 @@ export async function updateSendingServer(
       name: input.name,
       summary: input.summary,
       configEncrypted: encryptSecret(JSON.stringify(input.config)),
+      ...input.limits,
     })
     .where(and(eq(sendingServers.id, serverId), eq(sendingServers.workspaceId, workspaceId)))
     .returning(viewColumns);

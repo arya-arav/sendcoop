@@ -34,7 +34,22 @@ export type ServerForm = {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  /** Blank means no limit. */
+  maxPerSecond: string;
+  maxPerHour: string;
+  maxPerDay: string;
 };
+
+/** "" -> no limit; otherwise a whole number from 1 to 1,000,000. */
+function parseLimit(value: string, label: string): number | null | { error: string } {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const n = Number(text);
+  if (!Number.isInteger(n) || n < 1 || n > 1_000_000) {
+    return { error: `${label} must be a whole number above 0, or blank for no limit.` };
+  }
+  return n;
+}
 
 export type ServerResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -93,7 +108,25 @@ export async function saveServerAction(
     if (problem) return { ok: false, error: problem };
   }
 
-  const input = { name, summary: serverSummary(config), config };
+  const limits = {
+    maxPerSecond: parseLimit(form.maxPerSecond, "Emails per second"),
+    maxPerHour: parseLimit(form.maxPerHour, "Emails per hour"),
+    maxPerDay: parseLimit(form.maxPerDay, "Emails per day"),
+  };
+  for (const value of Object.values(limits)) {
+    if (value !== null && typeof value === "object") return { ok: false, error: value.error };
+  }
+
+  const input = {
+    name,
+    summary: serverSummary(config),
+    config,
+    limits: limits as {
+      maxPerSecond: number | null;
+      maxPerHour: number | null;
+      maxPerDay: number | null;
+    },
+  };
   const row = serverId
     ? await updateSendingServer(workspace.id, serverId, input)
     : await createSendingServer(workspace.id, { ...input, type: config.type });

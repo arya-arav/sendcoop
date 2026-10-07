@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -59,6 +60,10 @@ export const sendingServers = pgTable(
     type: serverType().notNull(),
     summary: text().notNull(),
     configEncrypted: text().notNull(),
+    // Sending limits per UTC second, hour and day; null means no limit.
+    maxPerSecond: integer(),
+    maxPerHour: integer(),
+    maxPerDay: integer(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

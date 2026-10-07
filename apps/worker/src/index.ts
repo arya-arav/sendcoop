@@ -18,7 +18,7 @@ import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
 import { processImport } from "./jobs/import-subscribers";
-import { prepareCampaign, sendBatch } from "./jobs/send-campaign";
+import { prepareCampaign, processSendBatch } from "./jobs/send-campaign";
 
 const service: ServiceName = "worker";
 
@@ -46,8 +46,8 @@ const workers = [
       concurrency: 2,
     },
   ),
-  // Several batches in parallel; per-server limits arrive with throttling (D20).
-  new Worker<SendBatchJob>(QUEUES.sends, (job) => sendBatch(job.data), {
+  // Several batches in parallel; per-server limits are enforced in Redis.
+  new Worker<SendBatchJob>(QUEUES.sends, processSendBatch, {
     connection: queueConnection(),
     concurrency: Number(process.env.SEND_CONCURRENCY ?? 5),
   }),

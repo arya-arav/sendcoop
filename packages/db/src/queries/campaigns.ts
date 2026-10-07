@@ -171,10 +171,15 @@ export async function loadMessageBatch(
     .orderBy(asc(messages.id));
 }
 
-export async function markMessageSent(messageId: string, providerMessageId: string | undefined) {
+/** sentAt is when the message was handed to the server (what rate limits count). */
+export async function markMessageSent(
+  messageId: string,
+  providerMessageId: string | undefined,
+  sentAt = new Date(),
+) {
   await getDb()
     .update(messages)
-    .set({ status: "sent", providerMessageId, sentAt: new Date() })
+    .set({ status: "sent", providerMessageId, sentAt })
     .where(and(eq(messages.id, messageId), eq(messages.status, "queued")));
 }
 

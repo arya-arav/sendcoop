@@ -33,6 +33,9 @@ export default async function NewServerPage({ params }: { params: Promise<{ slug
           region: "us-east-1",
           accessKeyId: "",
           secretAccessKey: "",
+          maxPerSecond: "14",
+          maxPerHour: "",
+          maxPerDay: "",
         }}
       />
     </div>

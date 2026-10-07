@@ -3,6 +3,7 @@ import {
   failCampaign,
   getCampaign,
   getDkimSigningKey,
+  getSendingServer,
   getSendingServerConfig,
   listSendingDomains,
   loadMessageBatch,
@@ -20,6 +21,8 @@ import {
   serverConfigSchema,
 } from "@sendcoop/mailer";
 import { type CampaignJob, enqueueSendBatches, type SendBatchJob } from "@sendcoop/queue";
+import { DelayedError, type Job } from "bullmq";
+import { acquireSendSlot, type Limits } from "../send-limiter";
 
 export const BATCH_SIZE = 100;
 
@@ -46,8 +49,22 @@ export async function prepareCampaign(
   if (batches.length === 0) await refreshCampaignProgress(campaignId);
 }
 
+/** Waits this long for a per-second slot; longer waits postpone the batch. */
+const MAX_INLINE_WAIT_MS = 2000;
+
+export type BatchResult = {
+  sent: number;
+  failed: number;
+  /** Set when an hourly or daily limit is reached: run the batch again then. */
+  resumeAt?: number;
+};
+
 /** Sends one batch. Only still-queued messages are sent, so retries never double-send. */
-export async function sendBatch({ campaignId, workspaceId, messageIds }: SendBatchJob) {
+export async function sendBatch({
+  campaignId,
+  workspaceId,
+  messageIds,
+}: SendBatchJob): Promise<BatchResult> {
   const campaign = await getCampaign(workspaceId, campaignId);
   // Paused or canceled campaigns leave their remaining messages queued.
   if (!campaign || campaign.status !== "sending") return { sent: 0, failed: 0 };
@@ -62,6 +79,15 @@ export async function sendBatch({ campaignId, workspaceId, messageIds }: SendBat
   let failed = 0;
   try {
     for (const message of batch) {
+      // Respect the server's limits: short waits inline, long ones postpone.
+      let resumeAt = await acquireSendSlot(context.serverId, context.limits);
+      while (resumeAt !== null && resumeAt - Date.now() <= MAX_INLINE_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, Math.max(resumeAt! - Date.now(), 1)));
+        resumeAt = await acquireSendSlot(context.serverId, context.limits);
+      }
+      if (resumeAt !== null) return { sent, failed, resumeAt };
+      const handedOverAt = new Date();
+
       const raw = await buildRawMessage(
         {
           from: { email: context.from, name: campaign.fromName },
@@ -77,7 +103,7 @@ export async function sendBatch({ campaignId, workspaceId, messageIds }: SendBat
       );
       try {
         const result = await driver.send(raw, { from: context.from, to: [message.email] });
-        await markMessageSent(message.id, result.messageId);
+        await markMessageSent(message.id, result.messageId, handedOverAt);
         sent++;
       } catch (error) {
         // The server is down or asks us to slow down: stop, and let the job
@@ -95,7 +121,14 @@ export async function sendBatch({ campaignId, workspaceId, messageIds }: SendBat
 }
 
 type Context =
-  { config: ServerConfig; from: string; dkim: DkimKey | undefined } | { error: string };
+  | {
+      serverId: string;
+      config: ServerConfig;
+      limits: Limits;
+      from: string;
+      dkim: DkimKey | undefined;
+    }
+  | { error: string };
 
 /** The server, From address and DKIM key a campaign sends with. */
 async function sendContext(
@@ -104,18 +137,23 @@ async function sendContext(
 ): Promise<Context> {
   if (!campaign.sendingServerId) return { error: "The campaign has no sending server." };
   if (!campaign.sendingDomainId) return { error: "The campaign has no sending domain." };
-  const [stored, domains] = await Promise.all([
+  const [server, stored, domains] = await Promise.all([
+    getSendingServer(workspaceId, campaign.sendingServerId),
     getSendingServerConfig(workspaceId, campaign.sendingServerId),
     listSendingDomains(workspaceId),
   ]);
   const config = stored ? serverConfigSchema.safeParse(stored.config) : null;
-  if (!config?.success) return { error: "The sending server was deleted or is incomplete." };
+  if (!server || !config?.success) {
+    return { error: "The sending server was deleted or is incomplete." };
+  }
   const domain = domains.find((d) => d.id === campaign.sendingDomainId);
   if (!domain) return { error: "The sending domain was deleted." };
 
   const key = await getDkimSigningKey(workspaceId, domain.domain);
   return {
+    serverId: server.id,
     config: config.data as ServerConfig,
+    limits: server,
     from: `${campaign.fromLocal}@${domain.domain}`,
     dkim: key
       ? { domainName: domain.domain, keySelector: key.selector, privateKey: key.privateKeyPem }
@@ -146,4 +184,17 @@ function isTemporary(error: unknown) {
 
 function describe(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The BullMQ processor for send batches. When an hourly or daily limit is
+ * full, the job is postponed until the window resets; that isn't a failed attempt.
+ */
+export async function processSendBatch(job: Job<SendBatchJob>, token?: string) {
+  const result = await sendBatch(job.data);
+  if (result.resumeAt) {
+    await job.moveToDelayed(result.resumeAt, token);
+    throw new DelayedError();
+  }
+  return result;
 }

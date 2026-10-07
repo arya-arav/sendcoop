@@ -35,6 +35,13 @@ test("a sending server delivers a DKIM-signed test email", async ({ page }) => {
   await page.getByLabel("Type").selectOption("smtp");
   await page.getByLabel("Host").fill(SMTP_HOST);
   await page.getByLabel("Port", { exact: true }).fill(SMTP_PORT);
+  // Limits must be whole numbers (blank means none)
+  await page.getByLabel("Emails per hour").fill("lots");
+  await page.getByRole("button", { name: "Add server" }).click();
+  await expect(
+    page.getByText("Emails per hour must be a whole number above 0, or blank for no limit."),
+  ).toBeVisible();
+  await page.getByLabel("Emails per hour").fill("5000");
   await page.getByRole("button", { name: "Add server" }).click();
   await expect(page).toHaveURL(/\/settings\/servers\/[0-9a-f-]+$/);
   await expect(page.getByRole("heading", { name: "Local SMTP" })).toBeVisible();
@@ -66,7 +73,7 @@ test("a sending server delivers a DKIM-signed test email", async ({ page }) => {
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
   await page.getByRole("link", { name: "Sending servers" }).click();
-  await expect(page.getByRole("row").filter({ hasText: "Mailpit" })).toContainText(
-    `${SMTP_HOST}:${SMTP_PORT}`,
-  );
+  const row = page.getByRole("row").filter({ hasText: "Mailpit" });
+  await expect(row).toContainText(`${SMTP_HOST}:${SMTP_PORT}`);
+  await expect(row).toContainText("14/s · 5000/h");
 });
