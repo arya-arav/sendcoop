@@ -12,13 +12,16 @@ import {
   prepareCampaignMessages,
   queuedMessageBatches,
   refreshCampaignProgress,
+  unsubscribeUrls,
 } from "@sendcoop/db";
 import {
   buildRawMessage,
   createDriver,
   type DkimKey,
+  listUnsubscribeHeaders,
   type ServerConfig,
   serverConfigSchema,
+  withUnsubscribeLink,
 } from "@sendcoop/mailer";
 import { type CampaignJob, enqueueSendBatches, type SendBatchJob } from "@sendcoop/queue";
 import { DelayedError, type Job } from "bullmq";
@@ -88,16 +91,19 @@ export async function sendBatch({
       if (resumeAt !== null) return { sent, failed, resumeAt };
       const handedOverAt = new Date();
 
+      const unsubscribe = unsubscribeUrls(message.id);
       const raw = await buildRawMessage(
         {
           from: { email: context.from, name: campaign.fromName },
           to: message.email,
           replyTo: campaign.replyTo ?? undefined,
           subject: campaign.subject,
-          html: campaign.html,
-          text: campaign.text,
-          // Ties bounces and complaints back to this message (D22).
-          headers: { "X-Sendcoop-Message": message.id },
+          ...withUnsubscribeLink({ html: campaign.html, text: campaign.text }, unsubscribe.page),
+          headers: {
+            ...listUnsubscribeHeaders(unsubscribe.oneClick),
+            // Ties bounces and complaints back to this message (D22).
+            "X-Sendcoop-Message": message.id,
+          },
         },
         context.dkim,
       );

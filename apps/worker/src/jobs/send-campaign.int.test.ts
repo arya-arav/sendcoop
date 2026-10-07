@@ -8,6 +8,7 @@ import {
   getSql,
   queueCampaign,
   queuedMessageBatches,
+  readUnsubscribeToken,
   type SendingLimits,
 } from "@sendcoop/db";
 import {
@@ -18,6 +19,7 @@ import {
   queueConnection,
   type SendBatchJob,
 } from "@sendcoop/queue";
+import { getRedis } from "@sendcoop/redis";
 import { Queue, Worker } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prepareCampaign, processSendBatch, sendBatch } from "./send-campaign";
@@ -161,6 +163,37 @@ describe("sending a campaign", () => {
     10 * 60_000,
   );
 
+  it("gives every email its own one-click unsubscribe link", async () => {
+    const { campaign, subject } = await setup(3);
+    await runUntil(campaign.id, (c) => c?.status === "sent");
+    const query = encodeURIComponent(`subject:"${subject}"`);
+    const found = (await fetch(`${MAILPIT}/api/v1/search?query=${query}`).then((r) =>
+      r.json(),
+    )) as { messages: { ID: string }[] };
+    expect(found.messages).toHaveLength(3);
+
+    const tokens = new Set<string>();
+    for (const { ID } of found.messages) {
+      const headers = (await fetch(`${MAILPIT}/api/v1/message/${ID}/headers`).then((r) =>
+        r.json(),
+      )) as Record<string, string[]>;
+      expect(headers["List-Unsubscribe-Post"]).toEqual(["List-Unsubscribe=One-Click"]);
+      const token = headers["List-Unsubscribe"]?.[0]?.match(
+        /^<http[^>]+\/api\/unsubscribe\/([^>]+)>$/,
+      )?.[1];
+      // The token names this very message.
+      expect(readUnsubscribeToken(token!)).toBe(headers["X-Sendcoop-Message"]?.[0]);
+      const body = (await fetch(`${MAILPIT}/api/v1/message/${ID}`).then((r) => r.json())) as {
+        Text: string;
+        HTML: string;
+      };
+      expect(body.Text).toContain(`/u/${token}`);
+      expect(body.HTML).toContain(`/u/${token}" style="color:#6b7280">Unsubscribe</a>`);
+      tokens.add(token!);
+    }
+    expect(tokens.size).toBe(3);
+  });
+
   it("never sends more than the per-second limit, with five batches in parallel", async () => {
     const { campaign } = await setup(150, { maxPerSecond: 25, maxPerHour: null, maxPerDay: null });
     const started = performance.now();
@@ -189,11 +222,14 @@ describe("sending a campaign", () => {
 
     const sends = new Queue(QUEUES.sends, { connection: queueConnection() });
     const delayed = (await sends.getDelayed()).filter((j) => j.data.campaignId === campaign.id);
-    await sends.close();
     expect(delayed.length).toBeGreaterThan(0);
+    // When each job will run: BullMQ scores delayed jobs as run-at time × 4096.
+    const redis = getRedis();
     const nextHour = Math.ceil(Date.now() / 3_600_000) * 3_600_000;
     for (const job of delayed) {
-      expect(job.timestamp + (job.delay ?? 0)).toBeGreaterThanOrEqual(nextHour - 1000);
+      const score = Number(await redis.zscore(sends.toKey("delayed"), job.id!));
+      expect(Math.floor(score / 0x1000)).toBeGreaterThanOrEqual(nextHour);
     }
+    await sends.close();
   }, 60_000);
 });

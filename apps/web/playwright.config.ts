@@ -1,4 +1,9 @@
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+
+// Some tests set up data directly (e.g. a campaign before the builder exists).
+const rootEnv = new URL("../../.env", import.meta.url);
+if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const isCI = Boolean(process.env.CI);
 

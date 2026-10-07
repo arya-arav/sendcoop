@@ -79,6 +79,8 @@ export const messages = pgTable(
     providerMessageId: text(),
     error: text(),
     sentAt: timestamp({ withTimezone: true }),
+    /** When the recipient unsubscribed using this email's link. */
+    unsubscribedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [

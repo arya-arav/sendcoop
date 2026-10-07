@@ -8,6 +8,7 @@ export * from "./imports";
 export * from "./secrets";
 export * from "./segments";
 export * from "./sending-domains";
+export * from "./unsubscribe-token";
 export * from "./schema";
 export * from "./queries/bulk";
 export * from "./queries/campaigns";
@@ -22,6 +23,7 @@ export * from "./queries/sending-domains";
 export * from "./queries/sending-servers";
 export * from "./queries/subscribers";
 export * from "./queries/tags";
+export * from "./queries/unsubscribe";
 export * from "./queries/workspaces";
 
 export const SERVICE_NAMES = ["web", "worker", "edge"] as const;
