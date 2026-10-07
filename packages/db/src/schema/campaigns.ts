@@ -1,0 +1,93 @@
+import {
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { workspaces } from "./auth";
+import { createdAt, id, updatedAt } from "./columns";
+import { lists, segments, subscribers } from "./contacts";
+import { sendingDomains, sendingServers } from "./sending";
+
+export const campaignStatus = pgEnum("campaign_status", [
+  "draft",
+  "queued", // waiting for the prepare job
+  "sending",
+  "sent",
+  "paused",
+  "canceled",
+  "failed",
+]);
+
+// A one-off send to a list or segment. The builder UI arrives in D31; the
+// sending engine works from these columns.
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    subject: text().notNull(),
+    fromName: text().notNull(),
+    /** The part before @; the domain comes from sendingDomainId. */
+    fromLocal: text().notNull(),
+    replyTo: text(),
+    html: text().notNull(),
+    text: text().notNull(),
+    sendingDomainId: uuid().references(() => sendingDomains.id, { onDelete: "set null" }),
+    sendingServerId: uuid().references(() => sendingServers.id, { onDelete: "set null" }),
+    // Audience: a list or a segment (one of the two).
+    listId: uuid().references(() => lists.id, { onDelete: "set null" }),
+    segmentId: uuid().references(() => segments.id, { onDelete: "set null" }),
+    status: campaignStatus().notNull().default("draft"),
+    recipientCount: integer().notNull().default(0),
+    sentCount: integer().notNull().default(0),
+    failedCount: integer().notNull().default(0),
+    error: text(),
+    startedAt: timestamp({ withTimezone: true }),
+    finishedAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.workspaceId, t.id)],
+);
+
+export const messageStatus = pgEnum("message_status", ["queued", "sent", "failed", "skipped"]);
+
+// One row per recipient of a campaign: the record of what was sent to whom.
+// Unique per (campaign, subscriber), so preparing twice never double-sends.
+export const messages = pgTable(
+  "messages",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    campaignId: uuid()
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    subscriberId: uuid().references(() => subscribers.id, { onDelete: "set null" }),
+    /** Copied at queue time, so the record survives the subscriber being deleted. */
+    email: text().notNull(),
+    status: messageStatus().notNull().default("queued"),
+    providerMessageId: text(),
+    error: text(),
+    sentAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("messages_campaign_subscriber_unique").on(t.campaignId, t.subscriberId),
+    index().on(t.campaignId, t.status),
+    index().on(t.subscriberId),
+  ],
+);
+
+export type Campaign = typeof campaigns.$inferSelect;
+export type CampaignStatus = (typeof campaignStatus.enumValues)[number];
+export type Message = typeof messages.$inferSelect;

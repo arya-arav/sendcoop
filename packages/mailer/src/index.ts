@@ -96,12 +96,14 @@ export interface MailDriver {
   close(): void;
 }
 
-export function createDriver(config: ServerConfig): MailDriver {
-  return config.type === "smtp" ? smtpDriver(config) : sesDriver(config);
+/** pool keeps SMTP connections open across a batch instead of reconnecting per message. */
+export function createDriver(config: ServerConfig, { pool = false } = {}): MailDriver {
+  return config.type === "smtp" ? smtpDriver(config, pool) : sesDriver(config);
 }
 
-function smtpDriver(config: SmtpConfig): MailDriver {
+function smtpDriver(config: SmtpConfig, pool: boolean): MailDriver {
   const transport = nodemailer.createTransport({
+    ...(pool ? { pool: true as const, maxConnections: 3, maxMessages: 100 } : {}),
     host: config.host,
     port: config.port,
     secure: config.secure,

@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { authenticate } from "mailauth";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildRawMessage, smtpHostProblem } from "./index";
 
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -56,8 +56,14 @@ describe("buildRawMessage", () => {
 });
 
 describe("smtpHostProblem", () => {
-  afterEach(() => {
+  // CI and local .env allow private hosts for Mailpit; these tests need the default.
+  const original = process.env.ALLOW_PRIVATE_SMTP_HOSTS;
+  beforeEach(() => {
     delete process.env.ALLOW_PRIVATE_SMTP_HOSTS;
+  });
+  afterEach(() => {
+    if (original === undefined) delete process.env.ALLOW_PRIVATE_SMTP_HOSTS;
+    else process.env.ALLOW_PRIVATE_SMTP_HOSTS = original;
   });
 
   it.each(["127.0.0.1", "10.0.0.5", "192.168.1.10", "172.20.0.2", "::1", "169.254.169.254"])(

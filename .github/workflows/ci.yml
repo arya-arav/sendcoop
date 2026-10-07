@@ -80,6 +80,8 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
       mailpit:
         image: axllent/mailpit:latest
+        env:
+          MP_MAX_MESSAGES: 50000
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

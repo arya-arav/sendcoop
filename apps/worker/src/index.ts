@@ -6,16 +6,19 @@ import {
   verifyDueDomains,
 } from "@sendcoop/db";
 import {
+  type CampaignJob,
   type ImportJob,
   MAINTENANCE_JOBS,
   QUEUES,
   queueConnection,
   scheduleMaintenanceJobs,
+  type SendBatchJob,
 } from "@sendcoop/queue";
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
 import { processImport } from "./jobs/import-subscribers";
+import { prepareCampaign, sendBatch } from "./jobs/send-campaign";
 
 const service: ServiceName = "worker";
 
@@ -34,6 +37,20 @@ const workers = [
     (job) => processImport(job.data, { allowRestart: job.attemptsStarted > 1 }),
     { connection: queueConnection(), concurrency: 2 },
   ),
+  // A retry (attemptsStarted > 1) resumes a campaign the first attempt claimed.
+  new Worker<CampaignJob>(
+    QUEUES.campaigns,
+    (job) => prepareCampaign(job.data, { resume: job.attemptsStarted > 1 }),
+    {
+      connection: queueConnection(),
+      concurrency: 2,
+    },
+  ),
+  // Several batches in parallel; per-server limits arrive with throttling (D20).
+  new Worker<SendBatchJob>(QUEUES.sends, (job) => sendBatch(job.data), {
+    connection: queueConnection(),
+    concurrency: Number(process.env.SEND_CONCURRENCY ?? 5),
+  }),
   // Recurring housekeeping, registered by scheduleMaintenanceJobs below.
   new Worker(
     QUEUES.maintenance,

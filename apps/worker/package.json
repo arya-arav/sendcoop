@@ -12,7 +12,9 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1147.0",
     "@sendcoop/db": "workspace:*",
+    "@sendcoop/mailer": "workspace:*",
     "@sendcoop/queue": "workspace:*",
     "@sendcoop/redis": "workspace:*",
     "@sendcoop/storage": "workspace:*",
@@ -20,6 +22,7 @@
     "csv-parse": "^7.0.3",
     "drizzle-orm": "^0.45.3",
     "ioredis": "^6.0.0",
+    "nodemailer": "^10.0.16",
     "postgres": "^3.4.9",
     "zod": "^4.6.5"
   },

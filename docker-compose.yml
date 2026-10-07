@@ -41,6 +41,8 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      # Keep enough mail for bulk-send tests (the default is 500).
+      MP_MAX_MESSAGES: 50000
 
 volumes:
   postgres:
