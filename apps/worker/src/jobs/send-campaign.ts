@@ -12,6 +12,7 @@ import {
   prepareCampaignMessages,
   queuedMessageBatches,
   refreshCampaignProgress,
+  skipUnsendableMessages,
   unsubscribeUrls,
 } from "@sendcoop/db";
 import {
@@ -74,8 +75,13 @@ export async function sendBatch({
 
   const context = await sendContext(workspaceId, campaign);
   if ("error" in context) throw new Error(context.error);
+  // Suppressed or unsubscribed since the campaign started: never sent.
+  const skipped = await skipUnsendableMessages(workspaceId, campaignId, messageIds);
   const batch = await loadMessageBatch(workspaceId, campaignId, messageIds);
-  if (batch.length === 0) return { sent: 0, failed: 0 };
+  if (batch.length === 0) {
+    if (skipped > 0) await refreshCampaignProgress(campaignId);
+    return { sent: 0, failed: 0 };
+  }
 
   const driver = createDriver(context.config, { pool: true });
   let sent = 0;

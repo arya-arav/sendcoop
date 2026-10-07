@@ -1,11 +1,14 @@
 import {
   addSendingDomain,
+  addSuppressions,
+  claimCampaign,
   type Campaign,
   createCampaign,
   createList,
   createSendingServer,
   getCampaign,
   getSql,
+  prepareCampaignMessages,
   queueCampaign,
   queuedMessageBatches,
   readUnsubscribeToken,
@@ -232,4 +235,50 @@ describe("sending a campaign", () => {
     }
     await sends.close();
   }, 60_000);
+});
+
+describe("suppression", () => {
+  it("leaves suppressed addresses out, and skips any suppressed after the campaign started", async () => {
+    const { campaign } = await setup(5);
+    const emails = (
+      await sql<{ email: string }[]>`
+        select s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
+        where lm.list_id = ${campaign.listId} and s.status = 'subscribed' order by s.email`
+    ).map((r) => r.email);
+    const [early, global, workspace, unsubscribed, kept] = emails as [
+      string,
+      string,
+      string,
+      string,
+      string,
+    ];
+
+    // Suppressed before sending: not a recipient at all.
+    await addSuppressions(ws, [early.toUpperCase()], "manual");
+    const claimed = await claimCampaign(ws, campaign.id);
+    expect(await prepareCampaignMessages(claimed!)).toBe(4);
+
+    // Changed while the campaign is under way: skipped at send time.
+    await addSuppressions(null, [global], "manual");
+    await addSuppressions(ws, [workspace], "complaint");
+    await sql`update subscribers set status = 'unsubscribed' where workspace_id = ${ws} and email = ${unsubscribed}`;
+    try {
+      const [ids] = await queuedMessageBatches(campaign.id, 100);
+      expect(
+        await sendBatch({ campaignId: campaign.id, workspaceId: ws, messageIds: ids! }),
+      ).toEqual({ sent: 1, failed: 0 });
+    } finally {
+      await sql`delete from suppressions where workspace_id is null and email = ${global}`;
+    }
+
+    const rows = await sql<{ email: string; status: string; error: string | null }[]>`
+      select email, status, error from messages where campaign_id = ${campaign.id} order by email`;
+    expect(rows).toEqual([
+      { email: global, status: "skipped", error: "Suppressed" },
+      { email: workspace, status: "skipped", error: "Suppressed" },
+      { email: unsubscribed, status: "skipped", error: "No longer subscribed" },
+      { email: kept, status: "sent", error: null },
+    ]);
+    expect(await getCampaign(ws, campaign.id)).toMatchObject({ status: "sent", sentCount: 1 });
+  });
 });

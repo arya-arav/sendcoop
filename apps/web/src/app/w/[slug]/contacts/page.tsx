@@ -9,7 +9,15 @@ import {
   type SubscriberFilters as Filters,
   subscriberStatus,
 } from "@sendcoop/db";
-import { ChevronLeft, ChevronRight, FileUp, SearchX, SlidersHorizontal, Users } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  SearchX,
+  ShieldBan,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -123,6 +131,10 @@ export default async function ContactsPage({
           <Button variant="outline" render={<Link href={`/w/${slug}/contacts/fields`} />}>
             <SlidersHorizontal />
             Custom fields
+          </Button>
+          <Button variant="outline" render={<Link href={`/w/${slug}/contacts/suppressions`} />}>
+            <ShieldBan />
+            Suppression list
           </Button>
           {editable && (
             <Button variant="outline" render={<Link href={`/w/${slug}/contacts/import`} />}>

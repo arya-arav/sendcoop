@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../client";
-import { campaigns, messages, subscribers } from "../schema";
+import { campaigns, messages, subscribers, suppressions } from "../schema";
 
 // Bounces and complaints reported by the sending provider (Amazon SES via
 // SNS). A hard bounce or a complaint takes the address off every list in the
@@ -42,6 +42,7 @@ export async function recordFeedback(serverId: string, feedback: DeliveryFeedbac
         id: messages.id,
         subscriberId: messages.subscriberId,
         workspaceId: messages.workspaceId,
+        email: messages.email,
       })
       .from(messages)
       .innerJoin(campaigns, eq(campaigns.id, messages.campaignId))
@@ -74,6 +75,18 @@ export async function recordFeedback(serverId: string, feedback: DeliveryFeedbac
 
       const suppress =
         feedback.kind === "complaint" ? "complained" : feedback.hard ? "bounced" : null;
+      if (suppress) {
+        // On the suppression list too, so it holds even if the subscriber is
+        // deleted and imported again.
+        await tx
+          .insert(suppressions)
+          .values({
+            workspaceId: message.workspaceId,
+            email: message.email.toLowerCase(),
+            reason: suppress === "complained" ? "complaint" : "bounce",
+          })
+          .onConflictDoNothing();
+      }
       if (suppress && message.subscriberId) {
         await tx
           .update(subscribers)

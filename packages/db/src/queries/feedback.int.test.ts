@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getDb, getSql } from "../client";
 import { campaigns, messages, sendingServers, subscribers, workspaces } from "../schema";
 import { recordFeedback } from "./feedback";
+import { isSuppressed } from "./suppressions";
 import { createSubscriber } from "./subscribers";
 
 const db = getDb();
@@ -92,6 +93,7 @@ describe("recordFeedback", () => {
     });
     expect(n).toBe(1);
     expect(await statusOf("hard")).toBe("bounced");
+    expect(await isSuppressed(ws, "hard@example.com")).toBe(true);
     expect(await message("hard")).toMatchObject({
       bounceType: "hard",
       bounceDetail: "smtp; 550 5.1.1 user unknown",
@@ -106,6 +108,7 @@ describe("recordFeedback", () => {
       messageId: msg.soft,
     });
     expect(await statusOf("soft")).toBe("subscribed");
+    expect(await isSuppressed(ws, "soft@example.com")).toBe(false);
     expect((await message("soft")).bounceType).toBe("soft");
 
     await recordFeedback(server, {
