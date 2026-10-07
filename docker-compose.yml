@@ -1,0 +1,47 @@
+# Local development services. Start with `pnpm services:up`.
+# Ports are offset from the defaults so they don't clash with other projects.
+name: sendcoop-dev
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: sendcoop
+      POSTGRES_PASSWORD: sendcoop
+      POSTGRES_DB: sendcoop
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sendcoop -d sendcoop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    # BullMQ requires noeviction so queued jobs are never dropped under memory pressure.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1026:1025" # SMTP
+      - "8027:8025" # web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+volumes:
+  postgres:
+  redis:

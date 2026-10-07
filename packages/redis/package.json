@@ -1,5 +1,5 @@
 {
-  "name": "@sendcoop/db",
+  "name": "@sendcoop/redis",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "postgres": "^3.4.9"
+    "ioredis": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.19.1"

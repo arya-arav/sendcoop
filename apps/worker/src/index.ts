@@ -1,12 +1,16 @@
-import type { ServiceName } from "@sendcoop/db";
+import { pingDatabase, type ServiceName } from "@sendcoop/db";
+import { pingRedis } from "@sendcoop/redis";
 
 const service: ServiceName = "worker";
 
 // Background jobs: sending, imports, automations, webhooks.
-// Queues (BullMQ on Redis) are wired up from D19; for now the process just
-// starts and stays alive so `pnpm dev` runs every service.
+// Queues (BullMQ on Redis) are wired up from D19; for now the process checks
+// its connections and stays alive so `pnpm dev` runs every service.
 
-console.log(`[${service}] started, waiting for queues (none registered yet)`);
+const [postgres, redis] = await Promise.all([pingDatabase(), pingRedis()]);
+console.log(
+  `[${service}] started (postgres: ${postgres ? "ok" : "DOWN"}, redis: ${redis ? "ok" : "DOWN"})`,
+);
 
 const keepAlive = setInterval(() => {}, 60_000);
 
