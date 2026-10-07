@@ -8,7 +8,7 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const nextConfig: NextConfig = {
   // Workspace packages ship TypeScript source.
-  transpilePackages: ["@sendcoop/db", "@sendcoop/redis"],
+  transpilePackages: ["@sendcoop/db", "@sendcoop/redis", "@sendcoop/storage"],
 };
 
 export default nextConfig;

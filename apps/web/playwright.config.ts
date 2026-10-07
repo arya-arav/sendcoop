@@ -10,6 +10,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
+  // Locally the tests hit `pnpm dev`, which compiles pages on demand; more
+  // parallel browsers than this make it time out. CI runs a production build.
+  workers: isCI ? undefined : 4,
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://localhost:3000",

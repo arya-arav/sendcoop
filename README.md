@@ -86,4 +86,10 @@ CI (`.github/workflows/ci.yml`) runs format, lint, typecheck, unit tests and bui
 
 shadcn/ui (Base UI primitives) in `apps/web/src/components/ui`; add components with `pnpm dlx shadcn@latest add <name>` from `apps/web`. The workspace shell (sidebar, switcher, account menu with light/dark/system theme) is in `src/components/shell`.
 
+## Imports and file storage
+
+CSV uploads go to `POST /api/w/<slug>/imports` as a raw request body and stream to `@sendcoop/storage` (100 MB limit), so large files are never held in memory. The format (encoding, separator, header row) and a 10-row sample are detected at upload; the mapping page previews rows with the same rules (`@sendcoop/db/imports`) the import worker uses.
+
+Storage is a local folder in development (`STORAGE_DIR`, default: the OS temp dir). An S3-compatible driver replaces it before production.
+
 Health checks: `GET :3000/api/health`, `GET :3001/health`. Each reports Postgres and Redis, and returns 503 if either is down.

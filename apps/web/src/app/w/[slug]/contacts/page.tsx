@@ -7,7 +7,7 @@ import {
   subscriberStatus,
   type SubscriberStatus,
 } from "@sendcoop/db";
-import { ChevronLeft, ChevronRight, SearchX, SlidersHorizontal, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileUp, SearchX, SlidersHorizontal, Users } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +123,12 @@ export default async function ContactsPage({
             <SlidersHorizontal />
             Custom fields
           </Button>
+          {editable && (
+            <Button variant="outline" render={<Link href={`/w/${slug}/contacts/import`} />}>
+              <FileUp />
+              Import
+            </Button>
+          )}
           {editable && total > 0 && (
             <AddSubscriberButton slug={slug} lists={listOptions} fields={fieldViews} />
           )}
@@ -136,7 +142,7 @@ export default async function ContactsPage({
             <p className="font-medium">No subscribers yet</p>
             <p className="text-sm text-muted-foreground">
               {editable
-                ? "Add people one at a time now. CSV import and signup forms are coming."
+                ? "Import a CSV or add people one at a time. Signup forms are coming."
                 : "An owner or admin can add the first subscribers."}
             </p>
           </div>
