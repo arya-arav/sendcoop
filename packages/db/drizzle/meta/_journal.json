@@ -85,6 +85,13 @@
       "when": 1791410017532,
       "tag": "0011_sending_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791410791726,
+      "tag": "0012_sending_servers",
+      "breakpoints": true
     }
   ]
 }

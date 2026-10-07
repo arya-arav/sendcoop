@@ -14,7 +14,10 @@
     "CI",
     "STORAGE_DIR",
     "ENCRYPTION_KEY",
-    "SPF_INCLUDE"
+    "SPF_INCLUDE",
+    "ALLOW_PRIVATE_SMTP_HOSTS",
+    "SES_ENDPOINT",
+    "DNS_SERVERS"
   ],
   "tasks": {
     "dev": {

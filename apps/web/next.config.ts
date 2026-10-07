@@ -8,9 +8,15 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const nextConfig: NextConfig = {
   // Workspace packages ship TypeScript source.
-  transpilePackages: ["@sendcoop/db", "@sendcoop/queue", "@sendcoop/redis", "@sendcoop/storage"],
+  transpilePackages: [
+    "@sendcoop/db",
+    "@sendcoop/mailer",
+    "@sendcoop/queue",
+    "@sendcoop/redis",
+    "@sendcoop/storage",
+  ],
   // BullMQ loads its Lua scripts from files at runtime, so it can't be bundled.
-  serverExternalPackages: ["bullmq"],
+  serverExternalPackages: ["bullmq", "@aws-sdk/client-sesv2"],
 };
 
 export default nextConfig;

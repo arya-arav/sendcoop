@@ -43,3 +43,27 @@ export const sendingDomains = pgTable(
 
 export type SendingDomain = typeof sendingDomains.$inferSelect;
 export type DomainStatus = (typeof domainStatus.enumValues)[number];
+
+export const serverType = pgEnum("sending_server_type", ["smtp", "ses"]);
+
+// How a workspace delivers mail. Credentials live in configEncrypted (the whole
+// driver config, encrypted); summary is the non-secret part shown in lists.
+export const sendingServers = pgTable(
+  "sending_servers",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    type: serverType().notNull(),
+    summary: text().notNull(),
+    configEncrypted: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+export type SendingServer = typeof sendingServers.$inferSelect;
+export type SendingServerType = (typeof serverType.enumValues)[number];

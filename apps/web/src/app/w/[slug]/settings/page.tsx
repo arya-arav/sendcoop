@@ -1,4 +1,4 @@
-import { Globe, KeyRound, ReceiptText, Users } from "lucide-react";
+import { Globe, KeyRound, ReceiptText, Send, Users } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,12 @@ const sections = [
     description: "Authenticate the domains you send from with SPF, DKIM and DMARC.",
     icon: Globe,
     path: "/settings/domains",
+  },
+  {
+    title: "Sending servers",
+    description: "Amazon SES or SMTP: the service that delivers your email.",
+    icon: Send,
+    path: "/settings/servers",
   },
   { title: "Team", description: "Invite people and set their roles.", icon: Users, path: null },
   {
