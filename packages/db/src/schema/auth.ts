@@ -1,19 +1,7 @@
-import { sql } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { createdAt, id, updatedAt } from "./columns";
 
 // Field names follow Better Auth (wired up in D4); its "organization" is our "workspace".
-// IDs are UUIDv7 from Postgres 18: time-ordered, so indexes stay compact on big tables.
-
-const id = () =>
-  uuid()
-    .primaryKey()
-    .default(sql`uuidv7()`);
-const createdAt = () => timestamp({ withTimezone: true }).notNull().defaultNow();
-const updatedAt = () =>
-  timestamp({ withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date());
 
 export const users = pgTable("users", {
   id: id(),

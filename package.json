@@ -19,7 +19,8 @@
     "db:migrate": "pnpm --filter @sendcoop/db db:migrate",
     "db:studio": "pnpm --filter @sendcoop/db db:studio",
     "test": "turbo run test",
-    "test:e2e": "pnpm --filter @sendcoop/web test:e2e"
+    "test:e2e": "pnpm --filter @sendcoop/web test:e2e",
+    "test:integration": "pnpm --filter @sendcoop/db test:integration"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

@@ -46,7 +46,7 @@ jobs:
       - run: pnpm build
 
   e2e:
-    name: Browser tests
+    name: Integration and browser tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -80,6 +80,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @sendcoop/web exec playwright install --with-deps chromium
       - run: pnpm db:migrate
+      - run: pnpm test:integration
       - run: pnpm --filter @sendcoop/web build
       - run: pnpm test:e2e
         env:
