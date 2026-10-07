@@ -1,5 +1,17 @@
-import { getSql, pingDatabase, type ServiceName } from "@sendcoop/db";
-import { type ImportJob, QUEUES, queueConnection } from "@sendcoop/queue";
+import {
+  getSql,
+  pingDatabase,
+  type ServiceName,
+  systemTxtLookup,
+  verifyDueDomains,
+} from "@sendcoop/db";
+import {
+  type ImportJob,
+  MAINTENANCE_JOBS,
+  QUEUES,
+  queueConnection,
+  scheduleMaintenanceJobs,
+} from "@sendcoop/queue";
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
@@ -22,7 +34,23 @@ const workers = [
     (job) => processImport(job.data, { allowRestart: job.attemptsStarted > 1 }),
     { connection: queueConnection(), concurrency: 2 },
   ),
+  // Recurring housekeeping, registered by scheduleMaintenanceJobs below.
+  new Worker(
+    QUEUES.maintenance,
+    async (job) => {
+      if (job.name === MAINTENANCE_JOBS.verifyDomains.name) {
+        const result = await verifyDueDomains(systemTxtLookup());
+        if (result.checked > 0) {
+          console.log(
+            `[${service}] domains: checked ${result.checked}, newly verified ${result.verified}`,
+          );
+        }
+      }
+    },
+    { connection: queueConnection(), concurrency: 1 },
+  ),
 ];
+await scheduleMaintenanceJobs();
 
 for (const worker of workers) {
   worker.on("failed", (job, error) =>

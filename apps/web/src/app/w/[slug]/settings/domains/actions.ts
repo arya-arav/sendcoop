@@ -1,6 +1,13 @@
 "use server";
 
-import { addSendingDomain, deleteSendingDomain, normalizeSendingDomain } from "@sendcoop/db";
+import {
+  addSendingDomain,
+  deleteSendingDomain,
+  getCheckableDomain,
+  normalizeSendingDomain,
+  systemTxtLookup,
+  verifySendingDomain,
+} from "@sendcoop/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
@@ -29,4 +36,18 @@ export async function deleteDomainAction(slug: string, domainId: string) {
   const deleted = await deleteSendingDomain(workspace.id, domainId);
   revalidatePath(`/w/${slug}/settings/domains`);
   return { ok: deleted } as const;
+}
+
+export type CheckResult = { ok: true; status: string; problems: string[] } | { ok: false };
+
+/** "Check now": looks up the domain's records immediately. */
+export async function checkDomainAction(slug: string, domainId: string): Promise<CheckResult> {
+  const { workspace } = await requireMemberWorkspace(slug);
+  if (!z.uuid().safeParse(domainId).success) return { ok: false };
+  const domain = await getCheckableDomain(workspace.id, domainId);
+  if (!domain) return { ok: false };
+  const result = await verifySendingDomain(domain, systemTxtLookup());
+  revalidatePath(`/w/${slug}/settings/domains/${domainId}`);
+  revalidatePath(`/w/${slug}/settings/domains`);
+  return { ok: true, status: result.status, problems: result.problems };
 }

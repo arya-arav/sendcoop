@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { DomainStatusBadge } from "../status-badge";
+import { CheckNow } from "./check-now";
 import { DeleteDomainButton } from "./delete-domain";
 
 const RECORD_COPY: Record<DnsRecordPurpose, { title: string; why: string; note?: string }> = {
@@ -63,6 +64,12 @@ export default async function DomainPage({
         </div>
         <DomainStatusBadge status={domain.status} />
       </div>
+
+      <CheckNow
+        slug={slug}
+        domainId={domain.id}
+        lastCheckedAt={domain.lastCheckedAt?.toISOString() ?? null}
+      />
 
       {dnsRecords(domain).map((record) => {
         const copy = RECORD_COPY[record.purpose];

@@ -23,22 +23,29 @@ test("a sending domain gets SPF, DKIM and DMARC records to copy", async ({ page,
   await expect(page.getByText("Enter a domain like acme.com or mail.acme.com.")).toBeVisible();
 
   // A pasted address is turned into its domain
-  await input.fill("News@Mail.Acme-Test.com");
+  await input.fill("News@Mail.Acme.Test");
   await add.click();
   await expect(page).toHaveURL(/\/settings\/domains\/[0-9a-f-]+$/);
-  await expect(page.getByRole("heading", { name: "mail.acme-test.com" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "mail.acme.test" })).toBeVisible();
   await expect(page.getByText("Waiting for DNS")).toBeVisible();
 
-  await expect(page.getByLabel("SPF record name")).toHaveValue("mail.acme-test.com");
+  await expect(page.getByLabel("SPF record name")).toHaveValue("mail.acme.test");
   await expect(page.getByLabel("SPF record value")).toHaveValue(
     "v=spf1 include:amazonses.com ~all",
   );
   await expect(page.getByLabel("DKIM record name")).toHaveValue(
-    /^sc\d{6}\._domainkey\.mail\.acme-test\.com$/,
+    /^sc\d{6}\._domainkey\.mail\.acme.test$/,
   );
   await expect(page.getByLabel("DKIM record value")).toHaveValue(/^v=DKIM1; k=rsa; p=MIIB/);
-  await expect(page.getByLabel("DMARC record name")).toHaveValue("_dmarc.mail.acme-test.com");
+  await expect(page.getByLabel("DMARC record name")).toHaveValue("_dmarc.mail.acme.test");
   await expect(page.getByLabel("DMARC record value")).toHaveValue(/^v=DMARC1; p=none;/);
+
+  // Checking now reports exactly what is missing (.test domains never resolve)
+  await page.getByRole("button", { name: "Check now" }).click();
+  const report = page.getByRole("status").filter({ hasText: "No SPF record found." });
+  await expect(report).toContainText("No DKIM record found.");
+  await expect(report).toContainText("No DMARC record found.");
+  await expect(page.getByText(/Last checked at/)).toBeVisible();
 
   // Copy buttons put the value on the clipboard
   await page.getByRole("button", { name: "Copy" }).nth(3).click();
@@ -46,17 +53,17 @@ test("a sending domain gets SPF, DKIM and DMARC records to copy", async ({ page,
 
   // The same domain can't be added twice
   await page.getByRole("link", { name: "Sending domains" }).click();
-  await expect(page.getByRole("row").filter({ hasText: "mail.acme-test.com" })).toContainText(
+  await expect(page.getByRole("row").filter({ hasText: "mail.acme.test" })).toContainText(
     "Waiting for DNS",
   );
-  await input.fill("mail.acme-test.com");
+  await input.fill("mail.acme.test");
   await add.click();
-  await expect(page.getByText("mail.acme-test.com is already added.")).toBeVisible();
+  await expect(page.getByText("mail.acme.test is already added.")).toBeVisible();
 
   // Deleting returns to the list
-  await page.getByRole("link", { name: "mail.acme-test.com" }).click();
+  await page.getByRole("link", { name: "mail.acme.test" }).click();
   await page.getByRole("button", { name: "Delete domain" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Delete domain" }).click();
   await expect(page).toHaveURL(/\/settings\/domains$/);
-  await expect(page.getByRole("row").filter({ hasText: "mail.acme-test.com" })).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: "mail.acme.test" })).toHaveCount(0);
 });

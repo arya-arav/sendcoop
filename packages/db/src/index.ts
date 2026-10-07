@@ -3,6 +3,7 @@
 
 export { getDb, getSql, pingDatabase, type Db } from "./client";
 export * from "./custom-fields";
+export * from "./domain-verification";
 export * from "./imports";
 export * from "./secrets";
 export * from "./segments";
@@ -10,6 +11,7 @@ export * from "./sending-domains";
 export * from "./schema";
 export * from "./queries/bulk";
 export * from "./queries/custom-fields";
+export * from "./queries/domain-verification";
 export * from "./queries/forms";
 export * from "./queries/import-batch";
 export * from "./queries/imports";
