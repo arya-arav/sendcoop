@@ -14,7 +14,9 @@
     "lint": "eslint .",
     "typecheck": "tsc",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:subscribers": "tsx --env-file-if-exists=../../.env src/scripts/seed-subscribers.ts",
+    "bench:subscribers": "tsx --env-file-if-exists=../../.env src/scripts/bench-subscribers.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

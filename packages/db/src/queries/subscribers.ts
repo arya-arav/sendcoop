@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, gt, inArray, lt, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import type { FieldValue } from "../custom-fields";
 import {
@@ -77,22 +77,107 @@ export async function createSubscriber(
 
 export type SubscriberRow = Subscriber & { lists: { id: string; name: string }[] };
 
+// Must match the expression in migration 0005_subscriber_search exactly,
+// or Postgres can't use the trigram index.
+const searchText = sql`lower(${subscribers.email} || ' ' || coalesce(${subscribers.firstName}, '') || ' ' || coalesce(${subscribers.lastName}, ''))`;
+
+export type SubscriberFilters = {
+  /** Matches anywhere in email, first or last name, ignoring case. */
+  query?: string;
+  status?: SubscriberStatus;
+  listId?: string;
+};
+
+export type SubscriberPage = {
+  rows: SubscriberRow[];
+  /** Pass as `after` for the next (older) page. */
+  nextCursor: string | null;
+  /** Pass as `before` for the previous (newer) page. */
+  prevCursor: string | null;
+  /** Subscribers matching the filters, across all pages. */
+  total: number;
+};
+
+/**
+ * Newest-first subscribers with search, filters and keyset paging. Cursors are
+ * subscriber ids (uuidv7, so time-ordered): every page costs the same, unlike
+ * OFFSET, which slows down the deeper you go.
+ */
+export async function searchSubscribers(
+  workspaceId: string,
+  {
+    filters = {},
+    after,
+    before,
+    limit = 50,
+  }: { filters?: SubscriberFilters; after?: string; before?: string; limit?: number } = {},
+): Promise<SubscriberPage> {
+  const db = getDb();
+  const where = and(
+    eq(subscribers.workspaceId, workspaceId),
+    filters.status ? eq(subscribers.status, filters.status) : undefined,
+    filters.query?.trim()
+      ? sql`${searchText} like ${"%" + escapeLike(filters.query.trim().toLowerCase()) + "%"}`
+      : undefined,
+    filters.listId
+      ? exists(
+          db
+            .select({ one: sql`1` })
+            .from(listMemberships)
+            .where(
+              and(
+                eq(listMemberships.subscriberId, subscribers.id),
+                eq(listMemberships.listId, filters.listId),
+              ),
+            ),
+        )
+      : undefined,
+  );
+
+  // Fetch one extra row to know whether another page exists in that direction.
+  const goingBack = Boolean(before) && !after;
+  const fetched = await db
+    .select()
+    .from(subscribers)
+    .where(
+      and(
+        where,
+        after ? lt(subscribers.id, after) : undefined,
+        goingBack ? gt(subscribers.id, before!) : undefined,
+      ),
+    )
+    .orderBy(goingBack ? asc(subscribers.id) : desc(subscribers.id))
+    .limit(limit + 1);
+
+  const hasMore = fetched.length > limit;
+  const page = fetched.slice(0, limit);
+  if (goingBack) page.reverse();
+
+  const [counted] = await db.select({ total: count() }).from(subscribers).where(where);
+  const rows = await withLists(page);
+  const first = rows[0]?.id ?? null;
+  const last = rows.at(-1)?.id ?? null;
+
+  return {
+    rows,
+    nextCursor: (goingBack ? true : hasMore) ? last : null,
+    prevCursor: (goingBack ? hasMore : Boolean(after)) ? first : null,
+    total: counted?.total ?? 0,
+  };
+}
+
 /** Newest subscribers first, each with the lists they belong to. */
 export async function listSubscribers(
   workspaceId: string,
   { limit = 50 }: { limit?: number } = {},
 ): Promise<SubscriberRow[]> {
-  const db = getDb();
-  const page = await db
-    .select()
-    .from(subscribers)
-    .where(eq(subscribers.workspaceId, workspaceId))
-    .orderBy(desc(subscribers.id))
-    .limit(limit);
-  if (page.length === 0) return [];
+  return (await searchSubscribers(workspaceId, { limit })).rows;
+}
 
-  // Lists for this page only, rather than aggregating every membership.
-  const memberships = await db
+/** Attaches list names, fetching memberships for this page only. */
+async function withLists(page: Subscriber[]): Promise<SubscriberRow[]> {
+  if (page.length === 0) return [];
+  const memberships = await getDb()
     .select({ subscriberId: listMemberships.subscriberId, id: lists.id, name: lists.name })
     .from(listMemberships)
     .innerJoin(lists, eq(lists.id, listMemberships.listId))
@@ -109,6 +194,11 @@ export async function listSubscribers(
     ...s,
     lists: (listsBySubscriber.get(s.id) ?? []).map(({ id, name }) => ({ id, name })),
   }));
+}
+
+/** Makes % and _ in user input match literally in LIKE patterns. */
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (c) => "\\" + c);
 }
 
 export async function countSubscribers(workspaceId: string) {

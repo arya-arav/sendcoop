@@ -78,6 +78,8 @@ export const subscribers = pgTable(
     // Newest-first listing; uuidv7 ids are time-ordered.
     index().on(t.workspaceId, t.id),
     index().on(t.workspaceId, t.status),
+    // Plus subscribers_search_trgm (GIN trigram on email + name), hand-written
+    // in migration 0005 because drizzle-kit can't express it.
   ],
 );
 
