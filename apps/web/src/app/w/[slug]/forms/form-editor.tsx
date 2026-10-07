@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { CopyField } from "@/components/copy-field";
 import { FormError } from "@/components/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -219,45 +220,6 @@ export function FormEditor({
           </Card>
         )}
       </aside>
-    </div>
-  );
-}
-
-function CopyField({
-  label,
-  value,
-  multiline,
-}: {
-  label: string;
-  value: string;
-  multiline?: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="grid gap-2">
-      {multiline ? (
-        <Textarea
-          aria-label={label}
-          readOnly
-          rows={8}
-          value={value}
-          className="font-mono text-xs"
-        />
-      ) : (
-        <Input aria-label={label} readOnly value={value} className="font-mono text-xs" />
-      )}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={async () => {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-      >
-        {copied ? <Check /> : <Copy />}
-        {copied ? "Copied" : "Copy"}
-      </Button>
     </div>
   );
 }

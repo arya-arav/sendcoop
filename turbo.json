@@ -12,7 +12,9 @@
     "AUTH_RATE_LIMIT",
     "PW_CHANNEL",
     "CI",
-    "STORAGE_DIR"
+    "STORAGE_DIR",
+    "ENCRYPTION_KEY",
+    "SPF_INCLUDE"
   ],
   "tasks": {
     "dev": {
