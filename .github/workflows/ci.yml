@@ -77,8 +77,24 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The browser download is cached per Playwright version; system packages
+      # come from apt every run. Time-boxed so a stalled download fails fast.
+      - name: Get Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter @sendcoop/web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
         run: pnpm --filter @sendcoop/web exec playwright install --with-deps chromium
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 8
+        run: pnpm --filter @sendcoop/web exec playwright install-deps chromium
       - run: pnpm db:migrate
       - run: pnpm test:integration
       - run: pnpm --filter @sendcoop/web build
