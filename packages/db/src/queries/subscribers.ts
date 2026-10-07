@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, exists, gt, inArray, lt, type SQL, sql } from "drizzle-orm";
 import { getDb } from "../client";
+import type { SegmentRules } from "../segments";
 import type { FieldValue } from "../custom-fields";
 import {
   listMemberships,
@@ -12,6 +13,8 @@ import {
   tags,
 } from "../schema";
 import { isUniqueViolation } from "./errors";
+import { escapeLike } from "./like";
+import { segmentSql } from "./segment-sql";
 
 // Every query is scoped by workspaceId. list_memberships has no workspace
 // column, so writes check that each list belongs to the subscriber's workspace.
@@ -92,6 +95,8 @@ export type SubscriberFilters = {
   status?: SubscriberStatus;
   listId?: string;
   tagId?: string;
+  /** A segment's rules (resolved from its id by the caller). */
+  segment?: SegmentRules;
 };
 
 /**
@@ -120,6 +125,7 @@ export function subscriberConditions(workspaceId: string, filters: SubscriberFil
             ),
         )
       : undefined,
+    filters.segment ? segmentSql(filters.segment) : undefined,
     filters.tagId
       ? exists(
           db
@@ -230,11 +236,6 @@ async function withListsAndTags(page: Subscriber[]): Promise<SubscriberRow[]> {
     lists: (listsOf.get(s.id) ?? []).map(({ id, name }) => ({ id, name })),
     tags: (tagsOf.get(s.id) ?? []).map(({ id, name }) => ({ id, name })),
   }));
-}
-
-/** Makes % and _ in user input match literally in LIKE patterns. */
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, (c) => "\\" + c);
 }
 
 export async function countSubscribers(workspaceId: string) {

@@ -1,4 +1,4 @@
-import { listSegments } from "@sendcoop/db";
+import { listSegments, previewSegment } from "@sendcoop/db";
 import { Filter, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,18 @@ import { requireMemberWorkspace } from "@/lib/workspace";
 import { DeleteSegmentButton } from "./delete-segment";
 
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium" });
+const numberFormat = new Intl.NumberFormat("en");
 
 export default async function SegmentsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
   const segments = await listSegments(workspace.id);
+  // Counts are computed now, so they always reflect current data.
+  const counts = await Promise.all(
+    segments.map((s) =>
+      previewSegment(workspace.id, s.rules, { sampleSize: 0 }).then((r) => r.count),
+    ),
+  );
   const editable = canManage(role);
 
   return (
@@ -62,13 +69,14 @@ export default async function SegmentsPage({ params }: { params: Promise<{ slug:
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4">Name</TableHead>
+                <TableHead className="w-32 text-right">Subscribers</TableHead>
                 <TableHead>Conditions</TableHead>
                 <TableHead className="w-40">Updated</TableHead>
                 {editable && <TableHead className="w-12 pr-4" aria-label="Actions" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {segments.map((segment) => {
+              {segments.map((segment, index) => {
                 const count = segment.rules.conditions.reduce(
                   (n, c) => n + (c.type === "group" ? c.conditions.length : 1),
                   0,
@@ -78,6 +86,14 @@ export default async function SegmentsPage({ params }: { params: Promise<{ slug:
                     <TableCell className="pl-4 font-medium">
                       <Link href={`/w/${slug}/segments/${segment.id}`} className="hover:underline">
                         {segment.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <Link
+                        href={`/w/${slug}/contacts?segment=${segment.id}`}
+                        className="hover:underline"
+                      >
+                        {numberFormat.format(counts[index]!)}
                       </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground">

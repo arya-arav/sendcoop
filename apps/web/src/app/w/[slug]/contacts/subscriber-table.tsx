@@ -49,7 +49,13 @@ export type SubscriberRowView = {
 };
 
 type Option = { id: string; name: string };
-type Filters = { query?: string; status?: SubscriberStatus; listId?: string; tagId?: string };
+type Filters = {
+  query?: string;
+  status?: SubscriberStatus;
+  listId?: string;
+  tagId?: string;
+  segmentId?: string;
+};
 type DialogKind = "addTag" | "removeTag" | "addToList" | "removeFromList" | "moveToList";
 
 const statusStyle: Record<

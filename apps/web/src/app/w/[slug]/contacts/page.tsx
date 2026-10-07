@@ -2,6 +2,8 @@ import {
   countSubscribers,
   listCustomFields,
   listLists,
+  getSegment,
+  listSegments,
   listTags,
   searchSubscribers,
   type SubscriberFilters as Filters,
@@ -28,6 +30,7 @@ const searchParamsSchema = z.object({
   status: z.enum(subscriberStatus.enumValues).optional().catch(undefined),
   list: z.uuid().optional().catch(undefined),
   tag: z.uuid().optional().catch(undefined),
+  segment: z.uuid().optional().catch(undefined),
   after: z.uuid().optional().catch(undefined),
   before: z.uuid().optional().catch(undefined),
 });
@@ -46,16 +49,21 @@ export default async function ContactsPage({
   const query = searchParamsSchema.parse(
     Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
   );
-  const filters: Filters = {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  // A segment id from the URL only counts if it belongs to this workspace.
+  const segment = query.segment ? await getSegment(workspace.id, query.segment) : null;
+  /** Filters as the browser knows them (ids); the server resolves the segment. */
+  const viewFilters = {
     query: query.q,
     status: query.status,
     listId: query.list,
     tagId: query.tag,
+    segmentId: segment?.id,
   };
-  const filtered = Boolean(query.q || query.status || query.list || query.tag);
+  const filters: Filters = { ...viewFilters, segment: segment?.rules };
+  const filtered = Boolean(query.q || query.status || query.list || query.tag || segment);
 
-  const { workspace, role } = await requireMemberWorkspace(slug);
-  const [page, workspaceTotal, lists, customFields, tags] = await Promise.all([
+  const [page, workspaceTotal, lists, customFields, tags, segments] = await Promise.all([
     searchSubscribers(workspace.id, {
       filters,
       after: query.after,
@@ -67,7 +75,9 @@ export default async function ContactsPage({
     listLists(workspace.id),
     listCustomFields(workspace.id),
     listTags(workspace.id),
+    listSegments(workspace.id),
   ]);
+  const segmentOptions = segments.map(({ id, name }) => ({ id, name }));
   const tagOptions = tags.map(({ id, name }) => ({ id, name }));
   const total = workspaceTotal ?? page.total;
 
@@ -90,6 +100,7 @@ export default async function ContactsPage({
     if (query.status) next.set("status", query.status);
     if (query.list) next.set("list", query.list);
     if (query.tag) next.set("tag", query.tag);
+    if (segment) next.set("segment", segment.id);
     if (cursor.after) next.set("after", cursor.after);
     if (cursor.before) next.set("before", cursor.before);
     return `/w/${slug}/contacts?${next}`;
@@ -147,7 +158,7 @@ export default async function ContactsPage({
         </Card>
       ) : (
         <>
-          <SubscriberFilters lists={listOptions} tags={tagOptions} />
+          <SubscriberFilters lists={listOptions} tags={tagOptions} segments={segmentOptions} />
 
           {page.rows.length === 0 ? (
             <Card className="items-center gap-3 py-12 text-center">
@@ -174,7 +185,7 @@ export default async function ContactsPage({
                 added: dateFormat.format(r.createdAt),
               }))}
               total={page.total}
-              filters={filters}
+              filters={viewFilters}
               lists={listOptions}
               tags={tagOptions}
               editable={editable}

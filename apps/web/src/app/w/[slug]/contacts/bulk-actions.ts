@@ -9,6 +9,7 @@ import {
   bulkRemoveTag,
   bulkUnsubscribe,
   findOrCreateTag,
+  getSegment,
   getTag,
   listLists,
   MAX_SELECTED_IDS,
@@ -31,6 +32,7 @@ const selectionSchema = z.union([
       status: z.enum(subscriberStatus.enumValues).optional(),
       listId: z.uuid().optional(),
       tagId: z.uuid().optional(),
+      segmentId: z.uuid().optional(),
     }),
   }),
 ]);
@@ -66,7 +68,17 @@ export async function bulkAction(
     return { ok: false, error: "Something in the request was invalid. Reload and try again." };
   }
   const ws = workspace.id;
-  const chosen = selection.data as SubscriberSelection;
+  let chosen: SubscriberSelection;
+  if ("filters" in selection.data && selection.data.filters.segmentId) {
+    // Resolve the segment here: rules never come from the browser.
+    const { segmentId, ...rest } = selection.data.filters;
+    const segment = await getSegment(ws, segmentId);
+    if (!segment)
+      return { ok: false, error: "That segment no longer exists. Reload and try again." };
+    chosen = { filters: { ...rest, segment: segment.rules } };
+  } else {
+    chosen = selection.data as SubscriberSelection;
+  }
 
   // Lists and tags in the action must belong to this workspace.
   const ownLists = new Map((await listLists(ws)).map((l) => [l.id, l.name]));

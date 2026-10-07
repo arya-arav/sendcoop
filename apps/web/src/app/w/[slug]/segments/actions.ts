@@ -3,6 +3,7 @@
 import {
   createSegment,
   deleteSegment,
+  previewSegment,
   segmentRulesProblem,
   segmentRulesSchema,
   updateSegment,
@@ -65,4 +66,19 @@ export async function deleteSegmentAction(slug: string, segmentId: string) {
   const deleted = await deleteSegment(workspace.id, segmentId);
   revalidatePath(`/w/${slug}/segments`);
   return { ok: deleted } as const;
+}
+
+export type SegmentPreview =
+  | { ok: true; count: number; sample: { id: string; email: string }[] }
+  | { ok: false; error: string };
+
+/** Live count while editing: how many subscribers the unsaved rules match. */
+export async function previewSegmentAction(slug: string, rules: unknown): Promise<SegmentPreview> {
+  const { workspace } = await requireMemberWorkspace(slug);
+  const parsed = segmentRulesSchema.safeParse(rules);
+  if (!parsed.success) return { ok: false, error: "The rules are invalid." };
+  const problem = segmentRulesProblem(parsed.data, await segmentContext(workspace.id));
+  if (problem) return { ok: false, error: problem };
+  const { count, sample } = await previewSegment(workspace.id, parsed.data);
+  return { ok: true, count, sample };
 }

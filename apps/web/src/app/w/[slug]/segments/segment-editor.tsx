@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { saveSegmentAction } from "./actions";
+import { SegmentCount } from "./segment-count";
 
 type Option = { id: string; name: string };
 type Item = SegmentRules["conditions"][number];
@@ -90,7 +91,7 @@ export function SegmentEditor({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
       <div className="grid content-start gap-4">
         <div className="grid max-w-md gap-2">
           <Label htmlFor="segment-name">Segment name</Label>
@@ -184,6 +185,9 @@ export function SegmentEditor({
         </div>
         <FormError message={error} />
       </div>
+      <aside className="lg:sticky lg:top-6 lg:self-start">
+        <SegmentCount slug={slug} rules={rules} valid={!problem} segmentId={segmentId} />
+      </aside>
     </div>
   );
 }

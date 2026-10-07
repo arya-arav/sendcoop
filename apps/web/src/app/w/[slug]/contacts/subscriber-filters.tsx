@@ -23,9 +23,11 @@ const STATUSES = [
 export function SubscriberFilters({
   lists,
   tags,
+  segments,
 }: {
   lists: { id: string; name: string }[];
   tags: { id: string; name: string }[];
+  segments: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -55,7 +57,11 @@ export function SubscriberFilters({
   useEffect(() => () => clearTimeout(debounce.current), []);
 
   const filtered = Boolean(
-    params.get("q") || params.get("status") || params.get("list") || params.get("tag"),
+    params.get("q") ||
+    params.get("status") ||
+    params.get("list") ||
+    params.get("tag") ||
+    params.get("segment"),
   );
 
   return (
@@ -120,13 +126,27 @@ export function SubscriberFilters({
           ))}
         </NativeSelect>
       )}
+      {segments.length > 0 && (
+        <NativeSelect
+          aria-label="Filter by segment"
+          value={params.get("segment") ?? ""}
+          onChange={(e) => update({ segment: e.target.value || null })}
+        >
+          <NativeSelectOption value="">All segments</NativeSelectOption>
+          {segments.map((segment) => (
+            <NativeSelectOption key={segment.id} value={segment.id}>
+              {segment.name}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      )}
       {filtered && (
         <Button
           variant="ghost"
           onClick={() => {
             setQuery("");
             clearTimeout(debounce.current);
-            update({ q: null, status: null, list: null, tag: null });
+            update({ q: null, status: null, list: null, tag: null, segment: null });
           }}
         >
           <X />
