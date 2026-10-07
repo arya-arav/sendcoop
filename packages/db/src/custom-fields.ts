@@ -1,8 +1,8 @@
 // Browser-safe: no runtime imports, so client components can use it via
 // "@sendcoop/db/custom-fields" without bundling the database driver.
-import type { CustomFieldType } from "./schema";
+import type { CustomFieldType, SubscriberStatus } from "./schema";
 
-export type { CustomFieldType };
+export type { CustomFieldType, SubscriberStatus };
 
 // Rules for custom field keys and values, shared by the subscriber form,
 // CSV import (worker) and the API, so a value means the same thing everywhere.

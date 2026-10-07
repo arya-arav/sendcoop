@@ -20,7 +20,13 @@ const STATUSES = [
  * can be bookmarked and the server renders the right page. Changing any filter
  * returns to the first page.
  */
-export function SubscriberFilters({ lists }: { lists: { id: string; name: string }[] }) {
+export function SubscriberFilters({
+  lists,
+  tags,
+}: {
+  lists: { id: string; name: string }[];
+  tags: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -48,7 +54,9 @@ export function SubscriberFilters({ lists }: { lists: { id: string; name: string
 
   useEffect(() => () => clearTimeout(debounce.current), []);
 
-  const filtered = Boolean(params.get("q") || params.get("status") || params.get("list"));
+  const filtered = Boolean(
+    params.get("q") || params.get("status") || params.get("list") || params.get("tag"),
+  );
 
   return (
     <div
@@ -98,13 +106,27 @@ export function SubscriberFilters({ lists }: { lists: { id: string; name: string
           ))}
         </NativeSelect>
       )}
+      {tags.length > 0 && (
+        <NativeSelect
+          aria-label="Filter by tag"
+          value={params.get("tag") ?? ""}
+          onChange={(e) => update({ tag: e.target.value || null })}
+        >
+          <NativeSelectOption value="">All tags</NativeSelectOption>
+          {tags.map((tag) => (
+            <NativeSelectOption key={tag.id} value={tag.id}>
+              {tag.name}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      )}
       {filtered && (
         <Button
           variant="ghost"
           onClick={() => {
             setQuery("");
             clearTimeout(debounce.current);
-            update({ q: null, status: null, list: null });
+            update({ q: null, status: null, list: null, tag: null });
           }}
         >
           <X />

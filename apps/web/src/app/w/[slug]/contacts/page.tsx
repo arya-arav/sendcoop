@@ -2,50 +2,32 @@ import {
   countSubscribers,
   listCustomFields,
   listLists,
+  listTags,
   searchSubscribers,
   type SubscriberFilters as Filters,
   subscriberStatus,
-  type SubscriberStatus,
 } from "@sendcoop/db";
 import { ChevronLeft, ChevronRight, FileUp, SearchX, SlidersHorizontal, Users } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { AddSubscriberButton } from "./add-subscriber";
 import { SubscriberFilters } from "./subscriber-filters";
+import { SubscriberTable } from "./subscriber-table";
 
 const PAGE_SIZE = 50;
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium" });
 const numberFormat = new Intl.NumberFormat("en");
-
-const statusStyle: Record<
-  SubscriberStatus,
-  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
-> = {
-  subscribed: { label: "Subscribed", variant: "default" },
-  pending: { label: "Pending", variant: "secondary" },
-  unsubscribed: { label: "Unsubscribed", variant: "outline" },
-  bounced: { label: "Bounced", variant: "destructive" },
-  complained: { label: "Complained", variant: "destructive" },
-};
 
 // URL parameters are user input: anything invalid is ignored, not an error.
 const searchParamsSchema = z.object({
   q: z.string().trim().max(100).optional().catch(undefined),
   status: z.enum(subscriberStatus.enumValues).optional().catch(undefined),
   list: z.uuid().optional().catch(undefined),
+  tag: z.uuid().optional().catch(undefined),
   after: z.uuid().optional().catch(undefined),
   before: z.uuid().optional().catch(undefined),
 });
@@ -64,11 +46,16 @@ export default async function ContactsPage({
   const query = searchParamsSchema.parse(
     Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
   );
-  const filters: Filters = { query: query.q, status: query.status, listId: query.list };
-  const filtered = Boolean(query.q || query.status || query.list);
+  const filters: Filters = {
+    query: query.q,
+    status: query.status,
+    listId: query.list,
+    tagId: query.tag,
+  };
+  const filtered = Boolean(query.q || query.status || query.list || query.tag);
 
   const { workspace, role } = await requireMemberWorkspace(slug);
-  const [page, workspaceTotal, lists, customFields] = await Promise.all([
+  const [page, workspaceTotal, lists, customFields, tags] = await Promise.all([
     searchSubscribers(workspace.id, {
       filters,
       after: query.after,
@@ -79,7 +66,9 @@ export default async function ContactsPage({
     filtered ? countSubscribers(workspace.id) : null,
     listLists(workspace.id),
     listCustomFields(workspace.id),
+    listTags(workspace.id),
   ]);
+  const tagOptions = tags.map(({ id, name }) => ({ id, name }));
   const total = workspaceTotal ?? page.total;
 
   const fieldViews = customFields.map(({ key, label, type, options }) => ({
@@ -100,6 +89,7 @@ export default async function ContactsPage({
     if (query.q) next.set("q", query.q);
     if (query.status) next.set("status", query.status);
     if (query.list) next.set("list", query.list);
+    if (query.tag) next.set("tag", query.tag);
     if (cursor.after) next.set("after", cursor.after);
     if (cursor.before) next.set("before", cursor.before);
     return `/w/${slug}/contacts?${next}`;
@@ -157,7 +147,7 @@ export default async function ContactsPage({
         </Card>
       ) : (
         <>
-          <SubscriberFilters lists={listOptions} />
+          <SubscriberFilters lists={listOptions} tags={tagOptions} />
 
           {page.rows.length === 0 ? (
             <Card className="items-center gap-3 py-12 text-center">
@@ -170,52 +160,25 @@ export default async function ContactsPage({
               </div>
             </Card>
           ) : (
-            <Card className="py-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-4">Email</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Lists</TableHead>
-                    <TableHead className="w-36 pr-4">Added</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {page.rows.map((s) => {
-                    const status = statusStyle[s.status];
-                    const name = [s.firstName, s.lastName].filter(Boolean).join(" ");
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell className="pl-4 font-medium">{s.email}</TableCell>
-                        <TableCell className={name ? undefined : "text-muted-foreground"}>
-                          {name || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={status.variant}>{status.label}</Badge>
-                        </TableCell>
-                        <TableCell className="whitespace-normal">
-                          {s.lists.length === 0 ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {s.lists.map((l) => (
-                                <Badge key={l.id} variant="outline">
-                                  {l.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="pr-4 text-muted-foreground">
-                          {dateFormat.format(s.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Card>
+            <SubscriberTable
+              // A new page or filter starts a fresh selection.
+              key={JSON.stringify([filters, query.after, query.before])}
+              slug={slug}
+              rows={page.rows.map((r) => ({
+                id: r.id,
+                email: r.email,
+                name: [r.firstName, r.lastName].filter(Boolean).join(" "),
+                status: r.status,
+                lists: r.lists,
+                tags: r.tags,
+                added: dateFormat.format(r.createdAt),
+              }))}
+              total={page.total}
+              filters={filters}
+              lists={listOptions}
+              tags={tagOptions}
+              editable={editable}
+            />
           )}
 
           {(page.prevCursor || page.nextCursor) && (

@@ -97,6 +97,35 @@ export const listMemberships = pgTable(
   (t) => [primaryKey({ columns: [t.listId, t.subscriberId] }), index().on(t.subscriberId)],
 );
 
+// Free-form labels (e.g. "buyer", "clicked-keto"), lighter than lists; used
+// for filtering now and by segments and automations later.
+export const tags = pgTable(
+  "tags",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("tags_workspace_name_unique").on(t.workspaceId, sql`lower(${t.name})`)],
+);
+
+export const subscriberTags = pgTable(
+  "subscriber_tags",
+  {
+    tagId: uuid()
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+    subscriberId: uuid()
+      .notNull()
+      .references(() => subscribers.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.tagId, t.subscriberId] }), index().on(t.subscriberId)],
+);
+
 export const customFieldType = pgEnum("custom_field_type", ["text", "number", "date", "dropdown"]);
 
 // Field definitions. Values live in subscribers.fields under the field's key.
@@ -125,4 +154,5 @@ export type Subscriber = typeof subscribers.$inferSelect;
 export type SubscriberStatus = (typeof subscriberStatus.enumValues)[number];
 export type SubscriberSource = (typeof subscriberSource.enumValues)[number];
 export type CustomField = typeof customFields.$inferSelect;
+export type Tag = typeof tags.$inferSelect;
 export type CustomFieldType = (typeof customFieldType.enumValues)[number];

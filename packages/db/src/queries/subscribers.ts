@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, gt, inArray, lt, type SQL, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import type { FieldValue } from "../custom-fields";
 import {
@@ -8,6 +8,8 @@ import {
   type SubscriberSource,
   type SubscriberStatus,
   subscribers,
+  subscriberTags,
+  tags,
 } from "../schema";
 import { isUniqueViolation } from "./errors";
 
@@ -75,7 +77,10 @@ export async function createSubscriber(
   }
 }
 
-export type SubscriberRow = Subscriber & { lists: { id: string; name: string }[] };
+export type SubscriberRow = Subscriber & {
+  lists: { id: string; name: string }[];
+  tags: { id: string; name: string }[];
+};
 
 // Must match the expression in migration 0005_subscriber_search exactly,
 // or Postgres can't use the trigram index.
@@ -86,7 +91,50 @@ export type SubscriberFilters = {
   query?: string;
   status?: SubscriberStatus;
   listId?: string;
+  tagId?: string;
 };
+
+/**
+ * The WHERE condition for a workspace's subscribers matching the filters.
+ * Shared by the Contacts page and bulk actions, so "all matching" in a bulk
+ * action means exactly the people the page shows.
+ */
+export function subscriberConditions(workspaceId: string, filters: SubscriberFilters = {}): SQL {
+  const db = getDb();
+  return and(
+    eq(subscribers.workspaceId, workspaceId),
+    filters.status ? eq(subscribers.status, filters.status) : undefined,
+    filters.query?.trim()
+      ? sql`${searchText} like ${"%" + escapeLike(filters.query.trim().toLowerCase()) + "%"}`
+      : undefined,
+    filters.listId
+      ? exists(
+          db
+            .select({ one: sql`1` })
+            .from(listMemberships)
+            .where(
+              and(
+                eq(listMemberships.subscriberId, subscribers.id),
+                eq(listMemberships.listId, filters.listId),
+              ),
+            ),
+        )
+      : undefined,
+    filters.tagId
+      ? exists(
+          db
+            .select({ one: sql`1` })
+            .from(subscriberTags)
+            .where(
+              and(
+                eq(subscriberTags.subscriberId, subscribers.id),
+                eq(subscriberTags.tagId, filters.tagId),
+              ),
+            ),
+        )
+      : undefined,
+  )!;
+}
 
 export type SubscriberPage = {
   rows: SubscriberRow[];
@@ -113,26 +161,7 @@ export async function searchSubscribers(
   }: { filters?: SubscriberFilters; after?: string; before?: string; limit?: number } = {},
 ): Promise<SubscriberPage> {
   const db = getDb();
-  const where = and(
-    eq(subscribers.workspaceId, workspaceId),
-    filters.status ? eq(subscribers.status, filters.status) : undefined,
-    filters.query?.trim()
-      ? sql`${searchText} like ${"%" + escapeLike(filters.query.trim().toLowerCase()) + "%"}`
-      : undefined,
-    filters.listId
-      ? exists(
-          db
-            .select({ one: sql`1` })
-            .from(listMemberships)
-            .where(
-              and(
-                eq(listMemberships.subscriberId, subscribers.id),
-                eq(listMemberships.listId, filters.listId),
-              ),
-            ),
-        )
-      : undefined,
-  );
+  const where = subscriberConditions(workspaceId, filters);
 
   // Fetch one extra row to know whether another page exists in that direction.
   const goingBack = Boolean(before) && !after;
@@ -154,7 +183,7 @@ export async function searchSubscribers(
   if (goingBack) page.reverse();
 
   const [counted] = await db.select({ total: count() }).from(subscribers).where(where);
-  const rows = await withLists(page);
+  const rows = await withListsAndTags(page);
   const first = rows[0]?.id ?? null;
   const last = rows.at(-1)?.id ?? null;
 
@@ -174,25 +203,32 @@ export async function listSubscribers(
   return (await searchSubscribers(workspaceId, { limit })).rows;
 }
 
-/** Attaches list names, fetching memberships for this page only. */
-async function withLists(page: Subscriber[]): Promise<SubscriberRow[]> {
+/** Attaches list and tag names, fetching them for this page only. */
+async function withListsAndTags(page: Subscriber[]): Promise<SubscriberRow[]> {
   if (page.length === 0) return [];
-  const memberships = await getDb()
-    .select({ subscriberId: listMemberships.subscriberId, id: lists.id, name: lists.name })
-    .from(listMemberships)
-    .innerJoin(lists, eq(lists.id, listMemberships.listId))
-    .where(
-      inArray(
-        listMemberships.subscriberId,
-        page.map((s) => s.id),
-      ),
-    )
-    .orderBy(lists.name);
+  const ids = page.map((s) => s.id);
+  const db = getDb();
+  const [memberships, tagged] = await Promise.all([
+    db
+      .select({ subscriberId: listMemberships.subscriberId, id: lists.id, name: lists.name })
+      .from(listMemberships)
+      .innerJoin(lists, eq(lists.id, listMemberships.listId))
+      .where(inArray(listMemberships.subscriberId, ids))
+      .orderBy(lists.name),
+    db
+      .select({ subscriberId: subscriberTags.subscriberId, id: tags.id, name: tags.name })
+      .from(subscriberTags)
+      .innerJoin(tags, eq(tags.id, subscriberTags.tagId))
+      .where(inArray(subscriberTags.subscriberId, ids))
+      .orderBy(tags.name),
+  ]);
 
-  const listsBySubscriber = Map.groupBy(memberships, (m) => m.subscriberId);
+  const listsOf = Map.groupBy(memberships, (m) => m.subscriberId);
+  const tagsOf = Map.groupBy(tagged, (t) => t.subscriberId);
   return page.map((s) => ({
     ...s,
-    lists: (listsBySubscriber.get(s.id) ?? []).map(({ id, name }) => ({ id, name })),
+    lists: (listsOf.get(s.id) ?? []).map(({ id, name }) => ({ id, name })),
+    tags: (tagsOf.get(s.id) ?? []).map(({ id, name }) => ({ id, name })),
   }));
 }
 
