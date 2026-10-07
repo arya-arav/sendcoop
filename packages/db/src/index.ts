@@ -26,6 +26,7 @@ export * from "./queries/sending-servers";
 export * from "./queries/subscribers";
 export * from "./queries/suppressions";
 export * from "./queries/tags";
+export * from "./queries/templates";
 export * from "./queries/unsubscribe";
 export * from "./queries/workspaces";
 

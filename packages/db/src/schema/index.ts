@@ -5,3 +5,4 @@ export * from "./forms";
 export * from "./imports";
 export * from "./sending";
 export * from "./suppressions";
+export * from "./templates";

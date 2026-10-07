@@ -3,7 +3,7 @@ import { ArrowLeft, Download, Search, ShieldBan } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,14 +70,14 @@ export default async function SuppressionsPage({
         </div>
         {editable && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              nativeButton={false}
-              render={<a href={`/api/w/${slug}/suppressions`} download />}
+            <a
+              href={`/api/w/${slug}/suppressions`}
+              download
+              className={buttonVariants({ variant: "outline" })}
             >
               <Download />
               Export CSV
-            </Button>
+            </a>
             <AddSuppressionsButton slug={slug} />
           </div>
         )}
@@ -151,26 +151,20 @@ export default async function SuppressionsPage({
           </Card>
           <div className="flex justify-end gap-2">
             {query.before && (
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={<Link href={query.q ? `${base}?q=${encodeURIComponent(query.q)}` : base} />}
+              <Link
+                href={query.q ? `${base}?q=${encodeURIComponent(query.q)}` : base}
+                className={buttonVariants({ variant: "outline" })}
               >
                 Back to newest
-              </Button>
+              </Link>
             )}
             {page.nextCursor && (
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={
-                  <Link
-                    href={`${base}?${new URLSearchParams({ ...(query.q ? { q: query.q } : {}), before: page.nextCursor })}`}
-                  />
-                }
+              <Link
+                href={`${base}?${new URLSearchParams({ ...(query.q ? { q: query.q } : {}), before: page.nextCursor })}`}
+                className={buttonVariants({ variant: "outline" })}
               >
                 Older
-              </Button>
+              </Link>
             )}
           </div>
         </>
