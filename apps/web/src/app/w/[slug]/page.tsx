@@ -1,10 +1,9 @@
+import { countSubscribers } from "@sendcoop/db";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireMemberWorkspace } from "@/lib/workspace";
 
-// Headline numbers are placeholders until sending (week 4) and conversion
-// tracking (weeks 9–10) produce real data.
-const stats = ["Revenue", "Conversions", "Earnings per click", "Subscribers"];
+const numberFormat = new Intl.NumberFormat("en");
 
 const setupSteps = [
   { title: "Import your contacts", detail: "CSV upload with field mapping", week: 2 },
@@ -14,7 +13,15 @@ const setupSteps = [
 ];
 
 export default async function DashboardPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { user } = await requireMemberWorkspace((await params).slug);
+  const { user, workspace } = await requireMemberWorkspace((await params).slug);
+  const subscriberCount = await countSubscribers(workspace.id);
+  // Revenue numbers stay placeholders until conversion tracking (weeks 9–10).
+  const stats = [
+    { label: "Revenue", value: "—" },
+    { label: "Conversions", value: "—" },
+    { label: "Earnings per click", value: "—" },
+    { label: "Subscribers", value: numberFormat.format(subscriberCount) },
+  ];
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6">
@@ -24,11 +31,11 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((label) => (
-          <Card key={label} size="sm">
+        {stats.map((stat) => (
+          <Card key={stat.label} size="sm">
             <CardHeader>
-              <CardDescription>{label}</CardDescription>
-              <CardTitle className="text-2xl tabular-nums">—</CardTitle>
+              <CardDescription>{stat.label}</CardDescription>
+              <CardTitle className="text-2xl tabular-nums">{stat.value}</CardTitle>
             </CardHeader>
           </Card>
         ))}

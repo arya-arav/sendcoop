@@ -14,6 +14,7 @@ import { requireMemberWorkspace } from "@/lib/workspace";
 import { ListRowActions, NewListButton } from "./list-actions";
 
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium" });
+const numberFormat = new Intl.NumberFormat("en");
 
 export default async function ListsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -52,6 +53,7 @@ export default async function ListsPage({ params }: { params: Promise<{ slug: st
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4">Name</TableHead>
+                <TableHead className="w-32 text-right">Subscribers</TableHead>
                 <TableHead className="w-40">Created</TableHead>
                 {editable && <TableHead className="w-12 pr-4" aria-label="Actions" />}
               </TableRow>
@@ -64,6 +66,9 @@ export default async function ListsPage({ params }: { params: Promise<{ slug: st
                     {list.description && (
                       <p className="text-sm text-muted-foreground">{list.description}</p>
                     )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {numberFormat.format(list.subscriberCount)}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {dateFormat.format(list.createdAt)}

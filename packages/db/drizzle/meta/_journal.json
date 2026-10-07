@@ -22,6 +22,13 @@
       "when": 1791396247307,
       "tag": "0002_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791402505384,
+      "tag": "0003_subscribers",
+      "breakpoints": true
     }
   ]
 }

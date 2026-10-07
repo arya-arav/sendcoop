@@ -1,6 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "../client";
-import { type List, lists } from "../schema";
+import { type List, listMemberships, lists } from "../schema";
+import { isUniqueViolation } from "./errors";
 
 // Every query is scoped by workspaceId, so an id from another workspace
 // behaves exactly like an id that doesn't exist.
@@ -9,9 +10,19 @@ export type ListInput = { name: string; description: string | null };
 export type ListWriteResult =
   { ok: true; list: List } | { ok: false; error: "duplicate" | "not_found" };
 
+/** The workspace's lists, newest first, with how many subscribers each has. */
 export async function listLists(workspaceId: string) {
   return getDb()
-    .select()
+    .select({
+      id: lists.id,
+      name: lists.name,
+      description: lists.description,
+      createdAt: lists.createdAt,
+      // Uses the (list_id, subscriber_id) primary key, so it stays an index scan.
+      subscriberCount: sql<number>`(
+        select count(*)::int from ${listMemberships} where ${listMemberships.listId} = ${lists.id}
+      )`,
+    })
     .from(lists)
     .where(eq(lists.workspaceId, workspaceId))
     .orderBy(desc(lists.createdAt));
@@ -55,12 +66,4 @@ export async function deleteList(workspaceId: string, listId: string): Promise<b
     .where(and(eq(lists.id, listId), eq(lists.workspaceId, workspaceId)))
     .returning({ id: lists.id });
   return deleted.length > 0;
-}
-
-// Drizzle wraps driver errors; the Postgres code is on the error or its cause.
-function isUniqueViolation(error: unknown): boolean {
-  for (let e = error; e && typeof e === "object"; e = (e as { cause?: unknown }).cause) {
-    if ((e as { code?: unknown }).code === "23505") return true;
-  }
-  return false;
 }
