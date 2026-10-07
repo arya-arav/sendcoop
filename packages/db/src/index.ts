@@ -16,6 +16,7 @@ export * from "./queries/custom-fields";
 export * from "./queries/domain-verification";
 export * from "./queries/feedback";
 export * from "./queries/forms";
+export * from "./queries/health";
 export * from "./queries/import-batch";
 export * from "./queries/imports";
 export * from "./queries/lists";

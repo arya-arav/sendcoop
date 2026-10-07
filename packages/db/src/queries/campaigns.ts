@@ -174,6 +174,25 @@ export async function loadMessageBatch(
 
 /** sentAt is when the message was handed to the server (what rate limits count). */
 /**
+ * Puts a paused campaign back to sending. The caller queues the batches of
+ * messages still waiting. Null if the campaign isn't paused.
+ */
+export async function resumeCampaign(workspaceId: string, campaignId: string) {
+  const [row] = await getDb()
+    .update(campaigns)
+    .set({ status: "sending", error: null })
+    .where(
+      and(
+        eq(campaigns.id, campaignId),
+        eq(campaigns.workspaceId, workspaceId),
+        eq(campaigns.status, "paused"),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/**
  * Just before sending: marks messages skipped whose address has since been
  * suppressed, or whose subscriber unsubscribed, bounced, complained or was
  * deleted after the campaign started. Returns how many were skipped.

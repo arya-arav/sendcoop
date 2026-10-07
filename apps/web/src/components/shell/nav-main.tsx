@@ -11,6 +11,7 @@ import {
   Mail,
   Plug,
   Settings,
+  ShieldCheck,
   Users,
   Workflow,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const items: NavItem[] = [
   { title: "Templates", path: "/templates", icon: FileText, ready: false },
   { title: "Revenue", path: "/revenue", icon: BarChart3, ready: false },
   { title: "Integrations", path: "/integrations", icon: Plug, ready: false },
+  { title: "Deliverability", path: "/deliverability", icon: ShieldCheck, ready: true },
   { title: "Settings", path: "/settings", icon: Settings, ready: true },
 ];
 

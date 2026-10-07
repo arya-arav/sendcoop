@@ -14,8 +14,12 @@ import { closeQueues, enqueueCampaign } from "@sendcoop/queue";
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
 
-/** Sends a campaign from a new Mailpit server named "Mailpit" to `recipients`. */
-export async function sendCampaign(slug: string, recipients: string[]) {
+/** Sends a campaign from a new Mailpit server named "Mailpit" to `recipients`, optionally slowly. */
+export async function sendCampaign(
+  slug: string,
+  recipients: string[],
+  { maxPerSecond = null }: { maxPerSecond?: number | null } = {},
+) {
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
   const domain = await addSendingDomain(workspaceId, `mail.${slug}.test`);
@@ -31,6 +35,7 @@ export async function sendCampaign(slug: string, recipients: string[]) {
       port: Number(process.env.SMTP_PORT ?? 1026),
       secure: false,
     },
+    limits: { maxPerSecond, maxPerHour: null, maxPerDay: null },
   });
   for (const email of recipients) {
     await createSubscriber(workspaceId, { email, firstName: null, lastName: null }, [list.list.id]);
@@ -50,12 +55,16 @@ export async function sendCampaign(slug: string, recipients: string[]) {
   });
   await queueCampaign(workspaceId, campaign.id);
   await enqueueCampaign({ campaignId: campaign.id, workspaceId });
+  return { campaignId: campaign.id };
 }
 
-/** Closes the connections sendCampaign opened; call from afterAll. */
+/**
+ * Closes the queue connections sendCampaign opened; call from afterAll. The
+ * database client is shared by every spec file a Playwright worker runs, so
+ * it stays open (the worker process ends it).
+ */
 export async function closeConnections() {
   await closeQueues();
-  await getSql().end();
 }
 
 /** The headers of the newest email to `to` in Mailpit. */

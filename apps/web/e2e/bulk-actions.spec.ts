@@ -64,7 +64,10 @@ test("bulk actions work on checked rows and on everyone matching", async ({ page
   await page.getByLabel("Filter by list").selectOption({ label: "Seed: keto buyers" });
   // Wait for the keto results to replace the newsletter ones (120 of 120).
   const summary = page.getByText(/^\d+ of 120 subscribers match$/);
+  // (not.toHaveText alone would also pass while the summary is briefly gone.)
+  await expect(summary).toBeVisible();
   await expect(summary).not.toHaveText("120 of 120 subscribers match");
+  await expect(page.getByText("120 of 120 subscribers match")).toHaveCount(0);
   await page.getByLabel("Select all on this page").check();
   const matchAll = page.getByRole("button", { name: /^Select all \d+ matching$/ });
   if (await matchAll.isVisible()) await matchAll.click();

@@ -1,6 +1,7 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { expect, test } from "@playwright/test";
+import { getCampaign, getSql } from "@sendcoop/db";
 import { closeConnections, mailpitHeaders, sendCampaign } from "./campaigns";
 import { emailLink, signUpWithWorkspace, uniqueEmail } from "./helpers";
 
@@ -9,6 +10,9 @@ import { emailLink, signUpWithWorkspace, uniqueEmail } from "./helpers";
 const CERT_URL = process.env.SNS_TEST_CERT_URL ?? "http://localhost:3998/sns-test-cert.pem";
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 let certServer: Server;
+
+// One certificate server on a fixed port: run this file's tests one after another.
+test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async () => {
   const pem = publicKey.export({ type: "spki", format: "pem" });
@@ -126,4 +130,68 @@ test("SES bounces and complaints take addresses off the list", async ({ page }) 
   await expect(page.getByRole("row").filter({ hasText: gone })).toContainText("Bounced");
   await expect(page.getByRole("row").filter({ hasText: angry })).toContainText("Complained");
   await expect(page.getByRole("row").filter({ hasText: fine })).toContainText("Subscribed");
+});
+
+test("a campaign with too many spam complaints pauses itself and can be resumed", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const slug = await signUpWithWorkspace(page, {
+    name: "Health Owner",
+    email: uniqueEmail("health-owner"),
+    workspace: `Health ${Date.now()}`,
+  });
+  const recipients = Array.from({ length: 200 }, (_, i) => uniqueEmail(`health-${i}`));
+  // 10 a second: complaints arrive while it is still sending, as in real life.
+  const { campaignId } = await sendCampaign(slug, recipients, { maxPerSecond: 10 });
+  const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
+  const progress = () => getCampaign(ws!.id, campaignId);
+  // sentCount moves when a batch finishes; count the messages themselves.
+  const sent = async () =>
+    (
+      await getSql()<{ n: number }[]>`
+        select count(*)::int as n from messages
+        where campaign_id = ${campaignId} and status = 'sent'`
+    )[0]!.n;
+  await expect.poll(sent, { timeout: 20_000, intervals: [100] }).toBeGreaterThanOrEqual(100);
+
+  // One recipient reports it as spam: over 0.3% of 100+ emails
+  await page.goto(`/w/${slug}/settings/servers`);
+  await page.getByRole("link", { name: "Mailpit" }).click();
+  const webhook = await page.getByLabel("SNS webhook URL").inputValue();
+  const [first] = await getSql()<{ email: string }[]>`
+    select email from messages where campaign_id = ${campaignId} and status = 'sent' limit 1`;
+  const complaint = await page.request.post(webhook, {
+    data: JSON.stringify(
+      snsNotification({
+        notificationType: "Complaint",
+        mail: await sesMail(first!.email),
+        complaint: { complainedRecipients: [{ emailAddress: first!.email }] },
+      }),
+    ),
+  });
+  expect(complaint.status()).toBe(200);
+
+  // Deliverability shows it paused, with the reason
+  await page
+    .locator("[data-sidebar=sidebar]")
+    .getByRole("link", { name: "Deliverability" })
+    .click();
+  await expect(page.getByRole("heading", { name: "1 campaign is paused" })).toBeVisible();
+  await expect(
+    page.getByText(/Paused automatically: .+% of recipients marked it as spam/),
+  ).toBeVisible();
+  const stopped = (await progress())!;
+  expect(stopped.status).toBe("paused");
+  expect(await sent()).toBeLessThan(200);
+
+  // Resuming sends the rest
+  await page.getByRole("button", { name: "Resume Flash sale" }).click();
+  await expect(page.getByRole("heading", { name: "1 campaign is paused" })).toBeHidden();
+  await expect.poll(async () => (await progress())?.status, { timeout: 30_000 }).toBe("sent");
+  expect((await progress())?.sentCount).toBe(200);
+  await page.reload();
+  const row = page.getByRole("row").filter({ hasText: "Flash sale" });
+  await expect(row).toContainText("Sent");
+  await expect(row).toContainText("200");
 });

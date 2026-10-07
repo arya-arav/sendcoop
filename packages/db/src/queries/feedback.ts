@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../client";
 import { campaigns, messages, subscribers, suppressions } from "../schema";
+import { enforceCampaignHealth } from "./health";
 
 // Bounces and complaints reported by the sending provider (Amazon SES via
 // SNS). A hard bounce or a complaint takes the address off every list in the
@@ -36,13 +37,14 @@ export async function recordFeedback(serverId: string, feedback: DeliveryFeedbac
   const recipients = feedback.recipients.map((r) => r.trim().toLowerCase()).filter(Boolean);
   if (ids.length === 0 || recipients.length === 0) return 0;
 
-  return getDb().transaction(async (tx) => {
-    const matched = await tx
+  const matched = await getDb().transaction(async (tx) => {
+    const rows = await tx
       .select({
         id: messages.id,
         subscriberId: messages.subscriberId,
         workspaceId: messages.workspaceId,
         email: messages.email,
+        campaignId: messages.campaignId,
       })
       .from(messages)
       .innerJoin(campaigns, eq(campaigns.id, messages.campaignId))
@@ -54,7 +56,7 @@ export async function recordFeedback(serverId: string, feedback: DeliveryFeedbac
         ),
       );
 
-    for (const message of matched) {
+    for (const message of rows) {
       const detail = feedback.detail?.slice(0, 500) ?? null;
       if (feedback.kind === "bounce") {
         await tx
@@ -104,6 +106,12 @@ export async function recordFeedback(serverId: string, feedback: DeliveryFeedbac
           );
       }
     }
-    return matched.length;
+    return rows;
   });
+
+  // Too many bounces or complaints: stop the campaign while it is still sending.
+  for (const campaignId of new Set(matched.map((m) => m.campaignId))) {
+    await enforceCampaignHealth(campaignId);
+  }
+  return matched.length;
 }

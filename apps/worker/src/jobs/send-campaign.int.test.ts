@@ -12,12 +12,15 @@ import {
   queueCampaign,
   queuedMessageBatches,
   readUnsubscribeToken,
+  recordFeedback,
+  resumeCampaign,
   type SendingLimits,
 } from "@sendcoop/db";
 import {
   type CampaignJob,
   closeQueues,
   enqueueCampaign,
+  enqueueSendBatches,
   QUEUES,
   queueConnection,
   type SendBatchJob,
@@ -107,7 +110,7 @@ async function setup(recipients: number, limits?: SendingLimits) {
     segmentId: null,
   });
   expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
-  return { campaign, subject };
+  return { campaign, subject, serverId: server.id };
 }
 
 async function runUntil(campaignId: string, done: (c: Campaign | null) => boolean) {
@@ -324,3 +327,66 @@ describe("personalization", () => {
     expect(other.Text).toMatch(/^(Hi|Hello) friend, code: none\r?\n/);
   });
 });
+
+describe("sending health", () => {
+  it("pauses a campaign that gets too many spam complaints, and can resume it", async () => {
+    // Slow enough (40/s) that complaints arrive while it is still sending.
+    const { campaign, serverId } = await setup(400, {
+      maxPerSecond: 40,
+      maxPerHour: null,
+      maxPerDay: null,
+    });
+    // sentCount only moves when a batch finishes; count the messages themselves.
+    await enqueueCampaign({ campaignId: campaign.id, workspaceId: ws });
+    await expect
+      .poll(
+        async () =>
+          (
+            await sql<{ n: number }[]>`
+              select count(*)::int as n from messages
+              where campaign_id = ${campaign.id} and status = 'sent'`
+          )[0]!.n,
+        { timeout: 20_000, interval: 100 },
+      )
+      .toBeGreaterThanOrEqual(120);
+
+    // One spam complaint in 120+ emails is far over the 0.3% limit.
+    const [first] = await sql<{ id: string; email: string }[]>`
+      select id, email from messages where campaign_id = ${campaign.id} and status = 'sent'
+      order by id limit 1`;
+    await recordFeedback(serverId, {
+      kind: "complaint",
+      recipients: [first!.email],
+      messageId: first!.id,
+    });
+    const paused = await getCampaign(ws, campaign.id);
+    expect(paused).toMatchObject({ status: "paused" });
+    expect(paused?.error).toMatch(/^Paused automatically: .+% of recipients marked it as spam/);
+
+    // Batches already running stop within a few messages; nothing else goes out.
+    await new Promise((r) => setTimeout(r, 2000));
+    const settled = (await getCampaign(ws, campaign.id))!.sentCount;
+    await new Promise((r) => setTimeout(r, 1500));
+    expect((await getCampaign(ws, campaign.id))!.sentCount).toBe(settled);
+    expect(settled).toBeLessThan(400);
+
+    // The owner fixes the list and resumes: the rest are sent, once.
+    expect(await resumeCampaign(ws, campaign.id)).not.toBeNull();
+    const batches = await queuedMessageBatches(campaign.id, 100);
+    await enqueueSendBatches(
+      batches.map((messageIds) => ({ campaignId: campaign.id, workspaceId: ws, messageIds })),
+      { round: String(Date.now()) },
+    );
+    const done = await runUntilDone(campaign.id);
+    expect(done).toMatchObject({ status: "sent", sentCount: 400 });
+  }, 60_000);
+});
+
+async function runUntilDone(campaignId: string) {
+  let current = await getCampaign(ws, campaignId);
+  while (current?.status === "sending") {
+    await new Promise((r) => setTimeout(r, 250));
+    current = await getCampaign(ws, campaignId);
+  }
+  return current;
+}

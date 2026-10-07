@@ -74,14 +74,18 @@ export async function enqueueCampaign(job: CampaignJob) {
  * queueing the same batch twice is a no-op. Batches retry with backoff when
  * the mail server is unreachable; messages already sent are never resent.
  */
-export async function enqueueSendBatches(jobs: SendBatchJob[]) {
+/**
+ * Queues send batches. Job ids make queueing the same batch twice a no-op;
+ * a resumed campaign passes a new `round`, since finished jobs are kept a day.
+ */
+export async function enqueueSendBatches(jobs: SendBatchJob[], { round }: { round?: string } = {}) {
   if (jobs.length === 0) return;
   await queue<SendBatchJob>(QUEUES.sends).addBulk(
     jobs.map((data) => ({
       name: "send",
       data,
       opts: {
-        jobId: `${data.campaignId}_${data.messageIds[0]}`,
+        jobId: `${data.campaignId}_${data.messageIds[0]}${round ? `_${round}` : ""}`,
         attempts: 5,
         backoff: { type: "exponential", delay: 30_000 },
         ...keep,
