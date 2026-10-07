@@ -17,7 +17,8 @@
     "SPF_INCLUDE",
     "ALLOW_PRIVATE_SMTP_HOSTS",
     "SES_ENDPOINT",
-    "DNS_SERVERS"
+    "DNS_SERVERS",
+    "SNS_TEST_CERT_URL"
   ],
   "tasks": {
     "dev": {

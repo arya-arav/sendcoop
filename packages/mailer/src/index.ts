@@ -4,6 +4,7 @@ import { SendEmailCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 
+export * from "./sns";
 export * from "./unsubscribe";
 
 // Builds outgoing messages (DKIM-signed with the sending domain's key) and

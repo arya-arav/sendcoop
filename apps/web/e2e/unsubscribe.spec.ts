@@ -1,69 +1,8 @@
 import { expect, test } from "@playwright/test";
-import {
-  addSendingDomain,
-  createCampaign,
-  createList,
-  createSendingServer,
-  createSubscriber,
-  getSql,
-  queueCampaign,
-} from "@sendcoop/db";
-import { closeQueues, enqueueCampaign } from "@sendcoop/queue";
+import { closeConnections, mailpitHeaders, sendCampaign } from "./campaigns";
 import { emailLink, signUpWithWorkspace, uniqueEmail } from "./helpers";
 
-const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
-
-test.afterAll(async () => {
-  await closeQueues();
-  await getSql().end();
-});
-
-/** Sends a campaign to `recipients` through the real worker. The builder UI comes in D31. */
-async function sendCampaign(slug: string, recipients: string[]) {
-  const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
-  const workspaceId = ws!.id;
-  const domain = await addSendingDomain(workspaceId, `mail.${slug}.test`);
-  const list = await createList(workspaceId, { name: "Deals", description: null });
-  if (!domain.ok || !list.ok) throw new Error("setup");
-  const server = await createSendingServer(workspaceId, {
-    name: "Mailpit",
-    type: "smtp",
-    summary: "mailpit",
-    config: {
-      type: "smtp",
-      host: process.env.SMTP_HOST ?? "localhost",
-      port: Number(process.env.SMTP_PORT ?? 1026),
-      secure: false,
-    },
-  });
-  for (const email of recipients) {
-    await createSubscriber(workspaceId, { email, firstName: null, lastName: null }, [list.list.id]);
-  }
-  const campaign = await createCampaign(workspaceId, {
-    name: "Flash sale",
-    subject: "Flash sale: 40% off today",
-    fromName: "Deals",
-    fromLocal: "news",
-    replyTo: null,
-    html: "<html><body><p>Big savings today.</p></body></html>",
-    text: "Big savings today.",
-    sendingDomainId: domain.domain.id,
-    sendingServerId: server.id,
-    listId: list.list.id,
-    segmentId: null,
-  });
-  await queueCampaign(workspaceId, campaign.id);
-  await enqueueCampaign({ campaignId: campaign.id, workspaceId });
-}
-
-async function mailpitHeaders(to: string) {
-  const search = await fetch(
-    `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`,
-  ).then((r) => r.json() as Promise<{ messages: { ID: string }[] }>);
-  return fetch(`${MAILPIT}/api/v1/message/${search.messages[0]!.ID}/headers`).then(
-    (r) => r.json() as Promise<Record<string, string[]>>,
-  );
-}
+test.afterAll(closeConnections);
 
 test("campaign emails can be unsubscribed from in one click or from the page", async ({ page }) => {
   const workspace = `Deals ${Date.now()}`;

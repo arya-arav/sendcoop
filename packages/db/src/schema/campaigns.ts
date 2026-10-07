@@ -59,6 +59,7 @@ export const campaigns = pgTable(
 );
 
 export const messageStatus = pgEnum("message_status", ["queued", "sent", "failed", "skipped"]);
+export const bounceType = pgEnum("bounce_type", ["hard", "soft"]);
 
 // One row per recipient of a campaign: the record of what was sent to whom.
 // Unique per (campaign, subscriber), so preparing twice never double-sends.
@@ -81,12 +82,20 @@ export const messages = pgTable(
     sentAt: timestamp({ withTimezone: true }),
     /** When the recipient unsubscribed using this email's link. */
     unsubscribedAt: timestamp({ withTimezone: true }),
+    // Feedback from the provider (D22).
+    bouncedAt: timestamp({ withTimezone: true }),
+    /** hard: the address doesn't exist (suppressed); soft: try again later. */
+    bounceType: bounceType(),
+    bounceDetail: text(),
+    complainedAt: timestamp({ withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex("messages_campaign_subscriber_unique").on(t.campaignId, t.subscriberId),
     index().on(t.campaignId, t.status),
     index().on(t.subscriberId),
+    // Provider feedback (bounces, complaints) names messages by their id.
+    index().on(t.providerMessageId),
   ],
 );
 

@@ -26,6 +26,7 @@ env:
   ENCRYPTION_KEY: Y2ktb25seS1rZXktZG8tbm90LXVzZS1hbnl3aGVyZSE=
   SPF_INCLUDE: amazonses.com
   ALLOW_PRIVATE_SMTP_HOSTS: "true"
+  SNS_TEST_CERT_URL: http://localhost:3998/sns-test-cert.pem
   NEXT_TELEMETRY_DISABLED: "1"
   TURBO_TELEMETRY_DISABLED: "1"
 

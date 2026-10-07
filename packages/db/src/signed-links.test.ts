@@ -1,5 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { createUnsubscribeToken, readUnsubscribeToken, unsubscribeUrls } from "./unsubscribe-token";
+import {
+  createUnsubscribeToken,
+  readSesWebhookToken,
+  readUnsubscribeToken,
+  sesWebhookUrl,
+  unsubscribeUrls,
+} from "./signed-links";
 
 const ID = "019a1b2c-3d4e-7f80-9123-456789abcdef";
 
@@ -31,5 +37,15 @@ describe("unsubscribe tokens", () => {
       page: `https://app.sendcoop.test/u/${token}`,
       oneClick: `https://app.sendcoop.test/api/unsubscribe/${token}`,
     });
+  });
+});
+
+describe("SES webhook URLs", () => {
+  it("name the server, and can't be swapped with unsubscribe tokens", () => {
+    const url = sesWebhookUrl(ID, "https://app.sendcoop.test");
+    const token = url.split("/api/webhooks/ses/")[1]!;
+    expect(readSesWebhookToken(token)).toBe(ID);
+    expect(readUnsubscribeToken(token)).toBeNull();
+    expect(readSesWebhookToken(createUnsubscribeToken(ID))).toBeNull();
   });
 });

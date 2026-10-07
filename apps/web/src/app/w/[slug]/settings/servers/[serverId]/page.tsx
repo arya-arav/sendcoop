@@ -1,4 +1,9 @@
-import { getSendingServer, getSendingServerConfig, listSendingDomains } from "@sendcoop/db";
+import {
+  getSendingServer,
+  getSendingServerConfig,
+  listSendingDomains,
+  sesWebhookUrl,
+} from "@sendcoop/db";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,6 +12,7 @@ import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { ServerEditor, TestEmailPanel } from "../server-editor";
 import { DeleteServerButton } from "./delete-server";
+import { FeedbackCard } from "./feedback-card";
 
 export default async function ServerPage({
   params,
@@ -59,6 +65,7 @@ export default async function ServerPage({
         serverId={server.id}
         domains={domains.map(({ id, domain }) => ({ id, domain }))}
       />
+      <FeedbackCard webhookUrl={sesWebhookUrl(server.id)} type={server.type} />
       <div>
         <DeleteServerButton slug={slug} id={server.id} name={server.name} />
       </div>
