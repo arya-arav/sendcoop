@@ -54,4 +54,12 @@ pnpm db:migrate                       # apply pending migrations
 pnpm db:studio                        # browse data
 ```
 
+## Auth
+
+Better Auth (`apps/web/src/lib/auth.ts`) with email + password and required email verification. Its "organizations" are our workspaces (`workspaces` / `memberships` / `invitations` tables).
+
+Flow: `/signup` → confirmation email (see Mailpit at http://localhost:8027) → `/onboarding` to name the workspace → `/w/<slug>`. Pages under `/w/<slug>` return 404 to anyone who isn't a member.
+
+Set `BETTER_AUTH_SECRET` in `.env` (`openssl rand -base64 32`).
+
 Health checks: `GET :3000/api/health`, `GET :3001/health`. Each reports Postgres and Redis, and returns 503 if either is down.

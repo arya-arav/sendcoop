@@ -55,6 +55,81 @@ export const memberships = pgTable(
   ],
 );
 
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: id(),
+    token: text().notNull().unique(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    activeWorkspaceId: uuid().references(() => workspaces.id, { onDelete: "set null" }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    ipAddress: text(),
+    userAgent: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+// Login methods per user: "credential" (email + password) or an OAuth provider.
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: text().notNull(),
+    providerId: text().notNull(),
+    password: text(),
+    accessToken: text(),
+    refreshToken: text(),
+    idToken: text(),
+    accessTokenExpiresAt: timestamp({ withTimezone: true }),
+    refreshTokenExpiresAt: timestamp({ withTimezone: true }),
+    scope: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId)],
+);
+
+// Short-lived tokens: email verification, password reset.
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: id(),
+    identifier: text().notNull(),
+    value: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.identifier)],
+);
+
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    email: text().notNull(),
+    role: text(),
+    // pending | accepted | rejected | canceled
+    status: text().notNull().default("pending"),
+    inviterId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.workspaceId), index().on(t.email)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;

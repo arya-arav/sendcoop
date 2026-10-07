@@ -1,10 +1,13 @@
-export default function Home() {
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-3 px-4">
-      <h1 className="text-3xl font-semibold tracking-tight">Sendcoop</h1>
-      <p className="text-zinc-600 dark:text-zinc-400">
-        Email marketing measured in revenue, not opens.
-      </p>
-    </main>
-  );
+import { listUserWorkspaces } from "@sendcoop/db";
+import { redirect } from "next/navigation";
+import { requireSession } from "@/lib/session";
+
+// Entry point: send people to their active workspace, or to onboarding if they have none.
+export default async function Home() {
+  const { session, user } = await requireSession();
+  const userWorkspaces = await listUserWorkspaces(user.id);
+  if (userWorkspaces.length === 0) redirect("/onboarding");
+
+  const active = userWorkspaces.find((w) => w.id === session.activeOrganizationId);
+  redirect(`/w/${(active ?? userWorkspaces[0]!).slug}`);
 }

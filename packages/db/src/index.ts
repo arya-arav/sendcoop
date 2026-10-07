@@ -3,6 +3,7 @@
 
 export { getDb, getSql, pingDatabase, type Db } from "./client";
 export * from "./schema";
+export * from "./queries/workspaces";
 
 export const SERVICE_NAMES = ["web", "worker", "edge"] as const;
 export type ServiceName = (typeof SERVICE_NAMES)[number];
