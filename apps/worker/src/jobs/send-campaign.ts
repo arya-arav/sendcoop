@@ -20,6 +20,8 @@ import {
   createDriver,
   type DkimKey,
   listUnsubscribeHeaders,
+  mergeValuesFor,
+  personalize,
   type ServerConfig,
   serverConfigSchema,
   withUnsubscribeLink,
@@ -98,13 +100,15 @@ export async function sendBatch({
       const handedOverAt = new Date();
 
       const unsubscribe = unsubscribeUrls(message.id);
+      // Merge tags and spintax, seeded by the message so a retry reads the same.
+      const content = personalize(campaign, mergeValuesFor(message), message.id);
       const raw = await buildRawMessage(
         {
           from: { email: context.from, name: campaign.fromName },
           to: message.email,
           replyTo: campaign.replyTo ?? undefined,
-          subject: campaign.subject,
-          ...withUnsubscribeLink({ html: campaign.html, text: campaign.text }, unsubscribe.page),
+          subject: content.subject,
+          ...withUnsubscribeLink(content, unsubscribe.page),
           headers: {
             ...listUnsubscribeHeaders(unsubscribe.oneClick),
             // Ties bounces and complaints back to this message (D22).

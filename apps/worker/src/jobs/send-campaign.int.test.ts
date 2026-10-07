@@ -282,3 +282,45 @@ describe("suppression", () => {
     expect(await getCampaign(ws, campaign.id)).toMatchObject({ status: "sent", sentCount: 1 });
   });
 });
+
+describe("personalization", () => {
+  it("sends each recipient their own merge tags, fallbacks and spintax", async () => {
+    const { campaign } = await setup(2);
+    const [named, anonymous] = (
+      await sql<{ id: string; email: string }[]>`
+        select s.id, s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
+        where lm.list_id = ${campaign.listId} and s.status = 'subscribed' order by s.email`
+    ).map((r) => r) as [{ id: string; email: string }, { id: string; email: string }];
+    await sql`update subscribers set first_name = 'Ana', fields = ${JSON.stringify({ coupon: "SAVE<20>" })}::jsonb
+              where id = ${named.id}`;
+    await sql`update campaigns set
+        subject = ${`{Hi|Hello} {{first_name | friend}} ${run}`},
+        html = ${'<p>{Hi|Hello} {{first_name | friend}}, code: {{coupon | none}}</p><p><a href="{{unsubscribe_url}}">Leave</a></p>'},
+        text = ${"{Hi|Hello} {{first_name | friend}}, code: {{coupon | none}}\nLeave: {{unsubscribe_url}}"}
+      where id = ${campaign.id}`;
+    await runUntil(campaign.id, (c) => c?.status === "sent");
+
+    const read = async (to: string) => {
+      const query = encodeURIComponent(`to:"${to}"`);
+      const found = (await fetch(`${MAILPIT}/api/v1/search?query=${query}`).then((r) =>
+        r.json(),
+      )) as { messages: { ID: string; Subject: string }[] };
+      const message = (await fetch(`${MAILPIT}/api/v1/message/${found.messages[0]!.ID}`).then((r) =>
+        r.json(),
+      )) as { Subject: string; HTML: string; Text: string };
+      return message;
+    };
+
+    const ana = await read(named.email);
+    expect(ana.Subject).toMatch(new RegExp(`^(Hi|Hello) Ana ${run}$`));
+    expect(ana.HTML).toMatch(/<p>(Hi|Hello) Ana, code: SAVE&#60;20&#62;<\/p>/);
+    expect(ana.Text).toMatch(/^(Hi|Hello) Ana, code: SAVE<20>\r?\nLeave: http\S+\/u\/\S+/);
+    // The design had its own unsubscribe link, so no footer was added.
+    expect(ana.HTML).not.toContain("Don't want these emails?");
+    expect(ana.HTML).toMatch(/<a href="http[^"]+\/u\/[^"]+">Leave<\/a>/);
+
+    const other = await read(anonymous.email);
+    expect(other.Subject).toMatch(new RegExp(`^(Hi|Hello) friend ${run}$`));
+    expect(other.Text).toMatch(/^(Hi|Hello) friend, code: none\r?\n/);
+  });
+});
