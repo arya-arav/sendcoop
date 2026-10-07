@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./custom-fields": "./src/custom-fields.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
@@ -12,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "lint": "eslint .",
     "typecheck": "tsc",
-    "test:integration": "vitest run"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

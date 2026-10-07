@@ -2,7 +2,9 @@
 // talk to Postgres directly.
 
 export { getDb, getSql, pingDatabase, type Db } from "./client";
+export * from "./custom-fields";
 export * from "./schema";
+export * from "./queries/custom-fields";
 export * from "./queries/lists";
 export * from "./queries/subscribers";
 export * from "./queries/workspaces";

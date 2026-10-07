@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -94,7 +95,32 @@ export const listMemberships = pgTable(
   (t) => [primaryKey({ columns: [t.listId, t.subscriberId] }), index().on(t.subscriberId)],
 );
 
+export const customFieldType = pgEnum("custom_field_type", ["text", "number", "date", "dropdown"]);
+
+// Field definitions. Values live in subscribers.fields under the field's key.
+// Key and type are fixed after creation, so stored values never change meaning.
+export const customFields = pgTable(
+  "custom_fields",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    key: text().notNull(),
+    label: text().notNull(),
+    type: customFieldType().notNull(),
+    // Allowed values for dropdown fields; empty for other types.
+    options: jsonb().$type<string[]>().notNull().default([]),
+    position: integer().notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("custom_fields_workspace_key_unique").on(t.workspaceId, t.key)],
+);
+
 export type List = typeof lists.$inferSelect;
 export type Subscriber = typeof subscribers.$inferSelect;
 export type SubscriberStatus = (typeof subscriberStatus.enumValues)[number];
 export type SubscriberSource = (typeof subscriberSource.enumValues)[number];
+export type CustomField = typeof customFields.$inferSelect;
+export type CustomFieldType = (typeof customFieldType.enumValues)[number];

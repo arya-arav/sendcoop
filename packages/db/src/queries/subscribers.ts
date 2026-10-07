@@ -1,5 +1,6 @@
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../client";
+import type { FieldValue } from "../custom-fields";
 import {
   listMemberships,
   lists,
@@ -23,6 +24,8 @@ export type SubscriberInput = {
   lastName: string | null;
   status?: SubscriberStatus;
   source?: SubscriberSource;
+  /** Custom field values, already validated with parseFieldValues. */
+  fields?: Record<string, FieldValue>;
 };
 
 export type CreateSubscriberResult =
@@ -54,6 +57,7 @@ export async function createSubscriber(
           lastName: input.lastName,
           status,
           source: input.source ?? "manual",
+          fields: input.fields ?? {},
           subscribedAt: status === "subscribed" ? new Date() : null,
         })
         .returning();

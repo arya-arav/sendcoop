@@ -1,13 +1,6 @@
-import { existsSync } from "node:fs";
 import { defineConfig } from "vitest/config";
 
-// Integration tests run against a real Postgres (DATABASE_URL), migrated first.
-if (existsSync("../../.env")) process.loadEnvFile("../../.env");
-
+// Unit tests: pure code, no database. Integration tests use vitest.integration.config.ts.
 export default defineConfig({
-  test: {
-    include: ["src/**/*.int.test.ts"],
-    // Tests share one database; run files one at a time.
-    fileParallelism: false,
-  },
+  test: { include: ["src/**/*.test.ts"], exclude: ["src/**/*.int.test.ts"] },
 });

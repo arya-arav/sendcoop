@@ -1,13 +1,20 @@
 "use server";
 
-import { createSubscriber } from "@sendcoop/db";
+import { createSubscriber, listCustomFields, parseFieldValues } from "@sendcoop/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 
 export type SubscriberFormResult =
-  { ok: true } | { ok: false; error?: string; fieldErrors?: { email?: string; name?: string } };
+  | { ok: true }
+  | {
+      ok: false;
+      error?: string;
+      fieldErrors?: { email?: string; name?: string };
+      /** Custom field errors keyed by field key. */
+      customErrors?: Record<string, string>;
+    };
 
 const optionalName = z
   .string()
@@ -37,20 +44,33 @@ export async function addSubscriberAction(
     lastName: formData.get("lastName") ?? "",
     listIds: formData.getAll("listIds"),
   });
-  if (!input.success) {
-    const { fieldErrors } = z.flattenError(input.error);
+  // Custom fields arrive as cf_<key>; validate against this workspace's definitions.
+  const definitions = await listCustomFields(workspace.id);
+  const fields = parseFieldValues(
+    definitions,
+    Object.fromEntries(definitions.map((f) => [f.key, formData.get(`cf_${f.key}`)])),
+  );
+
+  // Report every problem at once rather than one group at a time.
+  if (!input.success || !fields.ok) {
+    const errors = input.success ? undefined : z.flattenError(input.error).fieldErrors;
     return {
       ok: false,
       fieldErrors: {
-        email: fieldErrors.email?.[0],
-        name: fieldErrors.firstName?.[0] ?? fieldErrors.lastName?.[0],
+        email: errors?.email?.[0],
+        name: errors?.firstName?.[0] ?? errors?.lastName?.[0],
       },
-      error: fieldErrors.listIds ? "Pick lists from this workspace." : undefined,
+      error: errors?.listIds ? "Pick lists from this workspace." : undefined,
+      customErrors: fields.ok ? undefined : fields.errors,
     };
   }
 
   const { listIds, ...subscriber } = input.data;
-  const result = await createSubscriber(workspace.id, { ...subscriber, source: "manual" }, listIds);
+  const result = await createSubscriber(
+    workspace.id,
+    { ...subscriber, source: "manual", fields: fields.values },
+    listIds,
+  );
   if (!result.ok) {
     return result.error === "duplicate"
       ? { ok: false, fieldErrors: { email: "This email is already a subscriber." } }

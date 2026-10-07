@@ -15,14 +15,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addSubscriberAction, type SubscriberFormResult } from "./actions";
+import { CustomFieldInput, type FieldDefinitionView } from "./custom-field-input";
 
 export function AddSubscriberButton({
   slug,
   lists,
+  fields,
   label = "Add subscriber",
 }: {
   slug: string;
   lists: { id: string; name: string }[];
+  fields: FieldDefinitionView[];
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -52,7 +55,7 @@ export function AddSubscriberButton({
         {label}
       </Button>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <form onSubmit={onSubmit} className="grid gap-4">
             <DialogHeader>
               <DialogTitle>Add subscriber</DialogTitle>
@@ -94,6 +97,18 @@ export function AddSubscriberButton({
             </div>
             {failed?.fieldErrors?.name && (
               <p className="text-sm text-destructive">{failed.fieldErrors.name}</p>
+            )}
+
+            {fields.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {fields.map((field) => (
+                  <CustomFieldInput
+                    key={field.key}
+                    field={field}
+                    error={failed?.customErrors?.[field.key]}
+                  />
+                ))}
+              </div>
             )}
 
             <fieldset className="grid gap-2">

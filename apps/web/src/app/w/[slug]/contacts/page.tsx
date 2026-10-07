@@ -1,5 +1,13 @@
-import { countSubscribers, listLists, listSubscribers, type SubscriberStatus } from "@sendcoop/db";
-import { Users } from "lucide-react";
+import {
+  countSubscribers,
+  listCustomFields,
+  listLists,
+  listSubscribers,
+  type SubscriberStatus,
+} from "@sendcoop/db";
+import { SlidersHorizontal, Users } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -32,11 +40,18 @@ const statusStyle: Record<
 export default async function ContactsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
-  const [subscribers, total, lists] = await Promise.all([
+  const [subscribers, total, lists, customFields] = await Promise.all([
     listSubscribers(workspace.id, { limit: PAGE_SIZE }),
     countSubscribers(workspace.id),
     listLists(workspace.id),
+    listCustomFields(workspace.id),
   ]);
+  const fieldViews = customFields.map(({ key, label, type, options }) => ({
+    key,
+    label,
+    type,
+    options,
+  }));
   const editable = canManage(role);
   // Alphabetical, so lists are easy to find when picking.
   const listOptions = lists
@@ -54,7 +69,15 @@ export default async function ContactsPage({ params }: { params: Promise<{ slug:
               : `${numberFormat.format(total)} ${total === 1 ? "subscriber" : "subscribers"}`}
           </p>
         </div>
-        {editable && total > 0 && <AddSubscriberButton slug={slug} lists={listOptions} />}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" render={<Link href={`/w/${slug}/contacts/fields`} />}>
+            <SlidersHorizontal />
+            Custom fields
+          </Button>
+          {editable && total > 0 && (
+            <AddSubscriberButton slug={slug} lists={listOptions} fields={fieldViews} />
+          )}
+        </div>
       </div>
 
       {total === 0 ? (
@@ -72,6 +95,7 @@ export default async function ContactsPage({ params }: { params: Promise<{ slug:
             <AddSubscriberButton
               slug={slug}
               lists={listOptions}
+              fields={fieldViews}
               label="Add your first subscriber"
             />
           )}
