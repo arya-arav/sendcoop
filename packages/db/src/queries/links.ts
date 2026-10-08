@@ -56,3 +56,21 @@ export async function listCampaignLinks(workspaceId: string, campaignId: string)
     .where(and(eq(links.workspaceId, workspaceId), eq(links.campaignId, campaignId)))
     .orderBy(asc(links.variant), asc(links.position));
 }
+
+export async function getUtmSettings(workspaceId: string) {
+  const [row] = await getDb()
+    .select({ addUtm: trackingSettings.addUtm, utmSource: trackingSettings.utmSource })
+    .from(trackingSettings)
+    .where(eq(trackingSettings.workspaceId, workspaceId));
+  return row ?? { addUtm: true, utmSource: "sendcoop" };
+}
+
+export async function setUtmSettings(
+  workspaceId: string,
+  settings: { addUtm: boolean; utmSource: string },
+) {
+  await getDb()
+    .insert(trackingSettings)
+    .values({ workspaceId, ...settings })
+    .onConflictDoUpdate({ target: trackingSettings.workspaceId, set: settings });
+}

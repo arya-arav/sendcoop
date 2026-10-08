@@ -1,5 +1,11 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { pingDatabase, readClickToken, recordClick, type ServiceName } from "@sendcoop/db";
+import {
+  decorateDestination,
+  pingDatabase,
+  readClickToken,
+  recordClick,
+  type ServiceName,
+} from "@sendcoop/db";
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
 import { pingRedis } from "@sendcoop/redis";
 import { type Context, Hono } from "hono";
@@ -47,8 +53,17 @@ app.get("/c/:token", async (c) => {
   });
   if (!click) return brokenLink(c);
 
-  const destination = fillUrlTemplate(click.url, mergeValuesFor(click.subscriber));
-  if (!/^https?:\/\//i.test(destination)) return brokenLink(c);
+  const url = fillUrlTemplate(click.url, mergeValuesFor(click.subscriber));
+  if (!/^https?:\/\//i.test(url)) return brokenLink(c);
+  // UTM tags and sc_cid, or the click id in the affiliate network's sub-id.
+  const destination = decorateDestination(url, {
+    clickId: click.clickId,
+    networkId: click.link.networkId,
+    campaignName: click.campaignName,
+    label: click.link.label,
+    position: click.link.position,
+    ...click.tracking,
+  });
   c.header("cache-control", "no-store");
   return c.redirect(destination, 302);
 });

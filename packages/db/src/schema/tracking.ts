@@ -54,6 +54,9 @@ export const trackingSettings = pgTable("tracking_settings", {
     .references(() => workspaces.id, { onDelete: "cascade" }),
   /** Links on these domains (and their subdomains) count as affiliate links. */
   affiliateDomains: jsonb().$type<string[]>().notNull().default([]),
+  /** Add utm_* tags to ordinary links (those already set are kept). */
+  addUtm: boolean().notNull().default(true),
+  utmSource: text().notNull().default("sendcoop"),
   updatedAt: updatedAt(),
 });
 

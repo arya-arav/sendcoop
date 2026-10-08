@@ -197,6 +197,13 @@
       "when": 1791422795258,
       "tag": "0027_clicks",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791423388587,
+      "tag": "0028_utm_settings",
+      "breakpoints": true
     }
   ]
 }

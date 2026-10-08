@@ -22,6 +22,9 @@ export type RecordedClick = {
   url: string;
   workspaceId: string;
   campaignId: string;
+  campaignName: string;
+  link: { label: string | null; position: number; networkId: string | null };
+  tracking: { addUtm: boolean; utmSource: string };
   subscriber: {
     email: string;
     firstName: string | null;
@@ -46,8 +49,14 @@ export async function recordClick(input: {
   const ua = input.userAgent?.slice(0, 500) ?? null;
   const [row] = await getDb().execute<{
     url: string;
+    label: string | null;
+    position: number;
+    network_id: string | null;
     workspace_id: string;
     campaign_id: string;
+    campaign_name: string;
+    add_utm: boolean | null;
+    utm_source: string | null;
     email: string;
     first_name: string | null;
     last_name: string | null;
@@ -57,7 +66,8 @@ export async function recordClick(input: {
       select id, workspace_id, campaign_id, subscriber_id, email
       from messages where id = ${input.messageId}
     ), l as (
-      select links.id, links.url from links join m on links.campaign_id = m.campaign_id
+      select links.id, links.url, links.label, links.position, links.network_id
+      from links join m on links.campaign_id = m.campaign_id
       where links.id = ${input.linkId}
     ), ins as (
       insert into clicks (click_id, workspace_id, campaign_id, message_id, link_id, subscriber_id, ip, user_agent)
@@ -69,14 +79,23 @@ export async function recordClick(input: {
       where id = ${input.messageId} and clicked_at is null and exists (select 1 from l)
       returning id
     )
-    select l.url, m.workspace_id, m.campaign_id, m.email, s.first_name, s.last_name, s.fields
-    from m cross join l left join subscribers s on s.id = m.subscriber_id`);
+    select l.url, l.label, l.position, l.network_id, m.workspace_id, m.campaign_id,
+           c.name as campaign_name, t.add_utm, t.utm_source,
+           m.email, s.first_name, s.last_name, s.fields
+    from m cross join l
+    join campaigns c on c.id = m.campaign_id
+    left join tracking_settings t on t.workspace_id = m.workspace_id
+    left join subscribers s on s.id = m.subscriber_id`);
   if (!row) return null;
   return {
     clickId,
     url: row.url,
     workspaceId: row.workspace_id,
     campaignId: row.campaign_id,
+    campaignName: row.campaign_name,
+    link: { label: row.label, position: row.position, networkId: row.network_id },
+    // Defaults when the workspace never changed its tracking settings.
+    tracking: { addUtm: row.add_utm ?? true, utmSource: row.utm_source ?? "sendcoop" },
     subscriber: {
       email: row.email,
       firstName: row.first_name,

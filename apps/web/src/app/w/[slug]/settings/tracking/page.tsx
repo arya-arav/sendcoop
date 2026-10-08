@@ -1,4 +1,4 @@
-import { AFFILIATE_NETWORKS, getAffiliateDomains } from "@sendcoop/db";
+import { AFFILIATE_NETWORKS, getAffiliateDomains, getUtmSettings } from "@sendcoop/db";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -7,13 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { AffiliateDomainsForm } from "./affiliate-domains-form";
+import { UtmForm } from "./utm-form";
 
 export const metadata: Metadata = { title: "Tracking settings" };
 
 export default async function TrackingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
-  const domains = await getAffiliateDomains(workspace.id);
+  const [domains, utm] = await Promise.all([
+    getAffiliateDomains(workspace.id),
+    getUtmSettings(workspace.id),
+  ]);
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -51,6 +55,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
       </Card>
 
       <AffiliateDomainsForm slug={slug} editable={canManage(role)} initial={domains} />
+      <UtmForm slug={slug} editable={canManage(role)} initial={utm} />
     </div>
   );
 }

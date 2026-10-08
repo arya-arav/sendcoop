@@ -4,6 +4,7 @@
 export { getDb, getSql, pingDatabase, type Db } from "./client";
 export * from "./affiliate-networks";
 export * from "./custom-fields";
+export * from "./destination";
 export * from "./domain-verification";
 export * from "./imports";
 export * from "./secrets";

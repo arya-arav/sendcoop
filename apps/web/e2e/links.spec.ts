@@ -24,6 +24,9 @@ test("a campaign's links are recorded, with affiliate links marked", async ({ pa
   await page.getByRole("button", { name: "Save domains" }).click();
   await expect(page.getByRole("status")).toHaveText("Saved 1 domain.");
   await expect(page.getByLabel("Affiliate domains")).toHaveValue("mypartner.com");
+  await page.getByLabel("utm_source").fill("newsletter");
+  await page.getByRole("button", { name: "Save tagging" }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
   const reader = uniqueEmail("links-reader");
   const { campaignId } = await sendCampaign(slug, [reader], {
@@ -70,8 +73,19 @@ test("a campaign's links are recorded, with affiliate links marked", async ({ pa
 
   const response = await page.request.get(tracked[0]!, { maxRedirects: 0 });
   expect(response.status()).toBe(302);
-  expect(response.headers().location).toBe("https://vendor.hop.clickbank.net/?affiliate=me");
+  // ClickBank gets the click id in tid, for its postback.
+  const [first] = await getSql()<{ click_id: string }[]>`
+    select click_id from clicks where campaign_id = ${campaignId}`;
+  expect(response.headers().location).toBe(
+    `https://vendor.hop.clickbank.net/?affiliate=me&tid=${first!.click_id}`,
+  );
   const [click] = await getSql()<{ n: number }[]>`
     select count(*)::int as n from clicks where campaign_id = ${campaignId}`;
   expect(click!.n).toBe(1);
+
+  // An ordinary link gets UTM tags and sc_cid
+  const post = await page.request.get(tracked[2]!, { maxRedirects: 0 });
+  expect(post.headers().location).toMatch(
+    /^https:\/\/blog\.example\.com\/post\?utm_source=newsletter&utm_medium=email&utm_campaign=flash-sale&utm_content=read-the-post&sc_cid=sc\w{16}$/,
+  );
 });
