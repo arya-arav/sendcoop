@@ -13,7 +13,8 @@ test("an image is uploaded in the editor, stored publicly and shown in the email
     workspace: `Media ${Date.now()}`,
   });
   await page.locator("[data-sidebar=sidebar]").getByRole("link", { name: "Templates" }).click();
-  await page.getByRole("button", { name: "Create your first template" }).click();
+  await page.getByRole("link", { name: "Create your first template" }).click();
+  await page.getByRole("button", { name: "Start from scratch" }).click();
   await expect(page.getByRole("status")).toHaveText("All changes saved", { timeout: 20_000 });
   const templateId = page.url().split("/").pop()!;
 

@@ -8,6 +8,7 @@ export async function createTemplate(
   workspaceId: string,
   input: {
     name: string;
+    subject?: string;
     editor?: TemplateEditor;
     design?: Record<string, unknown> | null;
     mjml?: string | null;
@@ -46,6 +47,7 @@ export async function listTemplates(workspaceId: string) {
 
 export type TemplateContent = {
   name?: string;
+  subject?: string;
   design?: Record<string, unknown> | null;
   mjml?: string | null;
   html?: string;

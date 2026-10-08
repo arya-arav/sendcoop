@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { FormError } from "@/components/form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { emailBlocks } from "@/lib/email-blocks";
 import { DeleteTemplateButton } from "../template-actions";
 
@@ -44,6 +45,7 @@ export function VisualEditor({
   slug,
   templateId,
   initialName,
+  initialSubject,
   design,
   mjml,
   assets,
@@ -52,6 +54,7 @@ export function VisualEditor({
   slug: string;
   templateId: string;
   initialName: string;
+  initialSubject: string;
   design: Record<string, unknown> | null;
   mjml: string | null;
   /** Absolute URL of the placeholder images used by blocks. */
@@ -62,6 +65,7 @@ export function VisualEditor({
   const container = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const [name, setName] = useState(initialName);
+  const [subject, setSubject] = useState(initialSubject);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -193,6 +197,7 @@ export function VisualEditor({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name,
+        subject,
         design: editor.getProjectData(),
         mjml: source,
       }),
@@ -256,6 +261,21 @@ export function VisualEditor({
             Save
           </Button>
         </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <Label htmlFor="template-subject" className="shrink-0 text-muted-foreground">
+          Subject line
+        </Label>
+        <Input
+          id="template-subject"
+          value={subject}
+          maxLength={200}
+          placeholder="Suggested subject for campaigns. Merge tags and spintax work here too."
+          onChange={(e) => {
+            setSubject(e.target.value);
+            setStatus("unsaved");
+          }}
+        />
       </div>
       <FormError message={error} />
       {warnings.length > 0 && (

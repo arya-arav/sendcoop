@@ -18,6 +18,7 @@ const saveSchema = z.object({
     .trim()
     .min(1, "Give the template a name.")
     .max(100, "Keep the name under 100 characters."),
+  subject: z.string().trim().max(200, "Keep the subject under 200 characters.").default(""),
   design: z.record(z.string(), z.unknown()),
   mjml: z.string().max(MAX_CODE, "This design is too large."),
 });
@@ -42,10 +43,11 @@ export async function PUT(
   const parsed = saveSchema.safeParse(data);
   if (!parsed.success) return jsonError(400, parsed.error.issues[0]?.message ?? "Invalid design.");
 
-  const { name, design, mjml } = parsed.data;
+  const { name, subject, design, mjml } = parsed.data;
   const { html, errors, bytes, clipped } = await compileMjml(mjml);
   const saved = await updateTemplate(access.workspace.id, templateId, {
     name,
+    subject,
     design,
     mjml,
     html,

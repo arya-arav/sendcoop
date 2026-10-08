@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -15,26 +15,43 @@ import {
 import { Button } from "@/components/ui/button";
 import { createTemplateAction, deleteTemplateAction } from "./actions";
 
-export function NewTemplateButton({
+/** Creates a template (from a starter, or blank) and opens the editor. */
+export function UseStarterButton({
   slug,
-  label = "New template",
+  starterId,
+  label,
+  name,
 }: {
   slug: string;
-  label?: string;
+  starterId?: string;
+  label: string;
+  /** For screen readers when several buttons share a label. */
+  name?: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Button
-      disabled={pending}
-      onClick={() =>
-        startTransition(async () => {
-          await createTemplateAction(slug);
-        })
-      }
-    >
-      <Plus />
-      {pending ? "Creating…" : label}
-    </Button>
+    <div className="grid gap-2">
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button
+        className="w-full"
+        variant={starterId ? "outline" : "default"}
+        disabled={pending}
+        aria-label={name ? `${label}: ${name}` : undefined}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await createTemplateAction(slug, starterId);
+            if (result?.error) setError(result.error);
+          })
+        }
+      >
+        {pending ? "Creating…" : label}
+      </Button>
+    </div>
   );
 }
 

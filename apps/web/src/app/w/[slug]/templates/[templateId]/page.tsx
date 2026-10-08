@@ -28,6 +28,7 @@ export default async function TemplatePage({
       slug={slug}
       templateId={template.id}
       initialName={template.name}
+      initialSubject={template.subject}
       design={template.design}
       mjml={template.mjml}
       assets={`${appUrl()}/email`}

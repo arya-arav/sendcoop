@@ -12,7 +12,8 @@ test("a template is designed in the visual editor, saved and reloaded", async ({
 
   await page.locator("[data-sidebar=sidebar]").getByRole("link", { name: "Templates" }).click();
   await expect(page.getByText("No templates yet")).toBeVisible();
-  await page.getByRole("button", { name: "Create your first template" }).click();
+  await page.getByRole("link", { name: "Create your first template" }).click();
+  await page.getByRole("button", { name: "Start from scratch" }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${slug}/templates/[0-9a-f-]+$`));
   const status = page.getByRole("status");
   await expect(status).toHaveText("All changes saved", { timeout: 20_000 });

@@ -1,6 +1,7 @@
 import {
   addSendingDomain,
   createCampaign,
+  createCampaignFromTemplate,
   createList,
   createSendingServer,
   createSubscriber,
@@ -14,11 +15,16 @@ import { closeQueues, enqueueCampaign } from "@sendcoop/queue";
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
 
-/** Sends a campaign from a new Mailpit server named "Mailpit" to `recipients`, optionally slowly. */
+type Recipient = string | { email: string; firstName: string };
+
+/**
+ * Sends a campaign from a new Mailpit server named "Mailpit" to `recipients`:
+ * optionally slowly, or with a template's content.
+ */
 export async function sendCampaign(
   slug: string,
-  recipients: string[],
-  { maxPerSecond = null }: { maxPerSecond?: number | null } = {},
+  recipients: Recipient[],
+  { maxPerSecond = null, templateId }: { maxPerSecond?: number | null; templateId?: string } = {},
 ) {
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
@@ -37,22 +43,30 @@ export async function sendCampaign(
     },
     limits: { maxPerSecond, maxPerHour: null, maxPerDay: null },
   });
-  for (const email of recipients) {
-    await createSubscriber(workspaceId, { email, firstName: null, lastName: null }, [list.list.id]);
+  for (const recipient of recipients) {
+    const { email, firstName = null } =
+      typeof recipient === "string" ? { email: recipient } : recipient;
+    await createSubscriber(workspaceId, { email, firstName, lastName: null }, [list.list.id]);
   }
-  const campaign = await createCampaign(workspaceId, {
-    name: "Flash sale",
-    subject: "Flash sale: 40% off today",
+  const settings = {
     fromName: "Deals",
     fromLocal: "news",
     replyTo: null,
-    html: "<html><body><p>Big savings today.</p></body></html>",
-    text: "Big savings today.",
     sendingDomainId: domain.domain.id,
     sendingServerId: server.id,
     listId: list.list.id,
     segmentId: null,
-  });
+  };
+  const campaign = templateId
+    ? await createCampaignFromTemplate(workspaceId, templateId, settings)
+    : await createCampaign(workspaceId, {
+        ...settings,
+        name: "Flash sale",
+        subject: "Flash sale: 40% off today",
+        html: "<html><body><p>Big savings today.</p></body></html>",
+        text: "Big savings today.",
+      });
+  if (!campaign) throw new Error("template not found");
   await queueCampaign(workspaceId, campaign.id);
   await enqueueCampaign({ campaignId: campaign.id, workspaceId });
   return { campaignId: campaign.id };

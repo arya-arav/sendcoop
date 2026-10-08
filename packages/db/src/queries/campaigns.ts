@@ -1,6 +1,6 @@
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../client";
-import { type Campaign, campaigns, messages, segments, subscribers } from "../schema";
+import { type Campaign, campaigns, messages, segments, subscribers, templates } from "../schema";
 import { subscriberConditions } from "./subscribers";
 import { suppressedSql } from "./suppressions";
 
@@ -28,6 +28,34 @@ export async function createCampaign(workspaceId: string, input: CampaignInput) 
     .values({ workspaceId, ...input })
     .returning();
   return row!;
+}
+
+/**
+ * A campaign with a template's content. The content is copied, so editing
+ * the template later never changes this campaign. Name and subject default
+ * to the template's. Null if the template isn't in this workspace.
+ */
+export async function createCampaignFromTemplate(
+  workspaceId: string,
+  templateId: string,
+  input: Omit<CampaignInput, "name" | "subject" | "html" | "text"> & {
+    name?: string;
+    subject?: string;
+  },
+) {
+  const [template] = await getDb()
+    .select()
+    .from(templates)
+    .where(and(eq(templates.workspaceId, workspaceId), eq(templates.id, templateId)));
+  if (!template) return null;
+  const { name, subject, ...settings } = input;
+  return createCampaign(workspaceId, {
+    ...settings,
+    name: name || template.name,
+    subject: subject || template.subject || template.name,
+    html: template.html,
+    text: template.text,
+  });
 }
 
 export async function getCampaign(workspaceId: string, campaignId: string) {

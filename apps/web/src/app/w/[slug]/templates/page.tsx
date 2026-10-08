@@ -1,8 +1,9 @@
 import { listTemplates, type TemplateEditor } from "@sendcoop/db";
-import { FileText } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -14,7 +15,6 @@ import {
 } from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
-import { NewTemplateButton } from "./template-actions";
 
 export const metadata: Metadata = { title: "Templates" };
 
@@ -38,10 +38,15 @@ export default async function TemplatesPage({ params }: { params: Promise<{ slug
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
           <p className="text-sm text-muted-foreground">
-            Reusable email designs. Start a campaign from one and change it as you like.
+            Reusable email designs. Start one from the gallery or from scratch.
           </p>
         </div>
-        {editable && templates.length > 0 && <NewTemplateButton slug={slug} />}
+        {editable && templates.length > 0 && (
+          <Link href={`/w/${slug}/templates/new`} className={buttonVariants()}>
+            <Plus />
+            New template
+          </Link>
+        )}
       </div>
 
       {templates.length === 0 ? (
@@ -53,7 +58,12 @@ export default async function TemplatesPage({ params }: { params: Promise<{ slug
               Design an email once with the drag-and-drop editor and reuse it.
             </p>
           </div>
-          {editable && <NewTemplateButton slug={slug} label="Create your first template" />}
+          {editable && (
+            <Link href={`/w/${slug}/templates/new`} className={buttonVariants()}>
+              <Plus />
+              Create your first template
+            </Link>
+          )}
         </Card>
       ) : (
         <Card className="py-0">

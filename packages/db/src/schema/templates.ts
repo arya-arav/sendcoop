@@ -15,6 +15,8 @@ export const templates = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    /** Suggested subject line for campaigns made from it. */
+    subject: text().notNull().default(""),
     editor: templateEditor().notNull().default("visual"),
     /** The visual editor's project (GrapesJS), reloaded to keep editing. */
     design: jsonb().$type<Record<string, unknown>>(),
