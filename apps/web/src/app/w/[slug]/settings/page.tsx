@@ -1,4 +1,12 @@
-import { Globe, KeyRound, MousePointerClick, ReceiptText, Send, Users } from "lucide-react";
+import {
+  Globe,
+  KeyRound,
+  MousePointerClick,
+  ReceiptText,
+  Send,
+  Users,
+  Webhook,
+} from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +48,12 @@ const sections = [
     description: "Connect other tools to this workspace.",
     icon: KeyRound,
     path: "/settings/api",
+  },
+  {
+    title: "Webhooks",
+    description: "Tell your other tools when people subscribe, click and buy.",
+    icon: Webhook,
+    path: "/settings/webhooks",
   },
 ];
 

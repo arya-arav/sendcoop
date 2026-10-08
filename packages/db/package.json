@@ -12,7 +12,8 @@
     "./postback-templates": "./src/postback-templates.ts",
     "./automations": "./src/automations.ts",
     "./automation-templates": "./src/automation-templates.ts",
-    "./plans": "./src/plans.ts"
+    "./plans": "./src/plans.ts",
+    "./webhook-events": "./src/webhook-events.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

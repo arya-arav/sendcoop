@@ -58,3 +58,26 @@ function isFromSendcoop(rawBody, headers, secret) {
 
 Webhooks go to public `https://` addresses. Private and internal addresses (10.x, 192.168.x,
 localhost, cloud metadata and so on) are refused, and redirects aren't followed.
+
+## Event webhooks
+
+Besides automation steps, Sendcoop can tell your endpoints about events as
+they happen (Settings > Webhooks; Growth and Pro plans). Choose events per
+endpoint:
+
+| Event                     | When                                                           | `data`                                                                                                                                             |
+| ------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `subscriber.subscribed`   | Someone is added as subscribed, or confirms a double opt-in    | `id`, `email`, `first_name`, `last_name`, `status`, `source`, `fields`                                                                             |
+| `subscriber.unsubscribed` | Someone unsubscribes, however it happens                       | the same                                                                                                                                           |
+| `email.clicked`           | A person (not a bot or link scanner) clicks a link in an email | `click_id`, `campaign_id`, `subscriber_id`, `email`, `url`, `clicked_at`                                                                           |
+| `conversion.created`      | A sale, lead or refund is recorded                             | `id`, `event`, `status`, `value`, `currency`, `txid`, `source`, `click_id`, `campaign_id`, `automation_id`, `subscriber_id`, `email`, `created_at` |
+
+Each POST body is `{ "id", "event", "created_at", "data" }`, signed like the
+automation webhooks above (`Sendcoop-Timestamp`, `Sendcoop-Signature`). The
+`id` is the delivery's: use it to ignore a repeat. "Send test" posts a
+`webhook.test` event.
+
+Answer with a 2xx within 10 seconds. Otherwise the delivery is tried again
+after 1, 5, 30, 120 and 360 minutes, then marked failed. After 20 failed
+deliveries in a row the endpoint turns itself off; turn it back on once it's
+fixed. The settings page lists the last 30 deliveries and how they went.

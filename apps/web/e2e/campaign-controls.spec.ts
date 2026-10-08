@@ -30,7 +30,9 @@ test("a sending campaign is paused, resumed and finishes", async ({ page }) => {
 
   await page.getByRole("button", { name: "Pause Flash sale" }).click();
   await expect(page.getByText("Paused. Nobody else gets it until you resume.")).toBeVisible();
-  await page.waitForTimeout(1500);
+  // Batches check for a pause every second, and a message already waiting on
+  // the rate limit still goes: let those settle.
+  await page.waitForTimeout(3000);
   const atPause = await sent();
   await page.waitForTimeout(2000);
   expect(await sent()).toBe(atPause);

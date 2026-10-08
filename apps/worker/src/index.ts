@@ -31,6 +31,7 @@ import {
 import { refreshFxRates } from "./jobs/fx-rates";
 import { processImport } from "./jobs/import-subscribers";
 import { applyUtmcapEvent } from "./jobs/utmcap-events";
+import { sendWebhookDeliveries } from "./jobs/webhook-deliveries";
 import {
   decideAbTests,
   prepareCampaign,
@@ -115,6 +116,9 @@ const workers = [
             `[${service}] FX rates for ${result.day}: ${result.stored} currencies, ${result.converted} conversions converted`,
           );
         }
+      }
+      if (job.name === MAINTENANCE_JOBS.webhookDeliveries.name) {
+        await sendWebhookDeliveries();
       }
       if (job.name === MAINTENANCE_JOBS.accountHealth.name) {
         for (const userId of await recentlySendingAccounts()) {

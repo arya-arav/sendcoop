@@ -20,6 +20,8 @@ export const QUEUES = {
 /** Recurring jobs on the maintenance queue, by name. */
 export const MAINTENANCE_JOBS = {
   verifyDomains: { name: "verify-domains", everyMs: 10 * 60_000 },
+  /** Sends queued outgoing webhooks (D78). */
+  webhookDeliveries: { name: "webhook-deliveries", everyMs: 3_000 },
   /** Suspends accounts whose last week drew too many complaints or bounces (D76). */
   accountHealth: { name: "account-health", everyMs: 10 * 60_000 },
   /** Starts scheduled campaigns whose time has come. */

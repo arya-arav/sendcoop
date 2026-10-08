@@ -17,6 +17,8 @@ process.env.ANTHROPIC_API_KEY ??= "sk-ant-e2e-fake";
 process.env.STRIPE_API_BASE ??= "http://127.0.0.1:3011";
 process.env.STRIPE_SECRET_KEY ??= "sk_test_e2e_fake";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_e2e_fake";
+// Outgoing webhooks go to a local test endpoint (e2e/webhooks.spec.ts).
+process.env.SENDCOOP_ALLOW_PRIVATE_WEBHOOKS ??= "1";
 
 // Needs Postgres, Redis and Mailpit running (`pnpm services:up` locally,
 // service containers in CI). Locally, set PW_CHANNEL=msedge to use the
