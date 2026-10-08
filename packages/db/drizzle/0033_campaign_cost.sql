@@ -1,0 +1,1 @@
+ALTER TABLE "campaigns" ADD COLUMN "cost" numeric(12, 2);

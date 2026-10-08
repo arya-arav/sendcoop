@@ -232,6 +232,13 @@
       "when": 1791428773790,
       "tag": "0032_lead_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791455132028,
+      "tag": "0033_campaign_cost",
+      "breakpoints": true
     }
   ]
 }

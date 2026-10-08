@@ -29,7 +29,8 @@ export async function sendCampaign(
     maxPerSecond = null,
     templateId,
     html = "<html><body><p>Big savings today.</p></body></html>",
-  }: { maxPerSecond?: number | null; templateId?: string; html?: string } = {},
+    name = "Flash sale",
+  }: { maxPerSecond?: number | null; templateId?: string; html?: string; name?: string } = {},
 ) {
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
@@ -67,7 +68,7 @@ export async function sendCampaign(
     ? await createCampaignFromTemplate(workspaceId, templateId, settings)
     : await createCampaign(workspaceId, {
         ...settings,
-        name: "Flash sale",
+        name,
         subject: "Flash sale: 40% off today",
         html,
         text: "Big savings today.",

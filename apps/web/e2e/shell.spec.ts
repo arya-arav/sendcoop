@@ -9,10 +9,10 @@ test("sidebar shows navigation, with unbuilt sections marked as coming soon", as
   });
   const sidebar = page.locator("[data-sidebar=sidebar]");
 
-  for (const item of ["Dashboard", "Contacts", "Lists"]) {
+  for (const item of ["Dashboard", "Contacts", "Lists", "Revenue"]) {
     await expect(sidebar.getByRole("link", { name: item })).toBeVisible();
   }
-  for (const item of ["Automations", "Revenue", "Integrations"]) {
+  for (const item of ["Automations", "Integrations"]) {
     await expect(sidebar.getByRole("button", { name: item })).toBeDisabled();
   }
 });

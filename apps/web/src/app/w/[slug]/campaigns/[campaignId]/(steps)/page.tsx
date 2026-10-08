@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
+import { CostForm } from "./cost-form";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { CampaignControls, LiveRefresh } from "../../campaign-controls";
 import { UnscheduleButton } from "./unschedule-button";
@@ -111,7 +112,10 @@ export default async function CampaignPage({
     {
       label: "Revenue",
       value: report.revenue.toLocaleString("en", { style: "currency", currency: "USD" }),
-      detail: "From tracked conversions",
+      detail:
+        campaign.cost !== null && campaign.cost > 0
+          ? `Return ${(((report.revenue - campaign.cost) / campaign.cost) * 100).toLocaleString("en", { maximumFractionDigits: 1 })}% on ${campaign.cost.toLocaleString("en", { style: "currency", currency: "USD" })} cost`
+          : "From tracked conversions",
     },
   ];
   const variantB = campaign.abTest ? await getVariantB(campaign.id) : null;
@@ -181,6 +185,9 @@ export default async function CampaignPage({
             </Card>
           ))}
         </section>
+      )}
+      {campaign.status !== "queued" && canManage(role) && (
+        <CostForm slug={slug} campaignId={campaign.id} cost={campaign.cost} />
       )}
       {campaign.abTest && ab && (
         <Card>

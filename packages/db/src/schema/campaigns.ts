@@ -105,6 +105,8 @@ export const campaigns = pgTable(
     error: text(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
+    /** What the campaign cost (list rental, ads, copywriting), for ROI in reports (D51). */
+    cost: numeric({ precision: 12, scale: 2, mode: "number" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

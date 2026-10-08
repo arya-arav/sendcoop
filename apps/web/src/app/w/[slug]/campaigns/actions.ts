@@ -15,6 +15,7 @@ import {
   queueCampaign,
   scheduleCampaign,
   setAbTest,
+  setCampaignCost,
   unscheduleCampaign,
   updateDraftCampaign,
   type VariantB,
@@ -367,5 +368,27 @@ export async function controlCampaignAction(
   }
   revalidatePath(`/w/${slug}/campaigns`);
   revalidatePath(`/w/${slug}/campaigns/${campaignId}`);
+  return { ok: true as const };
+}
+
+/** What the campaign cost, for ROI in revenue reports. Empty clears it. */
+export async function setCampaignCostAction(slug: string, campaignId: string, raw: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  const text = raw.trim().replace(/^\$/, "").replace(/,/g, "");
+  const cost = text === "" ? null : Number(text);
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 1e9)) {
+    return { ok: false as const, error: "Enter an amount, e.g. 250, or leave it empty." };
+  }
+  const saved = await setCampaignCost(
+    workspace.id,
+    campaignId,
+    cost === null ? null : Math.round(cost * 100) / 100,
+  );
+  if (!saved) return { ok: false as const, error: "This campaign doesn't exist anymore." };
+  revalidatePath(`/w/${slug}/campaigns/${campaignId}`);
+  revalidatePath(`/w/${slug}/revenue`);
   return { ok: true as const };
 }

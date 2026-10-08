@@ -40,6 +40,7 @@ export * from "./queries/leads";
 export * from "./queries/lists";
 export * from "./queries/media";
 export * from "./queries/reports";
+export * from "./queries/revenue";
 export * from "./queries/segments";
 export * from "./queries/sending-domains";
 export * from "./queries/sending-servers";

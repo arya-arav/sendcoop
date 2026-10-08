@@ -38,7 +38,7 @@ const items: NavItem[] = [
   { title: "Campaigns", path: "/campaigns", icon: Mail, ready: true },
   { title: "Automations", path: "/automations", icon: Workflow, ready: false },
   { title: "Templates", path: "/templates", icon: FileText, ready: true },
-  { title: "Revenue", path: "/revenue", icon: BarChart3, ready: false },
+  { title: "Revenue", path: "/revenue", icon: BarChart3, ready: true },
   { title: "Integrations", path: "/integrations", icon: Plug, ready: false },
   { title: "Deliverability", path: "/deliverability", icon: ShieldCheck, ready: true },
   { title: "Settings", path: "/settings", icon: Settings, ready: true },
