@@ -7,11 +7,14 @@ import {
   getSql,
 } from "@sendcoop/db";
 import { signUpWithWorkspace, uniqueEmail } from "./helpers";
-import { waitForTrackedUrls } from "./tracked";
+import { CHROME, waitForTrackedUrls } from "./tracked";
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
 
-test("a live automation emails someone who joins its list", async ({ page }) => {
+test("a live automation emails someone who joins its list, and shows what the email earned", async ({
+  page,
+  request,
+}) => {
   test.setTimeout(90_000);
   const slug = await signUpWithWorkspace(page, {
     name: "Welcomer",
@@ -98,4 +101,19 @@ test("a live automation emails someone who joins its list", async ({ page }) => 
   await expect(
     page.getByRole("table", { name: "Automations" }).getByRole("row", { name: /Welcome/ }),
   ).toContainText("Live");
+
+  // The member clicks like a person and buys: the email step shows what it earned
+  await page.waitForTimeout(5500);
+  const hop = await request.get(links[0]!, { headers: { "user-agent": CHROME }, maxRedirects: 0 });
+  const clickId = new URL(hop.headers().location!).searchParams.get("sc_cid")!;
+  await page.goto(`/w/${slug}/settings/tracking`);
+  const postback = await page.getByLabel("Postback URL", { exact: true }).inputValue();
+  await request.get(
+    postback.replace("{subid}", clickId).replace("{payout}", "42").replace("{txid}", "WELCOME-1"),
+  );
+  await page.goto(automationUrl);
+  await expect(page.getByRole("region", { name: "Results" })).toContainText(
+    "$42.00 from 1 conversion",
+  );
+  await expect(page.getByText("1 sent · 0% opened · 100% clicked · $42.00")).toBeVisible();
 });

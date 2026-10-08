@@ -1,5 +1,7 @@
 import {
+  automationReport,
   getAutomation,
+  getReportingCurrency,
   listCampaigns,
   listCustomFields,
   listLists,
@@ -25,12 +27,14 @@ export default async function AutomationPage({
   if (!canManage(role)) notFound();
   const automation = await getAutomation(workspace.id, automationId);
   if (!automation) notFound();
-  const [lists, tags, segments, campaigns, fields] = await Promise.all([
+  const [lists, tags, segments, campaigns, fields, report, currency] = await Promise.all([
     listLists(workspace.id),
     listTags(workspace.id),
     listSegments(workspace.id),
     listCampaigns(workspace.id),
     listCustomFields(workspace.id),
+    automationReport(workspace.id, automation.id),
+    getReportingCurrency(workspace.id),
   ]);
   const options = (rows: { id: string; name: string }[]) =>
     rows.map(({ id, name }) => ({ id, name }));
@@ -44,6 +48,8 @@ export default async function AutomationPage({
       initialGraph={automation.graph}
       status={automation.status}
       initialExitOnConversion={automation.exitOnConversion}
+      report={report}
+      currency={currency}
       context={{
         lists: options(lists),
         tags: options(tags),

@@ -11,6 +11,7 @@ import {
   type NodeType,
   type WaitStep,
 } from "@sendcoop/db/automations";
+import type { AutomationReport } from "@sendcoop/db";
 import { operatorsFor, type SegmentFieldInfo } from "@sendcoop/db/segments";
 import {
   addEdge,
@@ -48,6 +49,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
   activateAutomationAction,
@@ -69,7 +71,7 @@ export type BuilderContext = {
 };
 
 /** Node data on the canvas: the step's own data, plus its summary line. */
-type StepData = Record<string, unknown> & { summary?: string; label?: string };
+type StepData = Record<string, unknown> & { summary?: string; label?: string; stats?: string };
 type FlowNode = Node<StepData, NodeType>;
 
 const ICONS: Record<NodeType, typeof Mail> = {
@@ -167,6 +169,9 @@ function StepNode({ data, type, selected }: NodeProps<FlowNode>) {
         {type === "email" ? (data as { name?: string }).name || "Email" : TITLES[type]}
       </div>
       <p className="truncate text-sm font-medium">{data.summary}</p>
+      {data.stats && (
+        <p className="truncate text-xs text-muted-foreground tabular-nums">{data.stats}</p>
+      )}
       {type === "condition" ? (
         <>
           <Handle type="source" id="yes" position={Position.Bottom} style={{ left: "30%" }} />
@@ -217,6 +222,7 @@ function toGraph(nodes: FlowNode[], edges: Edge[]): AutomationGraph {
       const rest: Record<string, unknown> = { ...data };
       delete rest.summary;
       delete rest.label;
+      delete rest.stats;
       return {
         id,
         type: type!,
@@ -253,6 +259,8 @@ export function FlowBuilder({
   status,
   initialExitOnConversion,
   context,
+  report,
+  currency,
 }: {
   slug: string;
   automationId: string;
@@ -262,6 +270,9 @@ export function FlowBuilder({
   status: "draft" | "active" | "paused";
   initialExitOnConversion: boolean;
   context: BuilderContext;
+  /** Runs and results so far; null for a draft that never ran. */
+  report: AutomationReport | null;
+  currency: string;
 }) {
   const start = useMemo(() => toFlow(initialGraph), [initialGraph]);
   const [name, setName] = useState(initialName);
@@ -277,21 +288,26 @@ export function FlowBuilder({
   const locked = status === "active";
 
   const graph = toGraph(nodes, edges);
-  const shown: FlowNode[] = nodes.map((n) => ({
-    ...n,
-    data: {
-      ...n.data,
-      summary:
-        n.type === "trigger"
-          ? describeTrigger(trigger, context)
-          : describe(
-              graph.nodes.find((g) => g.id === n.id)!,
-              graph.nodes,
-              context,
-            ),
-    },
-    ariaLabel: `${TITLES[n.type!]} step`,
-  }));
+  const shown: FlowNode[] = nodes
+    .map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        summary:
+          n.type === "trigger"
+            ? describeTrigger(trigger, context)
+            : describe(
+                graph.nodes.find((g) => g.id === n.id)!,
+                graph.nodes,
+                context,
+              ),
+      },
+      ariaLabel: `${TITLES[n.type!]} step`,
+    }))
+    .map((n) => ({
+      ...n,
+      data: { ...n.data, stats: statsLine(n.type!, report?.steps[n.id], currency) },
+    }));
   const selected = graph.nodes.find((n) => n.id === selectedId) ?? null;
   const readiness = automationProblem(trigger, graph, { activating: true });
 
@@ -544,6 +560,19 @@ export function FlowBuilder({
         </div>
 
         <aside className="grid content-start gap-4 overflow-y-auto">
+          {report && report.runs.started > 0 && (
+            <section aria-label="Results" className="grid gap-1 rounded-lg border p-3 text-sm">
+              <h2 className="font-medium">Results</h2>
+              <p className="tabular-nums">
+                {formatMoney(report.revenue, currency)} from {report.conversions}{" "}
+                {report.conversions === 1 ? "conversion" : "conversions"}
+              </p>
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {report.runs.started} started · {report.runs.active} in progress ·{" "}
+                {report.runs.completed} finished · {report.runs.exited} left early
+              </p>
+            </section>
+          )}
           <nav aria-label="Steps" className="grid gap-1">
             <h2 className="text-sm font-medium">Steps</h2>
             <ol className="grid gap-1">
@@ -1242,4 +1271,20 @@ function FieldRule({
         ))}
     </>
   );
+}
+
+/** A step's numbers, under its summary on the canvas. */
+function statsLine(
+  type: NodeType,
+  stats: AutomationReport["steps"][string] | undefined,
+  currency: string,
+): string | undefined {
+  if (!stats || (stats.entered === 0 && !stats.waiting)) return undefined;
+  if (type === "email") {
+    const pct = (n = 0) => (stats.sent ? `${Math.round((n / stats.sent) * 100)}%` : "0%");
+    return `${stats.sent ?? 0} sent · ${pct(stats.opened)} opened · ${pct(stats.clicked)} clicked · ${formatMoney(stats.revenue ?? 0, currency)}`;
+  }
+  if (type === "condition") return `Yes ${stats.yes ?? 0} · No ${stats.no ?? 0}`;
+  if (type === "wait") return `${stats.waiting ?? 0} waiting · ${stats.entered} so far`;
+  return `${stats.entered} reached`;
 }

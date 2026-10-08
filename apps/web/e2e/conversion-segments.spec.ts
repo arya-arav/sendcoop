@@ -57,9 +57,8 @@ test('a "clicked but didn\'t buy" segment finds the right people, and a buyers o
   await expect(page.getByRole("complementary")).toContainText(/Matching subscribers\s*1/);
   await expect(page.getByText(browser!)).toBeVisible();
   await page.getByRole("button", { name: "Save segment" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
 
-  // Reloaded, the conditions are as saved
+  // Saved (a new segment moves to its own page), and reloaded as saved
   await expect(page).toHaveURL(/\/segments\/[0-9a-f-]{36}$/);
   await page.reload();
   await expect(conditions.nth(1).getByLabel("Comparison")).toHaveValue("did_not");

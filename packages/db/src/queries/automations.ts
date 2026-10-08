@@ -206,3 +206,94 @@ export async function setAutomationStatus(
       );
   });
 }
+
+export type AutomationStepStats = {
+  /** Runs that reached this step. */
+  entered: number;
+  /** Email steps. */
+  sent?: number;
+  opened?: number;
+  clicked?: number;
+  conversions?: number;
+  revenue?: number;
+  /** Conditions: which way runs went. */
+  yes?: number;
+  no?: number;
+  /** Waits: runs waiting here now. */
+  waiting?: number;
+};
+
+export type AutomationReport = {
+  runs: { started: number; active: number; completed: number; exited: number; failed: number };
+  revenue: number;
+  conversions: number;
+  steps: Record<string, AutomationStepStats>;
+};
+
+/**
+ * How an automation is doing (D68): runs, and per step who got there, and
+ * for each email what it earned (approved conversions credited to it, in
+ * the reporting currency, as in campaign reports).
+ */
+export async function automationReport(
+  workspaceId: string,
+  automationId: string,
+): Promise<AutomationReport | null> {
+  const automation = await getAutomation(workspaceId, automationId);
+  if (!automation) return null;
+  const db = getDb();
+  const [[runs], logs, waiting] = await Promise.all([
+    db.execute<AutomationReport["runs"]>(sql`
+      select count(*)::int as started,
+             count(*) filter (where status in ('active', 'waiting'))::int as active,
+             count(*) filter (where status = 'completed')::int as completed,
+             count(*) filter (where status = 'exited')::int as exited,
+             count(*) filter (where status = 'failed')::int as failed
+      from automation_runs where automation_id = ${automationId}`),
+    db.execute<{ node_id: string; entered: number; yes: number; no: number }>(sql`
+      select node_id, count(*)::int as entered,
+             count(*) filter (where detail->>'branch' = 'yes')::int as yes,
+             count(*) filter (where detail->>'branch' = 'no')::int as no
+      from automation_step_logs where automation_id = ${automationId}
+      group by node_id`),
+    db.execute<{ node_id: string; n: number }>(sql`
+      select current_node_id as node_id, count(*)::int as n from automation_runs
+      where automation_id = ${automationId} and status = 'waiting'
+      group by current_node_id`),
+  ]);
+  const steps: Record<string, AutomationStepStats> = {};
+  for (const node of automation.graph.nodes) {
+    const log = logs.find((l) => l.node_id === node.id);
+    steps[node.id] = { entered: log?.entered ?? 0 };
+    if (node.type === "condition")
+      Object.assign(steps[node.id]!, { yes: log?.yes ?? 0, no: log?.no ?? 0 });
+    if (node.type === "wait") {
+      steps[node.id]!.waiting = waiting.find((w) => w.node_id === node.id)?.n ?? 0;
+    }
+  }
+  const emails = automation.graph.nodes.flatMap((n) =>
+    n.type === "email" && n.data.campaignId ? [{ id: n.id, campaignId: n.data.campaignId }] : [],
+  );
+  let revenue = 0;
+  let conversions = 0;
+  for (const email of emails) {
+    const [m] = await db.execute<{
+      sent: number;
+      opened: number;
+      clicked: number;
+      revenue: number;
+      conversions: number;
+    }>(sql`
+      select count(*) filter (where status = 'sent')::int as sent,
+             count(*) filter (where opened_at is not null)::int as opened,
+             count(*) filter (where clicked_at is not null)::int as clicked,
+             coalesce(sum(revenue), 0)::float8 as revenue,
+             (select count(*) from conversions v where v.campaign_id = ${email.campaignId}
+                and v.status = 'approved')::int as conversions
+      from messages where campaign_id = ${email.campaignId}`);
+    Object.assign(steps[email.id]!, m);
+    revenue += m!.revenue;
+    conversions += m!.conversions;
+  }
+  return { runs: runs!, revenue: Math.round(revenue * 100) / 100, conversions, steps };
+}
