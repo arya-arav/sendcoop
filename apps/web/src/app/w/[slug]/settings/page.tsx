@@ -39,7 +39,7 @@ const sections = [
     title: "API keys",
     description: "Connect other tools to this workspace.",
     icon: KeyRound,
-    path: null,
+    path: "/settings/api",
   },
 ];
 

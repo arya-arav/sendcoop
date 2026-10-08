@@ -32,6 +32,8 @@ export * from "./queries/automation-triggers";
 export * from "./queries/automations";
 export * from "./queries/abuse";
 export * from "./queries/admin";
+export * from "./queries/api-keys";
+export * from "./queries/rest-api";
 export * from "./queries/billing";
 export * from "./queries/quotas";
 export * from "./queries/team";
