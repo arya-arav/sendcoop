@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { CampaignControls, LiveRefresh } from "../../campaign-controls";
 import { UnscheduleButton } from "./unschedule-button";
 
 /** The schedule in words, e.g. "Mon, 12 Oct 2026, 09:00 (Europe/Berlin)". */
@@ -58,7 +59,17 @@ export default async function CampaignPage({
               Scheduled for <strong>{describeSchedule(campaign)}</strong>.
             </span>
           </p>
-          {canManage(role) && <UnscheduleButton slug={slug} campaignId={campaign.id} />}
+          {canManage(role) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <UnscheduleButton slug={slug} campaignId={campaign.id} />
+              <CampaignControls
+                slug={slug}
+                campaignId={campaign.id}
+                name={campaign.name}
+                status={campaign.status}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -70,13 +81,52 @@ export default async function CampaignPage({
 
   return (
     <div className="grid gap-6">
+      <LiveRefresh active={campaign.status === "queued" || campaign.status === "sending"} />
       <Card>
-        <CardContent className="grid gap-1 text-sm">
-          <p>
-            Sent to {campaign.sentCount.toLocaleString("en")} of{" "}
-            {campaign.recipientCount.toLocaleString("en")} recipients.
-          </p>
-          {campaign.error && <p className="text-muted-foreground">{campaign.error}</p>}
+        <CardContent className="grid gap-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p role="status">
+              {campaign.status === "queued"
+                ? "Getting ready to send…"
+                : `Sent to ${campaign.sentCount.toLocaleString("en")} of ${campaign.recipientCount.toLocaleString("en")} recipients.`}
+            </p>
+            {canManage(role) && (
+              <CampaignControls
+                slug={slug}
+                campaignId={campaign.id}
+                name={campaign.name}
+                status={campaign.status}
+              />
+            )}
+          </div>
+          {campaign.recipientCount > 0 && (
+            <div
+              role="progressbar"
+              aria-label="Sending progress"
+              aria-valuemin={0}
+              aria-valuemax={campaign.recipientCount}
+              aria-valuenow={campaign.sentCount}
+              className="h-2 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full bg-foreground transition-[width]"
+                style={{
+                  width: `${Math.min(100, (campaign.sentCount / campaign.recipientCount) * 100)}%`,
+                }}
+              />
+            </div>
+          )}
+          {campaign.status === "paused" && (
+            <p className="text-muted-foreground">
+              {campaign.error ?? "Paused. Nobody else gets it until you resume."}
+            </p>
+          )}
+          {campaign.status !== "paused" && campaign.error && (
+            <p className="text-muted-foreground">{campaign.error}</p>
+          )}
+          {campaign.status === "canceled" && (
+            <p className="text-muted-foreground">Canceled. Nobody else will get it.</p>
+          )}
         </CardContent>
       </Card>
       {campaign.abTest && ab && (

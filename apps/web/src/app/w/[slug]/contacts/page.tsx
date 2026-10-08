@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   FileUp,
-  SearchX,
   ShieldBan,
   SlidersHorizontal,
   Users,
@@ -172,37 +171,25 @@ export default async function ContactsPage({
         <>
           <SubscriberFilters lists={listOptions} tags={tagOptions} segments={segmentOptions} />
 
-          {page.rows.length === 0 ? (
-            <Card className="items-center gap-3 py-12 text-center">
-              <SearchX className="size-8 text-muted-foreground" aria-hidden="true" />
-              <div>
-                <p className="font-medium">No subscribers match</p>
-                <p className="text-sm text-muted-foreground">
-                  Try a different search, or clear the filters.
-                </p>
-              </div>
-            </Card>
-          ) : (
-            <SubscriberTable
-              // A new page or filter starts a fresh selection.
-              key={JSON.stringify([filters, query.after, query.before])}
-              slug={slug}
-              rows={page.rows.map((r) => ({
-                id: r.id,
-                email: r.email,
-                name: [r.firstName, r.lastName].filter(Boolean).join(" "),
-                status: r.status,
-                lists: r.lists,
-                tags: r.tags,
-                added: dateFormat.format(r.createdAt),
-              }))}
-              total={page.total}
-              filters={viewFilters}
-              lists={listOptions}
-              tags={tagOptions}
-              editable={editable}
-            />
-          )}
+          <SubscriberTable
+            // A new page or filter starts a fresh selection.
+            key={JSON.stringify([filters, query.after, query.before])}
+            slug={slug}
+            rows={page.rows.map((r) => ({
+              id: r.id,
+              email: r.email,
+              name: [r.firstName, r.lastName].filter(Boolean).join(" "),
+              status: r.status,
+              lists: r.lists,
+              tags: r.tags,
+              added: dateFormat.format(r.createdAt),
+            }))}
+            total={page.total}
+            filters={viewFilters}
+            lists={listOptions}
+            tags={tagOptions}
+            editable={editable}
+          />
 
           {(page.prevCursor || page.nextCursor) && (
             <nav aria-label="Pages" className="flex items-center justify-end gap-2">

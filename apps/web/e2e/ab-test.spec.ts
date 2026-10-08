@@ -82,7 +82,9 @@ test("an A/B test sends two versions, then the winner to everyone else", async (
     )[0];
   await expect.poll(counts, { timeout: 20_000 }).toEqual({ held: 2, sent: 2 });
   await page.reload();
-  await expect(page.getByRole("status")).toContainText("goes to everyone else at");
+  await expect(page.getByRole("status").filter({ hasText: "everyone else" })).toContainText(
+    "goes to everyone else at",
+  );
 
   // B gets a click, and the test's hour is up
   await getSql()`update messages set clicked_at = now()
@@ -92,7 +94,7 @@ test("an A/B test sends two versions, then the winner to everyone else", async (
   // The worker's maintenance job picks B and sends it to the other two
   await expect.poll(counts, { timeout: 60_000, intervals: [1000] }).toEqual({ held: 0, sent: 4 });
   await page.reload();
-  await expect(page.getByRole("status")).toHaveText(
+  await expect(page.getByRole("status").filter({ hasText: "Version B" })).toHaveText(
     "Version B won on clicks and went to everyone else.",
   );
   const winner = page.getByRole("row").filter({ hasText: "Winner" });

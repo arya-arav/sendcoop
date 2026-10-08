@@ -2,6 +2,7 @@
 
 import {
   applyTemplateToDraft,
+  cancelCampaign,
   type CampaignDraftChanges,
   countAudience,
   createDraftCampaign,
@@ -10,6 +11,7 @@ import {
   getVariantB,
   listSendingDomains,
   listSendingServers,
+  pauseCampaign,
   queueCampaign,
   scheduleCampaign,
   setAbTest,
@@ -24,6 +26,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { appUrl } from "@/lib/app-url";
 import { cleanAudience } from "@/lib/campaign-audience";
+import { resumeCampaignSending } from "@/lib/campaign-control";
 import { campaignReadiness } from "@/lib/campaign-ready";
 import { sendCampaignTest } from "@/lib/campaign-test";
 import { STARTER_HTML, STARTER_TEXT } from "@/lib/code-starters";
@@ -341,5 +344,28 @@ export async function saveAbTestAction(
     variant: { subject: a.subject, preheader: a.preheader, editor, design, mjml, html, text },
   });
   revalidatePath(`/w/${slug}/campaigns/${campaign.id}/content`);
+  return { ok: true as const };
+}
+
+/** Pause, resume or cancel, from the campaign page or the list. */
+export async function controlCampaignAction(
+  slug: string,
+  campaignId: string,
+  command: "pause" | "resume" | "cancel",
+) {
+  const workspace = await managerWorkspace(slug);
+  if (!workspace) return { ok: false as const, error: NO_PERMISSION };
+  if (!z.uuid().safeParse(campaignId).success) return { ok: false as const, error: "Not found." };
+  const done =
+    command === "pause"
+      ? (await pauseCampaign(workspace.id, campaignId)) !== null
+      : command === "resume"
+        ? await resumeCampaignSending(workspace.id, campaignId)
+        : await cancelCampaign(workspace.id, campaignId);
+  if (!done) {
+    return { ok: false as const, error: "The campaign's status changed. Refresh the page." };
+  }
+  revalidatePath(`/w/${slug}/campaigns`);
+  revalidatePath(`/w/${slug}/campaigns/${campaignId}`);
   return { ok: true as const };
 }

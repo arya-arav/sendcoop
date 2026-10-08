@@ -40,8 +40,10 @@ import { DelayedError, type Job } from "bullmq";
 import { acquireSendSlot, type Limits } from "../send-limiter";
 
 export const BATCH_SIZE = 100;
-/** How often a running batch checks whether the campaign was paused meanwhile. */
+/** How often (in messages) a running batch checks whether the campaign was paused... */
 const STATUS_CHECK_EVERY = 20;
+/** ...and at least this often when sending slowly (rate limits). */
+const STATUS_CHECK_MS = 1000;
 
 /**
  * Prepare step: claims a queued campaign, creates a message per recipient and
@@ -135,10 +137,12 @@ export async function sendBatch({
   let sent = 0;
   let failed = 0;
   try {
+    let checkedAt = Date.now();
     for (const [i, message] of batch.entries()) {
       // Paused (by hand or for its health) while this batch runs: stop here.
       // The rest stay queued and are sent if the campaign resumes.
-      if (i > 0 && i % STATUS_CHECK_EVERY === 0) {
+      if (i > 0 && (i % STATUS_CHECK_EVERY === 0 || Date.now() - checkedAt >= STATUS_CHECK_MS)) {
+        checkedAt = Date.now();
         const current = await getCampaign(workspaceId, campaignId);
         if (current?.status !== "sending") break;
       }

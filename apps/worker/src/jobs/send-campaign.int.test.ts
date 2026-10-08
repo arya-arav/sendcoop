@@ -1,6 +1,7 @@
 import {
   addSendingDomain,
   addSuppressions,
+  cancelCampaign,
   claimCampaign,
   type Campaign,
   createCampaign,
@@ -12,6 +13,8 @@ import {
   prepareCampaignMessages,
   queueCampaign,
   queuedMessageBatches,
+  queuedMessageBatchesTimed,
+  pauseCampaign,
   pickWinner,
   readUnsubscribeToken,
   recordFeedback,
@@ -601,4 +604,76 @@ describe("A/B tests", () => {
     expect(pickWinner("clicks", { a: r(10, 2), b: r(5, 2) })).toBe("b");
     expect(pickWinner("revenue", { a: r(10, 5, 40), b: r(10, 1, 90) })).toBe("b");
   });
+});
+
+describe("pause, resume and cancel", () => {
+  const sentCount = async (campaignId: string) =>
+    (
+      await sql<{ n: number }[]>`
+        select count(*)::int as n from messages where campaign_id = ${campaignId} and status = 'sent'`
+    )[0]!.n;
+
+  async function resume(campaignId: string) {
+    expect(await resumeCampaign(ws, campaignId)).not.toBeNull();
+    const batches = await queuedMessageBatchesTimed(campaignId, 100);
+    await enqueueSendBatches(
+      batches.map((b) => ({
+        campaignId,
+        workspaceId: ws,
+        messageIds: b.messageIds,
+        notBefore: b.sendAfter,
+      })),
+      { round: String(Date.now()) },
+    );
+  }
+
+  it("stops when paused mid-send and finishes once resumed, each email sent once", async () => {
+    const { campaign, subject } = await setup(300, {
+      maxPerSecond: 50,
+      maxPerHour: null,
+      maxPerDay: null,
+    });
+    await enqueueCampaign({ campaignId: campaign.id, workspaceId: ws });
+    await expect
+      .poll(() => sentCount(campaign.id), { timeout: 15_000, interval: 50 })
+      .toBeGreaterThanOrEqual(60);
+
+    expect(await pauseCampaign(ws, campaign.id)).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 1500));
+    const atPause = await sentCount(campaign.id);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(await sentCount(campaign.id)).toBe(atPause);
+    expect(atPause).toBeLessThan(300);
+    expect((await getCampaign(ws, campaign.id))?.status).toBe("paused");
+
+    await resume(campaign.id);
+    let current = await getCampaign(ws, campaign.id);
+    while (current?.status === "sending") {
+      await new Promise((r) => setTimeout(r, 200));
+      current = await getCampaign(ws, campaign.id);
+    }
+    expect(current).toMatchObject({ status: "sent", sentCount: 300 });
+    await expect.poll(() => mailpitCount(subject), { timeout: 15_000 }).toBe(300);
+  }, 60_000);
+
+  it("cancels: nobody else gets it and what was waiting is skipped", async () => {
+    const { campaign } = await setup(200, { maxPerSecond: 40, maxPerHour: null, maxPerDay: null });
+    await enqueueCampaign({ campaignId: campaign.id, workspaceId: ws });
+    await expect
+      .poll(() => sentCount(campaign.id), { timeout: 15_000, interval: 50 })
+      .toBeGreaterThanOrEqual(20);
+    expect(await cancelCampaign(ws, campaign.id)).toBe(true);
+    await new Promise((r) => setTimeout(r, 1500));
+    const atCancel = await sentCount(campaign.id);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(await sentCount(campaign.id)).toBe(atCancel);
+    const [skipped] = await sql<{ n: number }[]>`
+      select count(*)::int as n from messages
+      where campaign_id = ${campaign.id} and status = 'skipped' and error = 'Canceled'`;
+    expect(atCancel + skipped!.n).toBe(200);
+    expect((await getCampaign(ws, campaign.id))?.status).toBe("canceled");
+    // Can't be resumed or canceled again.
+    expect(await resumeCampaign(ws, campaign.id)).toBeNull();
+    expect(await cancelCampaign(ws, campaign.id)).toBe(false);
+  }, 60_000);
 });

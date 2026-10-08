@@ -1,7 +1,7 @@
 "use client";
 
 import type { SubscriberStatus } from "@sendcoop/db/custom-fields";
-import { ListMinus, ListPlus, MoveRight, Tag, Tags, Trash2, UserX, X } from "lucide-react";
+import { ListMinus, ListPlus, MoveRight, SearchX, Tag, Tags, Trash2, UserX, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FormError } from "@/components/form";
@@ -241,80 +241,92 @@ export function SubscriberTable({
         </p>
       )}
 
-      <Card className="py-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {editable && (
-                <TableHead className="w-10 pl-4">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    aria-label="Select all on this page"
-                    checked={pageAllChecked}
-                    onChange={togglePage}
-                  />
-                </TableHead>
-              )}
-              <TableHead className={editable ? undefined : "pl-4"}>Email</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Lists and tags</TableHead>
-              <TableHead className="w-36 pr-4">Added</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((s) => {
-              const status = statusStyle[s.status];
-              const isChecked = allMatching || checked.has(s.id);
-              return (
-                <TableRow key={s.id} data-state={isChecked ? "selected" : undefined}>
-                  {editable && (
-                    <TableCell className="pl-4">
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        aria-label={`Select ${s.email}`}
-                        checked={isChecked}
-                        onChange={() => toggleRow(s.id)}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell className={editable ? "font-medium" : "pl-4 font-medium"}>
-                    {s.email}
-                  </TableCell>
-                  <TableCell className={s.name ? undefined : "text-muted-foreground"}>
-                    {s.name || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                  </TableCell>
-                  <TableCell className="whitespace-normal">
-                    {s.lists.length + s.tags.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {s.lists.map((l) => (
-                          <Badge key={l.id} variant="outline">
-                            {l.name}
-                          </Badge>
-                        ))}
-                        {s.tags.map((t) => (
-                          <Badge key={t.id} variant="secondary">
-                            <Tag aria-hidden="true" />
-                            {t.name}
-                          </Badge>
-                        ))}
-                      </div>
+      {rows.length === 0 ? (
+        <Card className="items-center gap-3 py-12 text-center">
+          <SearchX className="size-8 text-muted-foreground" aria-hidden="true" />
+          <div>
+            <p className="font-medium">No subscribers match</p>
+            <p className="text-sm text-muted-foreground">
+              Try a different search, or clear the filters.
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <Card className="py-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {editable && (
+                  <TableHead className="w-10 pl-4">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      aria-label="Select all on this page"
+                      checked={pageAllChecked}
+                      onChange={togglePage}
+                    />
+                  </TableHead>
+                )}
+                <TableHead className={editable ? undefined : "pl-4"}>Email</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Lists and tags</TableHead>
+                <TableHead className="w-36 pr-4">Added</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((s) => {
+                const status = statusStyle[s.status];
+                const isChecked = allMatching || checked.has(s.id);
+                return (
+                  <TableRow key={s.id} data-state={isChecked ? "selected" : undefined}>
+                    {editable && (
+                      <TableCell className="pl-4">
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-primary"
+                          aria-label={`Select ${s.email}`}
+                          checked={isChecked}
+                          onChange={() => toggleRow(s.id)}
+                        />
+                      </TableCell>
                     )}
-                  </TableCell>
-                  <TableCell className="pr-4 text-muted-foreground">{s.added}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Card>
+                    <TableCell className={editable ? "font-medium" : "pl-4 font-medium"}>
+                      {s.email}
+                    </TableCell>
+                    <TableCell className={s.name ? undefined : "text-muted-foreground"}>
+                      {s.name || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                      {s.lists.length + s.tags.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {s.lists.map((l) => (
+                            <Badge key={l.id} variant="outline">
+                              {l.name}
+                            </Badge>
+                          ))}
+                          {s.tags.map((t) => (
+                            <Badge key={t.id} variant="secondary">
+                              <Tag aria-hidden="true" />
+                              {t.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="pr-4 text-muted-foreground">{s.added}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
       <PickerDialog
         kind={dialog}

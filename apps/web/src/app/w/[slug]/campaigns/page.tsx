@@ -14,12 +14,18 @@ import {
 } from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { CampaignControls, LiveRefresh } from "./campaign-controls";
 import { NewCampaignButton } from "./new-campaign-button";
 import { STATUS_LABELS } from "./status";
 
 export const metadata: Metadata = { title: "Campaigns" };
 
 const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "medium" });
+const dateTimeFormat = new Intl.DateTimeFormat("en", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
 
 export default async function CampaignsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -29,6 +35,9 @@ export default async function CampaignsPage({ params }: { params: Promise<{ slug
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6">
+      <LiveRefresh
+        active={campaigns.some((c) => c.status === "queued" || c.status === "sending")}
+      />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
@@ -59,7 +68,12 @@ export default async function CampaignsPage({ params }: { params: Promise<{ slug
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Recipients</TableHead>
                 <TableHead className="text-right">Sent</TableHead>
-                <TableHead className="pr-4">Created</TableHead>
+                <TableHead>When</TableHead>
+                {editable && (
+                  <TableHead className="pr-4">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -81,9 +95,24 @@ export default async function CampaignsPage({ params }: { params: Promise<{ slug
                   <TableCell className="text-right tabular-nums">
                     {c.status === "draft" ? "—" : c.sentCount.toLocaleString("en")}
                   </TableCell>
-                  <TableCell className="pr-4 text-muted-foreground">
-                    {dateFormat.format(c.createdAt)}
+                  <TableCell className="text-muted-foreground">
+                    {c.status === "scheduled" && c.scheduledAt
+                      ? `Starts ${dateTimeFormat.format(c.scheduledAt)} UTC`
+                      : c.startedAt
+                        ? `Started ${dateTimeFormat.format(c.startedAt)} UTC`
+                        : `Created ${dateFormat.format(c.createdAt)}`}
                   </TableCell>
+                  {editable && (
+                    <TableCell className="pr-4">
+                      <CampaignControls
+                        slug={slug}
+                        campaignId={c.id}
+                        name={c.name}
+                        status={c.status}
+                        size="sm"
+                      />
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

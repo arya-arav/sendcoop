@@ -126,6 +126,7 @@ export async function listCampaigns(workspaceId: string) {
       sentCount: campaigns.sentCount,
       createdAt: campaigns.createdAt,
       startedAt: campaigns.startedAt,
+      scheduledAt: campaigns.scheduledAt,
     })
     .from(campaigns)
     .where(eq(campaigns.workspaceId, workspaceId))
@@ -290,6 +291,42 @@ export async function loadMessageBatch(
 }
 
 /** sentAt is when the message was handed to the server (what rate limits count). */
+/**
+ * Pauses a sending campaign by hand. Running batches notice within a few
+ * messages; the rest stay queued for resume. Null unless it was sending.
+ */
+export async function pauseCampaign(workspaceId: string, campaignId: string) {
+  return moveStatus(workspaceId, campaignId, "sending", { status: "paused", error: null });
+}
+
+/**
+ * Stops a campaign for good: anything not sent yet is skipped. Works on
+ * scheduled, queued, sending and paused campaigns. False if it was none of those.
+ */
+export async function cancelCampaign(workspaceId: string, campaignId: string) {
+  return getDb().transaction(async (tx) => {
+    const rows = await tx
+      .update(campaigns)
+      .set({ status: "canceled", finishedAt: new Date() })
+      .where(
+        and(
+          eq(campaigns.id, campaignId),
+          eq(campaigns.workspaceId, workspaceId),
+          inArray(campaigns.status, ["scheduled", "queued", "sending", "paused"]),
+        ),
+      )
+      .returning({ id: campaigns.id });
+    if (rows.length === 0) return false;
+    await tx
+      .update(messages)
+      .set({ status: "skipped", error: "Canceled" })
+      .where(
+        and(eq(messages.campaignId, campaignId), inArray(messages.status, ["queued", "held"])),
+      );
+    return true;
+  });
+}
+
 /**
  * Puts a paused campaign back to sending. The caller queues the batches of
  * messages still waiting. Null if the campaign isn't paused.
