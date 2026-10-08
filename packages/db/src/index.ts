@@ -15,6 +15,7 @@ export * from "./sending-domains";
 export * from "./signed-links";
 export * from "./schema";
 export * from "./queries/ab-tests";
+export * from "./queries/attribution";
 export * from "./queries/audience";
 export * from "./queries/bulk";
 export * from "./queries/clicks";

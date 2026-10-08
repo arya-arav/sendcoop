@@ -1,0 +1,1 @@
+ALTER TABLE "tracking_settings" ADD COLUMN "attribution_window_days" integer DEFAULT 7 NOT NULL;

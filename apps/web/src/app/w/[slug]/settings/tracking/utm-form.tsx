@@ -16,7 +16,12 @@ export function UtmForm({
 }: {
   slug: string;
   editable: boolean;
-  initial: { addUtm: boolean; utmSource: string; trackOpens: boolean };
+  initial: {
+    addUtm: boolean;
+    utmSource: string;
+    trackOpens: boolean;
+    attributionWindowDays: number;
+  };
 }) {
   const [values, setValues] = useState(initial);
   const [saved, setSaved] = useState(false);
@@ -99,6 +104,25 @@ export function UtmForm({
                   anyone reading, so those opens are counted separately; clicks are more reliable.
                 </span>
               </div>
+            </div>
+            <div className="grid max-w-xs gap-2">
+              <Label htmlFor="attribution-window">Attribution window (days)</Label>
+              <Input
+                id="attribution-window"
+                type="number"
+                min={1}
+                max={90}
+                value={values.attributionWindowDays}
+                aria-describedby="attribution-window-hint"
+                onChange={(e) => {
+                  setValues((v) => ({ ...v, attributionWindowDays: Number(e.target.value) }));
+                  setSaved(false);
+                }}
+              />
+              <p id="attribution-window-hint" className="text-xs text-muted-foreground">
+                When a sale arrives without a click id but with the buyer&apos;s email, their last
+                email click within this many days gets the credit.
+              </p>
             </div>
           </fieldset>
           <FormError message={error} />

@@ -63,15 +63,21 @@ export async function getUtmSettings(workspaceId: string) {
       addUtm: trackingSettings.addUtm,
       utmSource: trackingSettings.utmSource,
       trackOpens: trackingSettings.trackOpens,
+      attributionWindowDays: trackingSettings.attributionWindowDays,
     })
     .from(trackingSettings)
     .where(eq(trackingSettings.workspaceId, workspaceId));
-  return row ?? { addUtm: true, utmSource: "sendcoop", trackOpens: true };
+  return row ?? { addUtm: true, utmSource: "sendcoop", trackOpens: true, attributionWindowDays: 7 };
 }
 
 export async function setUtmSettings(
   workspaceId: string,
-  settings: { addUtm: boolean; utmSource: string; trackOpens?: boolean },
+  settings: {
+    addUtm: boolean;
+    utmSource: string;
+    trackOpens?: boolean;
+    attributionWindowDays?: number;
+  },
 ) {
   await getDb()
     .insert(trackingSettings)

@@ -25,6 +25,7 @@ export async function saveAffiliateDomainsAction(slug: string, text: string) {
 const utmSchema = z.object({
   addUtm: z.boolean(),
   trackOpens: z.boolean(),
+  attributionWindowDays: z.number().int().min(1, "Use 1 to 90 days.").max(90, "Use 1 to 90 days."),
   utmSource: z
     .string()
     .trim()

@@ -61,6 +61,16 @@ test("an affiliate network's postback records a sale once, from the URL in setti
     where campaign_id = ${campaignId}`;
   expect(rows).toEqual([{ value: 47, campaign_id: campaignId, status: "approved" }]);
 
+  // ...and the campaign's report shows the revenue
+  await page.goto(`/w/${slug}/campaigns/${campaignId}`);
+  await expect(
+    page
+      .getByRole("region", { name: "Results" })
+      .locator("[data-slot=card]")
+      .filter({ has: page.getByText("Revenue", { exact: true }) }),
+  ).toContainText("$47.00");
+  await page.goto(`/w/${slug}/settings/tracking`);
+
   // A new key: the old URL stops working
   await page.getByRole("button", { name: "New key" }).click();
   await page.getByRole("button", { name: "Make a new key" }).click();

@@ -59,6 +59,8 @@ export const trackingSettings = pgTable("tracking_settings", {
   utmSource: text().notNull().default("sendcoop"),
   /** Add the open pixel to HTML emails. */
   trackOpens: boolean().notNull().default(true),
+  /** How long after an email click a sale matched only by email still counts (days). */
+  attributionWindowDays: integer().notNull().default(7),
   updatedAt: updatedAt(),
 });
 
