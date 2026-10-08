@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const STEPS = [
   { path: "recipients", label: "Recipients", ready: true },
   { path: "content", label: "Content", ready: true },
-  { path: "schedule", label: "Schedule", ready: false },
+  { path: "schedule", label: "Schedule", ready: true },
 ];
 
 export function CampaignSteps({ base }: { base: string }) {

@@ -71,6 +71,8 @@ export const subscribers = pgTable(
     fields: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     subscribedAt: timestamp({ withTimezone: true }),
     unsubscribedAt: timestamp({ withTimezone: true }),
+    /** IANA timezone, e.g. Europe/Berlin, for sending at local times. */
+    timezone: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

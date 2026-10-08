@@ -15,6 +15,7 @@ import {
   readUnsubscribeToken,
   recordFeedback,
   resumeCampaign,
+  scheduleCampaign,
   type SendingLimits,
 } from "@sendcoop/db";
 import {
@@ -29,7 +30,12 @@ import {
 import { getRedis } from "@sendcoop/redis";
 import { Queue, Worker } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { prepareCampaign, processSendBatch, sendBatch } from "./send-campaign";
+import {
+  prepareCampaign,
+  processSendBatch,
+  sendBatch,
+  startScheduledCampaigns,
+} from "./send-campaign";
 
 // The whole sending path with real Redis queues and Mailpit.
 
@@ -65,7 +71,7 @@ afterAll(async () => {
 let counter = 0;
 
 /** A server, domain and list with `recipients` subscribers, and a queued campaign. */
-async function setup(recipients: number, limits?: SendingLimits) {
+async function setup(recipients: number, limits?: SendingLimits, { draft = false } = {}) {
   const n = ++counter;
   const domain = await addSendingDomain(ws, `mail.load-${run}-${n}.test`);
   if (!domain.ok) throw new Error("setup");
@@ -109,7 +115,7 @@ async function setup(recipients: number, limits?: SendingLimits) {
     sendingServerId: server.id,
     audience: { ...EMPTY_AUDIENCE, lists: [list.list.id] },
   });
-  expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
+  if (!draft) expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
   return { campaign, subject, serverId: server.id };
 }
 
@@ -419,4 +425,103 @@ describe("plain-text campaigns", () => {
     expect(headers["Content-Type"]?.[0]).toMatch(/^text\/plain/);
     expect(headers["List-Unsubscribe-Post"]).toEqual(["List-Unsubscribe=One-Click"]);
   });
+});
+
+describe("scheduling", () => {
+  /** Wall-clock text of a moment in UTC, as a scheduling form would send it. */
+  const utcLocal = (ms: number) => new Date(ms).toISOString().slice(0, 19);
+
+  it("starts a scheduled campaign when its time comes, not before", async () => {
+    const { campaign } = await setup(2, undefined, { draft: true });
+    const at = Date.now() + 3000;
+    const scheduled = await scheduleCampaign(ws, campaign.id, {
+      local: utcLocal(at),
+      timezone: "UTC",
+      perSubscriber: false,
+    });
+    expect(scheduled).toEqual({ ok: true, scheduledAt: new Date(Math.floor(at / 1000) * 1000) });
+    expect((await getCampaign(ws, campaign.id))?.status).toBe("scheduled");
+
+    // What the worker's maintenance job does every 15 seconds, here every 100ms.
+    // (A running dev worker may start it first; either way it starts on time.)
+    let startedAt = 0;
+    while (!startedAt) {
+      await startScheduledCampaigns();
+      if ((await getCampaign(ws, campaign.id))?.status !== "scheduled") startedAt = Date.now();
+      else await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(startedAt).toBeGreaterThanOrEqual(Math.floor(at / 1000) * 1000);
+    expect(startedAt - at).toBeLessThan(1500);
+
+    let current = await getCampaign(ws, campaign.id);
+    while (current?.status !== "sent") {
+      await new Promise((r) => setTimeout(r, 200));
+      current = await getCampaign(ws, campaign.id);
+    }
+    expect(current.sentCount).toBe(2);
+  });
+
+  it("refuses times in the past and unknown timezones", async () => {
+    const { campaign } = await setup(1, undefined, { draft: true });
+    const base = { timezone: "UTC", perSubscriber: false };
+    expect(
+      await scheduleCampaign(ws, campaign.id, { ...base, local: utcLocal(Date.now() - 60_000) }),
+    ).toEqual({ ok: false, error: "past" });
+    expect(
+      await scheduleCampaign(ws, campaign.id, {
+        ...base,
+        local: utcLocal(Date.now() + 60_000),
+        timezone: "Mars/Olympus",
+      }),
+    ).toEqual({ ok: false, error: "timezone" });
+  });
+
+  it("sends at the chosen local time in each subscriber's timezone", async () => {
+    const { campaign } = await setup(3, undefined, { draft: true });
+    const people = await sql<{ id: string; email: string }[]>`
+      select s.id, s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
+      where lm.list_id = ${campaign.audience.lists[0]!} and s.status = 'subscribed' order by s.email`;
+    const [east, west, unknown] = [...people] as [
+      { id: string; email: string },
+      { id: string; email: string },
+      { id: string; email: string },
+    ];
+    // UTC+14: that local time was 14 hours ago. UTC-11: it's 11 hours away.
+    await sql`update subscribers set timezone = 'Pacific/Kiritimati' where id = ${east.id}`;
+    await sql`update subscribers set timezone = 'Pacific/Pago_Pago' where id = ${west.id}`;
+    await sql`update subscribers set timezone = 'Not/AZone' where id = ${unknown.id}`;
+
+    const now = Date.now();
+    const scheduled = await scheduleCampaign(ws, campaign.id, {
+      local: utcLocal(now),
+      timezone: "UTC", // for anyone without a valid timezone
+      perSubscriber: true,
+    });
+    expect(scheduled.ok).toBe(true);
+    await startScheduledCampaigns();
+
+    // East (already past) and unknown (UTC, now) go out; west waits.
+    const status = async (email: string) =>
+      (
+        await sql<{ status: string; send_after: Date }[]>`
+          select status, send_after from messages where campaign_id = ${campaign.id} and email = ${email}`
+      )[0]!;
+    await expect
+      .poll(async () => (await status(east.email)).status, { timeout: 10_000 })
+      .toBe("sent");
+    await expect
+      .poll(async () => (await status(unknown.email)).status, { timeout: 10_000 })
+      .toBe("sent");
+    const later = await status(west.email);
+    expect(later.status).toBe("queued");
+    expect(new Date(later.send_after).getTime()).toBeCloseTo(now + 11 * 3_600_000, -4);
+
+    const sends = new Queue(QUEUES.sends, { connection: queueConnection() });
+    const waiting = (await sends.getDelayed()).filter((j) => j.data.campaignId === campaign.id);
+    await sends.close();
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0]!.data.messageIds).toHaveLength(1);
+    expect(waiting[0]!.delay).toBeGreaterThan(10.9 * 3_600_000);
+    expect((await getCampaign(ws, campaign.id))?.status).toBe("sending");
+  }, 30_000);
 });

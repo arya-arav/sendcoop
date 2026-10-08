@@ -169,6 +169,13 @@
       "when": 1791419462232,
       "tag": "0023_campaign_content",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791420068827,
+      "tag": "0024_scheduling",
+      "breakpoints": true
     }
   ]
 }

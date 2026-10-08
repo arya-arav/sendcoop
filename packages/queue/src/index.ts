@@ -16,6 +16,8 @@ export const QUEUES = {
 /** Recurring jobs on the maintenance queue, by name. */
 export const MAINTENANCE_JOBS = {
   verifyDomains: { name: "verify-domains", everyMs: 10 * 60_000 },
+  /** Starts scheduled campaigns whose time has come. */
+  startScheduled: { name: "start-scheduled", everyMs: 15_000 },
 } as const;
 
 export type ImportJob = { importId: string; workspaceId: string };
@@ -70,21 +72,24 @@ export async function enqueueCampaign(job: CampaignJob) {
 }
 
 /**
- * Queues send batches. Each job id is derived from its first message, so
- * queueing the same batch twice is a no-op. Batches retry with backoff when
- * the mail server is unreachable; messages already sent are never resent.
+ * Queues send batches, optionally not before a given time (sending at local
+ * times). Job ids make queueing the same batch twice a no-op; a resumed
+ * campaign passes a new `round`, since finished jobs are kept a day.
+ * Batches retry with backoff when the mail server is unreachable; messages
+ * already sent are never resent.
  */
-/**
- * Queues send batches. Job ids make queueing the same batch twice a no-op;
- * a resumed campaign passes a new `round`, since finished jobs are kept a day.
- */
-export async function enqueueSendBatches(jobs: SendBatchJob[], { round }: { round?: string } = {}) {
+export async function enqueueSendBatches(
+  jobs: (SendBatchJob & { notBefore?: Date | null })[],
+  { round }: { round?: string } = {},
+) {
   if (jobs.length === 0) return;
+  const now = Date.now();
   await queue<SendBatchJob>(QUEUES.sends).addBulk(
-    jobs.map((data) => ({
+    jobs.map(({ notBefore, ...data }) => ({
       name: "send",
       data,
       opts: {
+        delay: notBefore ? Math.max(0, notBefore.getTime() - now) : 0,
         jobId: `${data.campaignId}_${data.messageIds[0]}${round ? `_${round}` : ""}`,
         attempts: 5,
         backoff: { type: "exponential", delay: 30_000 },

@@ -10,8 +10,9 @@ import {
   markMessageFailed,
   markMessageSent,
   prepareCampaignMessages,
-  queuedMessageBatches,
+  queuedMessageBatchesTimed,
   refreshCampaignProgress,
+  startDueCampaigns,
   skipUnsendableMessages,
   unsubscribeUrls,
 } from "@sendcoop/db";
@@ -26,7 +27,12 @@ import {
   serverConfigSchema,
   withUnsubscribeLink,
 } from "@sendcoop/mailer";
-import { type CampaignJob, enqueueSendBatches, type SendBatchJob } from "@sendcoop/queue";
+import {
+  type CampaignJob,
+  enqueueCampaign,
+  enqueueSendBatches,
+  type SendBatchJob,
+} from "@sendcoop/queue";
 import { DelayedError, type Job } from "bullmq";
 import { acquireSendSlot, type Limits } from "../send-limiter";
 
@@ -52,9 +58,24 @@ export async function prepareCampaign(
   }
 
   await prepareCampaignMessages(campaign);
-  const batches = await queuedMessageBatches(campaignId, BATCH_SIZE);
-  await enqueueSendBatches(batches.map((messageIds) => ({ campaignId, workspaceId, messageIds })));
+  // Batches for a later local time (subscriber timezones) wait until then.
+  const batches = await queuedMessageBatchesTimed(campaignId, BATCH_SIZE);
+  await enqueueSendBatches(
+    batches.map((b) => ({
+      campaignId,
+      workspaceId,
+      messageIds: b.messageIds,
+      notBefore: b.sendAfter,
+    })),
+  );
   if (batches.length === 0) await refreshCampaignProgress(campaignId);
+}
+
+/** Starts scheduled campaigns whose time has come (a maintenance job). */
+export async function startScheduledCampaigns() {
+  const due = await startDueCampaigns();
+  for (const campaign of due) await enqueueCampaign(campaign);
+  return due.length;
 }
 
 /** Waits this long for a per-second slot; longer waits postpone the batch. */

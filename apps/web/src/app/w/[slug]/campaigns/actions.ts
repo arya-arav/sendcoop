@@ -8,14 +8,19 @@ import {
   getCampaign,
   listSendingDomains,
   listSendingServers,
+  queueCampaign,
+  scheduleCampaign,
+  unscheduleCampaign,
   updateDraftCampaign,
 } from "@sendcoop/db";
+import { enqueueCampaign } from "@sendcoop/queue";
 import { htmlToText } from "@sendcoop/mailer";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { appUrl } from "@/lib/app-url";
 import { cleanAudience } from "@/lib/campaign-audience";
+import { campaignReadiness } from "@/lib/campaign-ready";
 import { sendCampaignTest } from "@/lib/campaign-test";
 import { STARTER_HTML, STARTER_TEXT } from "@/lib/code-starters";
 import { compileMjml } from "@/lib/compile-mjml";
@@ -197,4 +202,68 @@ export async function sendTestAction(slug: string, campaignId: string, to: strin
   return result.ok
     ? { ok: true as const, message: `Test sent to ${address.data}.` }
     : { ok: false as const, error: result.error };
+}
+
+const launchSchema = z.discriminatedUnion("when", [
+  z.object({ when: z.literal("now") }),
+  z.object({
+    when: z.enum(["later", "subscriber"]),
+    local: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Choose a date and time."),
+    timezone: z.string().min(1).max(64),
+  }),
+]);
+
+/** Step 3: sends the campaign now, or schedules it. */
+export async function launchCampaignAction(
+  slug: string,
+  campaignId: string,
+  input: z.input<typeof launchSchema>,
+) {
+  const workspace = await managerWorkspace(slug);
+  if (!workspace) return { error: NO_PERMISSION };
+  const parsed = launchSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]!.message };
+  const campaign = z.uuid().safeParse(campaignId).success
+    ? await getCampaign(workspace.id, campaignId)
+    : null;
+  if (!campaign || campaign.status !== "draft") return { error: "This campaign isn't a draft." };
+  const { ready, items } = await campaignReadiness(workspace.id, campaign);
+  if (!ready) return { error: items.find((i) => !i.ok)!.fix };
+
+  if (parsed.data.when === "now") {
+    if (!(await queueCampaign(workspace.id, campaign.id))) {
+      return { error: "This campaign isn't a draft." };
+    }
+    await enqueueCampaign({ campaignId: campaign.id, workspaceId: workspace.id });
+  } else {
+    const result = await scheduleCampaign(workspace.id, campaign.id, {
+      local: `${parsed.data.local}:00`,
+      timezone: parsed.data.timezone,
+      perSubscriber: parsed.data.when === "subscriber",
+    });
+    if (!result.ok) {
+      return {
+        error:
+          result.error === "past"
+            ? "That time has already passed. Choose a time in the future."
+            : result.error === "timezone"
+              ? "Choose a timezone from the list."
+              : "This campaign isn't a draft.",
+      };
+    }
+  }
+  revalidatePath(`/w/${slug}/campaigns`);
+  redirect(`/w/${slug}/campaigns/${campaign.id}`);
+}
+
+/** Cancels a schedule: the campaign goes back to being a draft. */
+export async function unscheduleCampaignAction(slug: string, campaignId: string) {
+  const workspace = await managerWorkspace(slug);
+  if (!workspace) return { error: NO_PERMISSION };
+  if (!z.uuid().safeParse(campaignId).success) return { error: "Not found." };
+  if (!(await unscheduleCampaign(workspace.id, campaignId))) {
+    return { error: "It has already started sending." };
+  }
+  revalidatePath(`/w/${slug}/campaigns`);
+  redirect(`/w/${slug}/campaigns/${campaignId}/schedule`);
 }

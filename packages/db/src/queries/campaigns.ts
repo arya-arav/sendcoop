@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import {
   type Campaign,
@@ -219,9 +219,18 @@ export async function prepareCampaignMessages(campaign: Campaign): Promise<numbe
   const db = getDb();
   const audience = await audienceSql(campaign.workspaceId, campaign.audience);
 
+  // In subscriber-timezone mode each message waits for the chosen local time
+  // in its subscriber's timezone (or the schedule's, when unknown or invalid).
+  const sendAfter =
+    campaign.sendInSubscriberTimezone && campaign.scheduleLocal && campaign.scheduleTimezone
+      ? sql`(${localString(campaign.scheduleLocal)}::timestamp at time zone
+          case when ${subscribers.timezone} in (select name from pg_timezone_names)
+            then ${subscribers.timezone} else ${campaign.scheduleTimezone} end)`
+      : sql`null::timestamptz`;
+
   await db.execute(sql`
-    insert into ${messages} (workspace_id, campaign_id, subscriber_id, email)
-    select ${campaign.workspaceId}, ${campaign.id}, ${subscribers.id}, ${subscribers.email}
+    insert into ${messages} (workspace_id, campaign_id, subscriber_id, email, send_after)
+    select ${campaign.workspaceId}, ${campaign.id}, ${subscribers.id}, ${subscribers.email}, ${sendAfter}
     from ${subscribers}
     where ${audience}
     on conflict (campaign_id, subscriber_id) do nothing`);
@@ -371,4 +380,119 @@ export async function refreshCampaignProgress(campaignId: string) {
     })
     .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "sending")));
   return { sent: by.sent ?? 0, failed: by.failed ?? 0, queued: by.queued ?? 0, done };
+}
+
+/**
+ * A timestamp-without-timezone column comes back as a Date read as UTC;
+ * this turns it back into the wall-clock text Postgres stored.
+ */
+function localString(value: Date) {
+  return value.toISOString().slice(0, 19);
+}
+
+/**
+ * Queued messages in batches, each batch sharing one send time (null: now).
+ * Subscriber-timezone sends have one group of batches per local moment.
+ */
+export async function queuedMessageBatchesTimed(campaignId: string, size = 100) {
+  const rows = await getDb()
+    .select({ id: messages.id, sendAfter: messages.sendAfter })
+    .from(messages)
+    .where(and(eq(messages.campaignId, campaignId), eq(messages.status, "queued")))
+    .orderBy(asc(messages.sendAfter), asc(messages.id));
+  const batches: { sendAfter: Date | null; messageIds: string[] }[] = [];
+  for (const row of rows) {
+    const last = batches.at(-1);
+    const sameTime = last && last.sendAfter?.getTime() === row.sendAfter?.getTime();
+    if (last && sameTime && last.messageIds.length < size) last.messageIds.push(row.id);
+    else batches.push({ sendAfter: row.sendAfter, messageIds: [row.id] });
+  }
+  return batches;
+}
+
+export async function isValidTimezone(timezone: string) {
+  const [row] = await getDb().execute<{ ok: boolean }>(
+    sql`select exists (select 1 from pg_timezone_names where name = ${timezone}) as ok`,
+  );
+  return Boolean(row?.ok);
+}
+
+export type ScheduleInput = {
+  /** Local date and time, "YYYY-MM-DDTHH:mm". */
+  local: string;
+  timezone: string;
+  /** Send at that local time in each subscriber's own timezone. */
+  perSubscriber: boolean;
+};
+
+/**
+ * Schedules a draft. The start time is worked out in Postgres from the local
+ * time and timezone; in per-subscriber mode the campaign starts when that
+ * local time first comes anywhere (UTC+14) and each message waits for its own.
+ */
+export async function scheduleCampaign(
+  workspaceId: string,
+  campaignId: string,
+  input: ScheduleInput,
+): Promise<{ ok: true; scheduledAt: Date } | { ok: false; error: "past" | "timezone" | "state" }> {
+  if (!(await isValidTimezone(input.timezone))) return { ok: false, error: "timezone" };
+  const db = getDb();
+  const local = sql`${input.local}::timestamp`;
+  // When it starts, and the last moment anyone gets it (UTC-12).
+  // (Etc/GMT-14 is UTC+14: POSIX zone names have the sign reversed.)
+  const ms = (zone: SQL) => sql`(extract(epoch from ${local} at time zone ${zone}) * 1000)::float8`;
+  const [times] = await db.execute<{ start: number; last: number }>(sql`
+    select ${input.perSubscriber ? ms(sql`'Etc/GMT-14'`) : ms(sql`${input.timezone}`)} as start,
+           ${input.perSubscriber ? ms(sql`'Etc/GMT+12'`) : ms(sql`${input.timezone}`)} as last`);
+  const start = new Date(Number(times!.start));
+  if (Number(times!.last) < Date.now()) return { ok: false, error: "past" };
+
+  const rows = await db
+    .update(campaigns)
+    .set({
+      status: "scheduled",
+      scheduledAt: start,
+      scheduleLocal: sql`${local}`,
+      scheduleTimezone: input.timezone,
+      sendInSubscriberTimezone: input.perSubscriber,
+    })
+    .where(
+      and(
+        eq(campaigns.id, campaignId),
+        eq(campaigns.workspaceId, workspaceId),
+        eq(campaigns.status, "draft"),
+      ),
+    )
+    .returning({ id: campaigns.id });
+  return rows.length > 0 ? { ok: true, scheduledAt: start } : { ok: false, error: "state" };
+}
+
+/** Back to a draft, to change it or send it another way. */
+export async function unscheduleCampaign(workspaceId: string, campaignId: string) {
+  const rows = await getDb()
+    .update(campaigns)
+    .set({
+      status: "draft",
+      scheduledAt: null,
+      scheduleLocal: null,
+      sendInSubscriberTimezone: false,
+    })
+    .where(
+      and(
+        eq(campaigns.id, campaignId),
+        eq(campaigns.workspaceId, workspaceId),
+        eq(campaigns.status, "scheduled"),
+      ),
+    )
+    .returning({ id: campaigns.id });
+  return rows.length > 0;
+}
+
+/** Moves scheduled campaigns whose time has come to queued; returns them for queueing. */
+export async function startDueCampaigns() {
+  return getDb()
+    .update(campaigns)
+    .set({ status: "queued" })
+    .where(and(eq(campaigns.status, "scheduled"), sql`${campaigns.scheduledAt} <= now()`))
+    .returning({ campaignId: campaigns.id, workspaceId: campaigns.workspaceId });
 }

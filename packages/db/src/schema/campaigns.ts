@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -38,6 +39,7 @@ export const EMPTY_AUDIENCE: CampaignAudience = {
 
 export const campaignStatus = pgEnum("campaign_status", [
   "draft",
+  "scheduled", // waits for scheduledAt
   "queued", // waiting for the prepare job
   "sending",
   "sent",
@@ -74,6 +76,13 @@ export const campaigns = pgTable(
     // Audience: who gets it (see CampaignAudience).
     audience: jsonb().$type<CampaignAudience>().notNull().default(EMPTY_AUDIENCE),
     status: campaignStatus().notNull().default("draft"),
+    /** When it starts. In subscriber-timezone mode: the earliest timezone's moment. */
+    scheduledAt: timestamp({ withTimezone: true }),
+    /** The chosen local time, for subscriber-timezone sends (no zone). */
+    scheduleLocal: timestamp({ withTimezone: false }),
+    /** IANA timezone of the schedule, and the fallback for subscribers without one. */
+    scheduleTimezone: text(),
+    sendInSubscriberTimezone: boolean().notNull().default(false),
     recipientCount: integer().notNull().default(0),
     sentCount: integer().notNull().default(0),
     failedCount: integer().notNull().default(0),
@@ -107,6 +116,8 @@ export const messages = pgTable(
     status: messageStatus().notNull().default("queued"),
     providerMessageId: text(),
     error: text(),
+    /** Not before this (subscriber-timezone sends); null means right away. */
+    sendAfter: timestamp({ withTimezone: true }),
     sentAt: timestamp({ withTimezone: true }),
     /** When the recipient unsubscribed using this email's link. */
     unsubscribedAt: timestamp({ withTimezone: true }),
