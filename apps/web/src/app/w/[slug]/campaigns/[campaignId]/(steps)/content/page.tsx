@@ -1,9 +1,16 @@
-import { getCampaign, listSendingDomains, listSendingServers, listTemplates } from "@sendcoop/db";
+import {
+  getCampaign,
+  getVariantB,
+  listSendingDomains,
+  listSendingServers,
+  listTemplates,
+} from "@sendcoop/db";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { canManage } from "@/lib/permissions";
 import { STARTERS } from "@/lib/starters";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { AbTestCard } from "./ab-test-card";
 import { ContentCard } from "./content-card";
 import { EnvelopeForm } from "./envelope-form";
 import { TestSendForm } from "./test-send-form";
@@ -22,10 +29,11 @@ export default async function ContentPage({
   if (campaign.status !== "draft") redirect(`/w/${slug}/campaigns/${campaign.id}`);
   const editable = canManage(role);
 
-  const [domains, servers, templates] = await Promise.all([
+  const [domains, servers, templates, variantB] = await Promise.all([
     listSendingDomains(workspace.id),
     listSendingServers(workspace.id),
     listTemplates(workspace.id),
+    getVariantB(campaign.id),
   ]);
 
   return (
@@ -60,6 +68,23 @@ export default async function ContentPage({
         templates={templates.map((t) => ({ id: t.id, name: t.name }))}
         starters={STARTERS.map((s) => ({ id: s.id, name: `${s.name} (${s.category})` }))}
       />
+      {editable && (
+        <AbTestCard
+          slug={slug}
+          campaignId={campaign.id}
+          initial={{
+            enabled: campaign.abTest !== null,
+            testPercent: campaign.abTest?.testPercent ?? 20,
+            waitHours: Math.round((campaign.abTest?.waitMinutes ?? 240) / 60),
+            metric: campaign.abTest?.metric ?? "clicks",
+            subject: variantB?.subject ?? campaign.subject,
+            preheader: variantB?.preheader ?? campaign.preheader,
+            hasVariant: variantB !== null,
+          }}
+          templates={templates.map((t) => ({ id: t.id, name: t.name }))}
+          starters={STARTERS.map((s) => ({ id: s.id, name: `${s.name} (${s.category})` }))}
+        />
+      )}
       {editable && <TestSendForm slug={slug} campaignId={campaign.id} defaultTo={user.email} />}
     </div>
   );

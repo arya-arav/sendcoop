@@ -6,12 +6,16 @@ import {
   countAudience,
   createDraftCampaign,
   getCampaign,
+  getTemplate,
+  getVariantB,
   listSendingDomains,
   listSendingServers,
   queueCampaign,
   scheduleCampaign,
+  setAbTest,
   unscheduleCampaign,
   updateDraftCampaign,
+  type VariantB,
 } from "@sendcoop/db";
 import { enqueueCampaign } from "@sendcoop/queue";
 import { htmlToText } from "@sendcoop/mailer";
@@ -266,4 +270,76 @@ export async function unscheduleCampaignAction(slug: string, campaignId: string)
   }
   revalidatePath(`/w/${slug}/campaigns`);
   redirect(`/w/${slug}/campaigns/${campaignId}/schedule`);
+}
+
+const abSchema = z.object({
+  enabled: z.boolean(),
+  testPercent: z.number().int().min(10).max(50),
+  waitHours: z.number().int().min(1).max(72),
+  metric: z.enum(["clicks", "revenue"]),
+  subject: z.string().trim().max(200, "Keep the subject under 200 characters."),
+  preheader: z.string().trim().max(200),
+  /** "same" (A's email), "keep" (B's current email), or "template:<id>" / "starter:<id>". */
+  content: z.string().max(100),
+});
+
+/** Turns the A/B test on (saving variant B) or off. */
+export async function saveAbTestAction(
+  slug: string,
+  campaignId: string,
+  input: z.input<typeof abSchema>,
+) {
+  const workspace = await managerWorkspace(slug);
+  if (!workspace) return { ok: false as const, error: NO_PERMISSION };
+  const parsed = abSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]!.message };
+  const campaign = z.uuid().safeParse(campaignId).success
+    ? await getCampaign(workspace.id, campaignId)
+    : null;
+  if (!campaign || campaign.status !== "draft") {
+    return { ok: false as const, error: "This campaign isn't a draft." };
+  }
+  const a = parsed.data;
+  if (!a.enabled) {
+    await setAbTest(workspace.id, campaign.id, null);
+    revalidatePath(`/w/${slug}/campaigns/${campaign.id}/content`);
+    return { ok: true as const };
+  }
+  if (!a.subject) return { ok: false as const, error: "Write version B's subject." };
+
+  // Version B's email: A's, B's current one, or a template's or starter's.
+  let content: VariantB | null = null;
+  if (a.content === "same") {
+    content = { ...campaign, subject: "", preheader: "" };
+  } else if (a.content === "keep") {
+    const existing = await getVariantB(campaign.id);
+    if (existing) content = existing;
+  } else if (a.content.startsWith("template:")) {
+    const template = await getTemplate(workspace.id, a.content.slice(9));
+    if (template) content = { ...template, subject: "", preheader: "" };
+  } else if (a.content.startsWith("starter:")) {
+    const starter = findStarter(a.content.slice(8));
+    if (starter) {
+      const mjml = starter.mjml(`${appUrl()}/email`);
+      const { html } = await compileMjml(mjml);
+      content = {
+        editor: "visual",
+        design: null,
+        mjml,
+        html,
+        text: htmlToText(html),
+        subject: "",
+        preheader: "",
+      };
+    }
+  }
+  if (!content) return { ok: false as const, error: "Choose version B's email." };
+
+  const { editor, design, mjml, html, text } = content;
+  await setAbTest(workspace.id, campaign.id, {
+    settings: { testPercent: a.testPercent, waitMinutes: a.waitHours * 60, metric: a.metric },
+    variant: { subject: a.subject, preheader: a.preheader, editor, design, mjml, html, text },
+  });
+  revalidatePath(`/w/${slug}/campaigns/${campaign.id}/content`);
+  return { ok: true as const };
 }

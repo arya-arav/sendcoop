@@ -18,6 +18,8 @@ export const MAINTENANCE_JOBS = {
   verifyDomains: { name: "verify-domains", everyMs: 10 * 60_000 },
   /** Starts scheduled campaigns whose time has come. */
   startScheduled: { name: "start-scheduled", everyMs: 15_000 },
+  /** Ends A/B tests whose time is up and sends the winner to the rest. */
+  decideAbTests: { name: "decide-ab-tests", everyMs: 30_000 },
 } as const;
 
 export type ImportJob = { importId: string; workspaceId: string };

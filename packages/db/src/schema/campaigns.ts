@@ -3,6 +3,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -21,6 +22,16 @@ import { templateEditor } from "./templates";
  * or segments; minus anyone in the excluded ones. Suppressed and
  * unsubscribed people never get campaigns.
  */
+/** A/B test settings: variant A is the campaign itself, B is in campaign_variants. */
+export type AbTestSettings = {
+  /** Share of recipients in the test, split evenly between A and B (10-50). */
+  testPercent: number;
+  /** How long the test runs before the winner goes to everyone else. */
+  waitMinutes: number;
+  /** What makes a winner. Ties, and no data, keep A. */
+  metric: "clicks" | "revenue";
+};
+
 export type CampaignAudience = {
   everyone: boolean;
   lists: string[];
@@ -83,6 +94,11 @@ export const campaigns = pgTable(
     /** IANA timezone of the schedule, and the fallback for subscribers without one. */
     scheduleTimezone: text(),
     sendInSubscriberTimezone: boolean().notNull().default(false),
+    /** Set when the campaign is an A/B test. */
+    abTest: jsonb().$type<AbTestSettings>(),
+    /** When the test's winner is picked and sent to the rest. */
+    abDecideAt: timestamp({ withTimezone: true }),
+    abWinner: text().$type<"a" | "b">(),
     recipientCount: integer().notNull().default(0),
     sentCount: integer().notNull().default(0),
     failedCount: integer().notNull().default(0),
@@ -95,7 +111,13 @@ export const campaigns = pgTable(
   (t) => [index().on(t.workspaceId, t.id)],
 );
 
-export const messageStatus = pgEnum("message_status", ["queued", "sent", "failed", "skipped"]);
+export const messageStatus = pgEnum("message_status", [
+  "queued",
+  "sent",
+  "failed",
+  "skipped",
+  "held", // A/B test remainder: waits for the winner
+]);
 export const bounceType = pgEnum("bounce_type", ["hard", "soft"]);
 
 // One row per recipient of a campaign: the record of what was sent to whom.
@@ -116,6 +138,12 @@ export const messages = pgTable(
     status: messageStatus().notNull().default("queued"),
     providerMessageId: text(),
     error: text(),
+    /** A/B tests: which variant this recipient gets ("a" or "b"). */
+    variant: text().$type<"a" | "b">(),
+    // Engagement, kept on the message for fast reports and A/B decisions:
+    // the first click (D37) and attributed revenue (D43).
+    clickedAt: timestamp({ withTimezone: true }),
+    revenue: numeric({ precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     /** Not before this (subscriber-timezone sends); null means right away. */
     sendAfter: timestamp({ withTimezone: true }),
     sentAt: timestamp({ withTimezone: true }),
@@ -141,3 +169,26 @@ export const messages = pgTable(
 export type Campaign = typeof campaigns.$inferSelect;
 export type CampaignStatus = (typeof campaignStatus.enumValues)[number];
 export type Message = typeof messages.$inferSelect;
+
+/** Variant B of an A/B test campaign: what differs from the campaign (variant A). */
+export const campaignVariants = pgTable(
+  "campaign_variants",
+  {
+    id: id(),
+    campaignId: uuid()
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    subject: text().notNull(),
+    preheader: text().notNull().default(""),
+    editor: templateEditor().notNull().default("html"),
+    design: jsonb().$type<Record<string, unknown>>(),
+    mjml: text(),
+    html: text().notNull(),
+    text: text().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("campaign_variants_campaign_unique").on(t.campaignId)],
+);
+
+export type CampaignVariant = typeof campaignVariants.$inferSelect;

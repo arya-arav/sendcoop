@@ -18,7 +18,12 @@ import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
 import { processImport } from "./jobs/import-subscribers";
-import { prepareCampaign, processSendBatch, startScheduledCampaigns } from "./jobs/send-campaign";
+import {
+  decideAbTests,
+  prepareCampaign,
+  processSendBatch,
+  startScheduledCampaigns,
+} from "./jobs/send-campaign";
 
 const service: ServiceName = "worker";
 
@@ -55,6 +60,11 @@ const workers = [
   new Worker(
     QUEUES.maintenance,
     async (job) => {
+      if (job.name === MAINTENANCE_JOBS.decideAbTests.name) {
+        for (const d of await decideAbTests()) {
+          console.log(`[${service}] A/B test ${d.campaignId}: ${d.winner.toUpperCase()} won`);
+        }
+      }
       if (job.name === MAINTENANCE_JOBS.startScheduled.name) {
         const started = await startScheduledCampaigns();
         if (started > 0) console.log(`[${service}] scheduled campaigns started: ${started}`);

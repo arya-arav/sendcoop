@@ -1,10 +1,13 @@
 import {
+  assignAbVariants,
   claimCampaign,
+  decideDueAbTests,
   failCampaign,
   getCampaign,
   getDkimSigningKey,
   getSendingServer,
   getSendingServerConfig,
+  getVariantB,
   listSendingDomains,
   loadMessageBatch,
   markMessageFailed,
@@ -58,6 +61,8 @@ export async function prepareCampaign(
   }
 
   await prepareCampaignMessages(campaign);
+  // A/B test: only the test share goes now; the rest wait for the winner.
+  await assignAbVariants(campaign);
   // Batches for a later local time (subscriber timezones) wait until then.
   const batches = await queuedMessageBatchesTimed(campaignId, BATCH_SIZE);
   await enqueueSendBatches(
@@ -72,6 +77,22 @@ export async function prepareCampaign(
 }
 
 /** Starts scheduled campaigns whose time has come (a maintenance job). */
+/** Ends due A/B tests and queues the winner for everyone held back (a maintenance job). */
+export async function decideAbTests() {
+  const decided = await decideDueAbTests();
+  for (const { campaignId, workspaceId, batches } of decided) {
+    await enqueueSendBatches(
+      batches.map((b) => ({
+        campaignId,
+        workspaceId,
+        messageIds: b.messageIds,
+        notBefore: b.sendAfter,
+      })),
+    );
+  }
+  return decided;
+}
+
 export async function startScheduledCampaigns() {
   const due = await startDueCampaigns();
   for (const campaign of due) await enqueueCampaign(campaign);
@@ -103,6 +124,8 @@ export async function sendBatch({
   // Suppressed or unsubscribed since the campaign started: never sent.
   const skipped = await skipUnsendableMessages(workspaceId, campaignId, messageIds);
   const batch = await loadMessageBatch(workspaceId, campaignId, messageIds);
+  // Variant B's subject and content, for A/B test recipients who get it.
+  const variantB = batch.some((m) => m.variant === "b") ? await getVariantB(campaignId) : null;
   if (batch.length === 0) {
     if (skipped > 0) await refreshCampaignProgress(campaignId);
     return { sent: 0, failed: 0 };
@@ -131,7 +154,8 @@ export async function sendBatch({
 
       const unsubscribe = unsubscribeUrls(message.id);
       // Merge tags and spintax, seeded by the message so a retry reads the same.
-      const content = personalize(campaign, mergeValuesFor(message), message.id);
+      const version = message.variant === "b" && variantB ? variantB : campaign;
+      const content = personalize(version, mergeValuesFor(message), message.id);
       const raw = await buildRawMessage(
         {
           from: { email: context.from, name: campaign.fromName },

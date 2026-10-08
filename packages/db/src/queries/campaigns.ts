@@ -270,6 +270,7 @@ export async function loadMessageBatch(
     .select({
       id: messages.id,
       email: messages.email,
+      variant: messages.variant,
       subscriberId: messages.subscriberId,
       firstName: subscribers.firstName,
       lastName: subscribers.lastName,
@@ -370,7 +371,8 @@ export async function refreshCampaignProgress(campaignId: string) {
     .where(eq(messages.campaignId, campaignId))
     .groupBy(messages.status);
   const by = Object.fromEntries(rows.map((r) => [r.status, r.n])) as Record<string, number>;
-  const done = (by.queued ?? 0) === 0;
+  // Held A/B remainders still have to go out.
+  const done = (by.queued ?? 0) === 0 && (by.held ?? 0) === 0;
   await db
     .update(campaigns)
     .set({

@@ -12,10 +12,12 @@ import {
   prepareCampaignMessages,
   queueCampaign,
   queuedMessageBatches,
+  pickWinner,
   readUnsubscribeToken,
   recordFeedback,
   resumeCampaign,
   scheduleCampaign,
+  setAbTest,
   type SendingLimits,
 } from "@sendcoop/db";
 import {
@@ -31,6 +33,7 @@ import { getRedis } from "@sendcoop/redis";
 import { Queue, Worker } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  decideAbTests,
   prepareCampaign,
   processSendBatch,
   sendBatch,
@@ -524,4 +527,78 @@ describe("scheduling", () => {
     expect(waiting[0]!.delay).toBeGreaterThan(10.9 * 3_600_000);
     expect((await getCampaign(ws, campaign.id))?.status).toBe("sending");
   }, 30_000);
+});
+
+describe("A/B tests", () => {
+  it("tests A and B on a share, then sends the winner to everyone else", async () => {
+    const { campaign, subject } = await setup(100, undefined, { draft: true });
+    expect(
+      await setAbTest(ws, campaign.id, {
+        settings: { testPercent: 20, waitMinutes: 60, metric: "clicks" },
+        variant: {
+          subject: `${subject} (B)`,
+          preheader: "",
+          editor: "html",
+          design: null,
+          mjml: null,
+          html: "<p>Version B</p>",
+          text: "Version B",
+        },
+      }),
+    ).toBe(true);
+    expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
+    await enqueueCampaign({ campaignId: campaign.id, workspaceId: ws });
+
+    const counts = async () =>
+      Object.fromEntries(
+        (
+          await sql<{ key: string; n: number }[]>`
+            select coalesce(variant, '-') || ':' || status as key, count(*)::int as n
+            from messages where campaign_id = ${campaign.id} group by 1`
+        ).map((r) => [r.key, r.n]),
+      );
+    // 10 get A, 10 get B, 80 wait.
+    await expect
+      .poll(counts, { timeout: 15_000 })
+      .toEqual({ "a:sent": 10, "b:sent": 10, "-:held": 80 });
+    expect((await getCampaign(ws, campaign.id))?.status).toBe("sending");
+
+    // B gets more clicks; the test's time is up.
+    await sql`update messages set clicked_at = now() where id in (
+      select id from messages where campaign_id = ${campaign.id} and variant = 'b' limit 3)`;
+    await sql`update messages set clicked_at = now() where id in (
+      select id from messages where campaign_id = ${campaign.id} and variant = 'a' limit 1)`;
+    await sql`update campaigns set ab_decide_at = now() where id = ${campaign.id}`;
+    // (A running dev worker may decide first; the winner is stored either way.)
+    await decideAbTests();
+    expect((await getCampaign(ws, campaign.id))?.abWinner).toBe("b");
+
+    let current = await getCampaign(ws, campaign.id);
+    while (current?.status !== "sent") {
+      await new Promise((r) => setTimeout(r, 200));
+      current = await getCampaign(ws, campaign.id);
+    }
+    expect(current).toMatchObject({ abWinner: "b", sentCount: 100 });
+    expect(await counts()).toEqual({ "a:sent": 10, "b:sent": 90 });
+
+    // A remainder recipient got version B.
+    const [one] = await sql<{ email: string }[]>`
+      select email from messages where campaign_id = ${campaign.id} and variant = 'b'
+      order by sent_at desc limit 1`;
+    const found = (await fetch(
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${one!.email}"`)}`,
+    ).then((r) => r.json())) as { messages: { ID: string; Subject: string }[] };
+    expect(found.messages[0]!.Subject).toBe(`${subject} (B)`);
+
+    // Deciding again does nothing.
+    expect((await decideAbTests()).some((d) => d.campaignId === campaign.id)).toBe(false);
+  }, 60_000);
+
+  it("keeps A on a tie or with no data, and compares per email sent", () => {
+    const r = (sent: number, clicks: number, revenue = 0) => ({ sent, clicks, revenue });
+    expect(pickWinner("clicks", { a: r(10, 0), b: r(10, 0) })).toBe("a");
+    expect(pickWinner("clicks", { a: r(10, 2), b: r(10, 2) })).toBe("a");
+    expect(pickWinner("clicks", { a: r(10, 2), b: r(5, 2) })).toBe("b");
+    expect(pickWinner("revenue", { a: r(10, 5, 40), b: r(10, 1, 90) })).toBe("b");
+  });
 });

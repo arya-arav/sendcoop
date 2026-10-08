@@ -1,7 +1,16 @@
-import { getCampaign } from "@sendcoop/db";
+import { abResults, getCampaign, getVariantB } from "@sendcoop/db";
 import { CalendarClock } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { UnscheduleButton } from "./unschedule-button";
@@ -55,15 +64,70 @@ export default async function CampaignPage({
     );
   }
 
+  const ab = campaign.abTest ? await abResults(campaign.id) : null;
+  const variantB = campaign.abTest ? await getVariantB(campaign.id) : null;
+  const money = (n: number) => n.toLocaleString("en", { style: "currency", currency: "USD" });
+
   return (
-    <Card>
-      <CardContent className="grid gap-1 text-sm">
-        <p>
-          Sent to {campaign.sentCount.toLocaleString("en")} of{" "}
-          {campaign.recipientCount.toLocaleString("en")} recipients.
-        </p>
-        {campaign.error && <p className="text-muted-foreground">{campaign.error}</p>}
-      </CardContent>
-    </Card>
+    <div className="grid gap-6">
+      <Card>
+        <CardContent className="grid gap-1 text-sm">
+          <p>
+            Sent to {campaign.sentCount.toLocaleString("en")} of{" "}
+            {campaign.recipientCount.toLocaleString("en")} recipients.
+          </p>
+          {campaign.error && <p className="text-muted-foreground">{campaign.error}</p>}
+        </CardContent>
+      </Card>
+      {campaign.abTest && ab && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>A/B test</h2>
+            </CardTitle>
+            <CardDescription role="status">
+              {campaign.abWinner
+                ? `Version ${campaign.abWinner.toUpperCase()} won on ${campaign.abTest.metric} and went to everyone else.`
+                : campaign.abDecideAt
+                  ? `The version with more ${campaign.abTest.metric} per email goes to everyone else at ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(campaign.abDecideAt)} UTC.`
+                  : "The test starts when sending begins."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead className="text-right">Sent</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(["a", "b"] as const).map((v) => (
+                  <TableRow key={v}>
+                    <TableCell className="font-medium">
+                      {v.toUpperCase()}
+                      {campaign.abWinner === v && <Badge className="ml-2">Winner</Badge>}
+                    </TableCell>
+                    <TableCell>{v === "a" ? campaign.subject : variantB?.subject}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {ab[v].sent.toLocaleString("en")}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {ab[v].clicks.toLocaleString("en")}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {money(ab[v].revenue)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
