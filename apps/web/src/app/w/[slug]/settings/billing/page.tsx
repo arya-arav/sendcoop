@@ -21,17 +21,46 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatMoney } from "@/lib/money";
+import { getStripe, syncSubscription } from "@/lib/stripe";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { ChoosePlanButton, ManageBillingButton } from "./billing-buttons";
 
 export const metadata: Metadata = { title: "Billing" };
 
 const price = (cents: number, currency: string) =>
   cents === 0 ? "Free" : `${formatMoney(cents / 100, currency)} a month`;
 
-export default async function BillingPage({ params }: { params: Promise<{ slug: string }> }) {
+/** Back from Checkout: applies the new subscription now, rather than waiting for the webhook. */
+async function syncCheckout(sessionId: string, customerId: string | null) {
+  const stripe = getStripe();
+  if (!stripe || !customerId || !/^cs_w+$/.test(sessionId)) return;
+  const session = await stripe.checkout.sessions.retrieve(sessionId).catch(() => null);
+  const customer = typeof session?.customer === "string" ? session.customer : session?.customer?.id;
+  if (!session?.subscription || customer !== customerId) return;
+  const id =
+    typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+  await syncSubscription(await stripe.subscriptions.retrieve(id));
+}
+
+export default async function BillingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ session_id?: string }>;
+}) {
   const { slug } = await params;
-  const { workspace } = await requireMemberWorkspace(slug);
+  const { session_id } = await searchParams;
+  const { user, workspace } = await requireMemberWorkspace(slug);
+  if (session_id) {
+    const before = await getWorkspacePlan(workspace.id);
+    if (before.ownerId === user.id) await syncCheckout(session_id, before.stripeCustomerId);
+  }
   const [current, plans] = await Promise.all([getWorkspacePlan(workspace.id), listPlans()]);
+  const isOwner = current.ownerId === user.id;
+  const billing = Boolean(getStripe());
+  const paying = Boolean(current.stripeSubscriptionId);
+  const day = (d: Date) => d.toLocaleDateString("en-GB", { dateStyle: "medium" });
 
   return (
     <div className="mx-auto grid max-w-5xl gap-6">
@@ -58,8 +87,10 @@ export default async function BillingPage({ params }: { params: Promise<{ slug: 
           </CardTitle>
           <CardDescription>
             {price(current.plan.priceCents, current.plan.currency)}
-            {current.cancelAtPeriodEnd && current.currentPeriodEnd
-              ? ` · ends ${current.currentPeriodEnd.toLocaleDateString("en-GB", { dateStyle: "medium" })}`
+            {current.currentPeriodEnd && paying
+              ? current.cancelAtPeriodEnd
+                ? ` · ends ${day(current.currentPeriodEnd)}`
+                : ` · renews ${day(current.currentPeriodEnd)}`
               : ""}
           </CardDescription>
         </CardHeader>
@@ -72,6 +103,16 @@ export default async function BillingPage({ params }: { params: Promise<{ slug: 
               </div>
             ))}
           </dl>
+          {isOwner && billing && current.stripeCustomerId && (
+            <div className="mt-4">
+              <ManageBillingButton slug={slug} />
+            </div>
+          )}
+          {!isOwner && (
+            <p className="mt-4 text-sm text-muted-foreground">
+              The workspace&apos;s owner manages its plan.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -82,7 +123,16 @@ export default async function BillingPage({ params }: { params: Promise<{ slug: 
             {plans.map((p) => (
               <TableHead key={p.id} className="text-center">
                 <span className="block font-semibold text-foreground">{p.name}</span>
-                <span className="text-xs">{price(p.priceCents, p.currency)}</span>
+                <span className="block text-xs">{price(p.priceCents, p.currency)}</span>
+                <span className="mt-2 flex min-h-8 items-center justify-center">
+                  {p.id === current.plan.id ? (
+                    <Badge variant="secondary">Your plan</Badge>
+                  ) : isOwner && billing && p.stripePriceId ? (
+                    <ChoosePlanButton slug={slug} planId={p.id} planName={p.name} paying={paying} />
+                  ) : isOwner && paying && p.priceCents === 0 ? (
+                    <span className="text-xs font-normal">Cancel under Manage billing</span>
+                  ) : null}
+                </span>
               </TableHead>
             ))}
           </TableRow>

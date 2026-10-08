@@ -18,6 +18,7 @@
     "FX_RATES_URL",
     "UTMCAP_API_URL",
     "ANTHROPIC_*",
+    "STRIPE_*",
     "ALLOW_PRIVATE_SMTP_HOSTS",
     "SES_ENDPOINT",
     "DNS_SERVERS",

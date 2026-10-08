@@ -67,6 +67,7 @@ export type AccountPlan = {
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
 };
 
 /** An account's plan, with any overrides; the free plan without a (live) subscription. */
@@ -88,6 +89,7 @@ export async function getAccountPlan(userId: string): Promise<AccountPlan> {
     currentPeriodEnd: live ? sub.subscription.currentPeriodEnd : null,
     cancelAtPeriodEnd: live ? sub.subscription.cancelAtPeriodEnd : false,
     stripeCustomerId: sub?.subscription.stripeCustomerId ?? null,
+    stripeSubscriptionId: live ? sub.subscription.stripeSubscriptionId : null,
   };
 }
 
@@ -112,6 +114,7 @@ export async function getWorkspacePlan(workspaceId: string) {
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       stripeCustomerId: null,
+      stripeSubscriptionId: null,
       ownerId: null,
     };
   }
@@ -144,4 +147,30 @@ export async function isSuperAdmin(userId: string) {
   const [row] = await getDb().execute<{ yes: boolean }>(sql`
     select is_super_admin as yes from users where id = ${userId}`);
   return Boolean(row?.yes);
+}
+
+export async function getPlanByStripePrice(priceId: string) {
+  const [row] = await getDb().select().from(plans).where(eq(plans.stripePriceId, priceId));
+  return row ?? null;
+}
+
+/** The account a Stripe customer belongs to. */
+export async function accountForStripeCustomer(customerId: string) {
+  const [row] = await getDb()
+    .select({ userId: subscriptions.userId })
+    .from(subscriptions)
+    .where(eq(subscriptions.stripeCustomerId, customerId));
+  return row?.userId ?? null;
+}
+
+/** Remembers an account's Stripe customer, keeping it on its plan (free without a subscription). */
+export async function setStripeCustomer(userId: string, customerId: string) {
+  const free = (await getPlanByKey("free"))!;
+  await getDb()
+    .insert(subscriptions)
+    .values({ userId, planId: free.id, status: "canceled", stripeCustomerId: customerId })
+    .onConflictDoUpdate({
+      target: subscriptions.userId,
+      set: { stripeCustomerId: customerId, updatedAt: new Date() },
+    });
 }

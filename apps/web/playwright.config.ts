@@ -13,6 +13,10 @@ process.env.UTMCAP_API_URL ??= "http://127.0.0.1:3009/api/v1";
 // AI assist goes to a fake Claude API (e2e/fake-anthropic.ts) with a fake key.
 process.env.ANTHROPIC_BASE_URL ??= "http://127.0.0.1:3010";
 process.env.ANTHROPIC_API_KEY ??= "sk-ant-e2e-fake";
+// Billing goes to a fake Stripe (e2e/fake-stripe.ts).
+process.env.STRIPE_API_BASE ??= "http://127.0.0.1:3011";
+process.env.STRIPE_SECRET_KEY ??= "sk_test_e2e_fake";
+process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_e2e_fake";
 
 // Needs Postgres, Redis and Mailpit running (`pnpm services:up` locally,
 // service containers in CI). Locally, set PW_CHANNEL=msedge to use the
