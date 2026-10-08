@@ -94,3 +94,12 @@ export async function getIntegrationConfig(workspaceId: string, kind: Integratio
     .where(and(eq(integrations.workspaceId, workspaceId), eq(integrations.kind, kind)));
   return row?.config ?? {};
 }
+
+/** The workspace's secret of this kind if it has one: never creates it. */
+export async function readIntegrationSecret(workspaceId: string, kind: IntegrationKind) {
+  const [row] = await getDb()
+    .select({ secret: integrations.secretEncrypted })
+    .from(integrations)
+    .where(and(eq(integrations.workspaceId, workspaceId), eq(integrations.kind, kind)));
+  return row ? decryptSecret(row.secret) : null;
+}

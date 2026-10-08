@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { ApiCard } from "./api-card";
 import { AffiliateDomainsForm } from "./affiliate-domains-form";
 import { PixelCard } from "./pixel-card";
 import { PostbackCard } from "./postback-card";
@@ -27,16 +28,18 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
   const editable = canManage(role);
-  const [domains, utm, postbackKey, postbackConfig, recent, pixelKey] = await Promise.all([
-    getAffiliateDomains(workspace.id),
-    getUtmSettings(workspace.id),
-    // Members don't see the key: it lets anyone report sales.
-    editable ? getIntegrationSecret(workspace.id, "postback") : null,
-    getIntegrationConfig(workspace.id, "postback"),
-    listRecentConversions(workspace.id),
-    // Public: it is in every page of the store.
-    getIntegrationSecret(workspace.id, "pixel"),
-  ]);
+  const [domains, utm, postbackKey, postbackConfig, recent, pixelKey, apiSecret] =
+    await Promise.all([
+      getAffiliateDomains(workspace.id),
+      getUtmSettings(workspace.id),
+      // Members don't see the key: it lets anyone report sales.
+      editable ? getIntegrationSecret(workspace.id, "postback") : null,
+      getIntegrationConfig(workspace.id, "postback"),
+      listRecentConversions(workspace.id),
+      // Public: it is in every page of the store.
+      getIntegrationSecret(workspace.id, "pixel"),
+      editable ? getIntegrationSecret(workspace.id, "api") : null,
+    ]);
   const tracking = (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
   const postbackUrl = postbackKey
     ? `${tracking}/pb?key=${postbackKey}&cid={subid}&payout={payout}&txid={txid}`
@@ -101,6 +104,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
         }
       />
       <PixelCard trackingUrl={tracking} pixelKey={pixelKey} />
+      <ApiCard slug={slug} trackingUrl={tracking} workspaceId={workspace.id} secret={apiSecret} />
       <RecentConversions slug={slug} editable={editable} conversions={recent} />
     </div>
   );

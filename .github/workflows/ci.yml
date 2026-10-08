@@ -110,6 +110,9 @@ jobs:
         run: for i in $(seq 1 30); do pnpm media:setup && exit 0; sleep 2; done; exit 1
       - run: pnpm test:integration
       - run: pnpm turbo run build --filter=@sendcoop/web --filter=@sendcoop/worker --filter=@sendcoop/edge
+      # The conversion API test runs the docs' curl example as written.
+      - name: curl and openssl for the API example
+        run: command -v curl && command -v openssl || (apt-get update && apt-get install -y --no-install-recommends curl openssl)
       - run: pnpm test:e2e
         env:
           AUTH_RATE_LIMIT: disabled

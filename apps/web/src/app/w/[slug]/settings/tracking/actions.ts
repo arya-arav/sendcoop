@@ -118,3 +118,13 @@ export async function sendTestPostbackAction(slug: string) {
   }
   return { ok: true as const, ms, txid };
 }
+
+export async function rotateApiSecretAction(slug: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  await rotateIntegrationSecret(workspace.id, "api");
+  revalidatePath(`/w/${slug}/settings/tracking`);
+  return { ok: true as const };
+}

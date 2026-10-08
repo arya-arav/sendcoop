@@ -3,17 +3,20 @@ import {
   decorateDestination,
   findIntegrationBySecret,
   ipAllowed,
+  parseApiConversion,
   parsePixelEvent,
   parsePostback,
   pingDatabase,
   readClickToken,
   readHoneypotToken,
+  readIntegrationSecret,
   readOpenToken,
   recordClick,
   recordConversion,
   recordHoneypot,
   recordOpen,
   type ServiceName,
+  verifyConversionSignature,
 } from "@sendcoop/db";
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
 import { pingRedis } from "@sendcoop/redis";
@@ -24,8 +27,8 @@ import { PIXEL_JS } from "./pixel";
 const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
-// postbacks (D42), the website pixel (D46). Kept small and fast: a click is
-// one database round trip.
+// postbacks (D42), the website pixel (D46), the conversion API (D47). Kept
+// small and fast: a click is one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -147,6 +150,67 @@ app.on(["GET", "POST"], "/pb", async (c) => {
     payload: rest,
   });
   return c.text(`ok ${result}`);
+});
+
+const apiError = (c: Context, status: 400 | 401 | 413 | 422, error: string) =>
+  c.json({ error }, status);
+
+/**
+ * The server-side conversion API, for stores and apps reporting sales from
+ * their own servers (see conversion-api.ts for the signature).
+ */
+app.post("/v1/conversions", async (c) => {
+  const workspaceId = c.req.header("sendcoop-workspace")?.trim() ?? "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
+    return apiError(c, 401, "Send your workspace id in the Sendcoop-Workspace header.");
+  }
+  const body = await c.req.text();
+  if (body.length > 20_000) return apiError(c, 413, "The body is too large.");
+  const secret = await readIntegrationSecret(workspaceId, "api");
+  const verdict = secret
+    ? verifyConversionSignature({
+        secret,
+        timestamp: c.req.header("sendcoop-timestamp"),
+        signature: c.req.header("sendcoop-signature"),
+        body,
+      })
+    : "invalid";
+  if (verdict === "missing") {
+    return apiError(c, 401, "Sign the request: Sendcoop-Timestamp and Sendcoop-Signature headers.");
+  }
+  if (verdict === "expired") {
+    return apiError(
+      c,
+      401,
+      "Sendcoop-Timestamp is more than 5 minutes off: sign each request anew.",
+    );
+  }
+  if (verdict !== "ok") {
+    return apiError(
+      c,
+      401,
+      "The signature doesn't match. Sign '<timestamp>.<body>' with your API secret.",
+    );
+  }
+
+  let json: unknown;
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return apiError(c, 400, "The body isn't valid JSON.");
+  }
+  const parsed = parseApiConversion(json);
+  if (!parsed.ok) return apiError(c, 422, parsed.error);
+  const recorded = await recordConversion(workspaceId, {
+    ...parsed.conversion,
+    source: "api",
+    network: null,
+    payload: json as Record<string, unknown>,
+  });
+  return c.json(
+    { result: recorded.result, id: recorded.id, attributed_by: recorded.method ?? null },
+    recorded.result === "created" ? 201 : 200,
+  );
 });
 
 /** The website pixel (see pixel.ts). */
