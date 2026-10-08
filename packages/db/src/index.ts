@@ -29,6 +29,7 @@ export * from "./queries/attribution";
 export * from "./queries/automation-engine";
 export * from "./queries/automation-triggers";
 export * from "./queries/automations";
+export * from "./queries/admin";
 export * from "./queries/billing";
 export * from "./queries/quotas";
 export * from "./queries/team";

@@ -87,6 +87,15 @@ describe("quotas", () => {
     expect((await accountQuota(userId)).room.subscribers).toBe(0);
   });
 
+  it("lets a suspended account send nothing", async () => {
+    await sql`update users set banned = true where id = ${userId}`;
+    const quota = await workspaceQuota(ws);
+    expect(quota.suspended).toBe(true);
+    expect(sendQuotaProblem(quota, 1)).toMatch(/suspended/);
+    await sql`update users set banned = false where id = ${userId}`;
+    expect(sendQuotaProblem(await workspaceQuota(ws), 1)).toBeNull();
+  });
+
   it("gives unowned workspaces no limits", async () => {
     const [w] = await sql<{ id: string }[]>`
       insert into workspaces (name, slug) values ('Loose', ${`int-quota-c-${run}`}) returning id`;

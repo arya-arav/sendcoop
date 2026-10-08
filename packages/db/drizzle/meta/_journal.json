@@ -295,6 +295,20 @@
       "when": 1791470071562,
       "tag": "0041_usage_index",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791474742156,
+      "tag": "0042_admin_plugin",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791474743324,
+      "tag": "0043_drop_super_admin_flag",
+      "breakpoints": true
     }
   ]
 }

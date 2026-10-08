@@ -26,7 +26,7 @@ test("a super-admin adds a plan, and customers see it on their billing page", as
   // Only super-admins reach /admin.
   const denied = await page.goto("/admin/plans");
   expect(denied?.status()).toBe(404);
-  await getSql()`update users set is_super_admin = true where email = ${email}`;
+  await getSql()`update users set role = 'admin' where email = ${email}`;
 
   await page.goto("/admin/plans");
   await page.getByRole("link", { name: "New plan" }).click();

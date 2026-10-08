@@ -21,7 +21,9 @@ export async function campaignReadiness(workspaceId: string, campaign: Campaign)
     workspaceQuota(workspaceId),
   ]);
   const overSubscribers =
-    quota.limits.subscribers !== null && quota.usage.subscribers > quota.limits.subscribers;
+    !quota.suspended &&
+    quota.limits.subscribers !== null &&
+    quota.usage.subscribers > quota.limits.subscribers;
   const quotaProblem = overSubscribers
     ? `You have ${quota.usage.subscribers.toLocaleString("en")} subscribers, over your ${quota.planName} plan's ${quota.limits.subscribers!.toLocaleString("en")}. Upgrade your plan, or delete or unsubscribe some, to send again.`
     : sendQuotaProblem(quota, recipients);

@@ -17,6 +17,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3 text-sm"
         >
           <span className="font-semibold">Sendcoop admin</span>
+          <Link href="/admin/customers" className="text-muted-foreground hover:text-foreground">
+            Customers
+          </Link>
           <Link href="/admin/plans" className="text-muted-foreground hover:text-foreground">
             Plans
           </Link>

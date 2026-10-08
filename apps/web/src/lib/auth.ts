@@ -13,7 +13,7 @@ import {
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { organization } from "better-auth/plugins";
+import { admin, organization } from "better-auth/plugins";
 import { appUrl } from "./app-url";
 import { sendSystemEmail } from "./mailer";
 
@@ -97,6 +97,14 @@ It expires in 7 days. If you weren't expecting it, ignore this email.`,
         invitation: { modelName: "invitations", fields: { organizationId: "workspaceId" } },
         session: { fields: { activeOrganizationId: "activeWorkspaceId" } },
       },
+    }),
+    // Super-admins (users.role "admin", D75): suspending (banning) accounts,
+    // which ends their sessions, and logging in as a customer to help them.
+    admin({
+      adminRoles: ["admin"],
+      impersonationSessionDuration: 60 * 60,
+      bannedUserMessage:
+        "This account is suspended. If you think that's a mistake, reply to any email from Sendcoop.",
     }),
     // Lets server actions set auth cookies; must be the last plugin.
     nextCookies(),

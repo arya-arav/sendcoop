@@ -25,6 +25,10 @@ export function LoginForm({ next }: { next?: string }) {
 
     if (error) {
       setPending(false);
+      if (error.code === "BANNED_USER") {
+        setError(error.message ?? "This account is suspended.");
+        return;
+      }
       if (error.status === 403) {
         // Unverified email: send them to the "check your inbox" page.
         router.push(`/verify-email?email=${encodeURIComponent(email)}`);

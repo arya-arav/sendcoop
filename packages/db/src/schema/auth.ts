@@ -9,8 +9,13 @@ export const users = pgTable("users", {
   email: text().notNull().unique(),
   emailVerified: boolean().notNull().default(false),
   image: text(),
-  /** Runs Sendcoop: plans, customers, suspensions (D71, D75). Set in the database only. */
-  isSuperAdmin: boolean().notNull().default(false),
+  // Better Auth's admin plugin (D75). role "admin": a super-admin, who runs
+  // Sendcoop (plans, customers, suspensions); set in the database only.
+  role: text(),
+  /** Suspended: can't log in, and nothing is sent for their workspaces. */
+  banned: boolean().notNull().default(false),
+  banReason: text(),
+  banExpires: timestamp({ withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -54,6 +59,8 @@ export const sessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     activeWorkspaceId: uuid().references(() => workspaces.id, { onDelete: "set null" }),
+    /** A super-admin viewing the app as this user (D75). */
+    impersonatedBy: uuid().references(() => users.id, { onDelete: "cascade" }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     ipAddress: text(),
     userAgent: text(),

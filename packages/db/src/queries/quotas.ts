@@ -38,6 +38,8 @@ export function nextMonthStart(now = new Date()) {
 
 export type Quota = {
   ownerId: string | null;
+  /** The account is suspended (D75): nothing may be sent. */
+  suspended: boolean;
   planName: string;
   limits: PlanLimits;
   usage: Usage;
@@ -49,9 +51,25 @@ const room = (limit: number | null, used: number) =>
   limit === null ? Infinity : Math.max(0, limit - used);
 
 export async function accountQuota(userId: string): Promise<Quota> {
-  const [plan, usage] = await Promise.all([getAccountPlan(userId), accountUsage(userId)]);
+  const [plan, usage, [owner]] = await Promise.all([
+    getAccountPlan(userId),
+    accountUsage(userId),
+    getDb().execute<{ banned: boolean }>(sql`select banned from users where id = ${userId}`),
+  ]);
+  const suspended = Boolean(owner?.banned);
+  if (suspended) {
+    return {
+      ownerId: userId,
+      suspended,
+      planName: plan.plan.name,
+      limits: plan.limits,
+      usage,
+      room: { subscribers: 0, sendsPerMonth: 0, workspaces: 0 },
+    };
+  }
   return {
     ownerId: userId,
+    suspended,
     planName: plan.plan.name,
     limits: plan.limits,
     usage,
@@ -75,6 +93,7 @@ export async function workspaceQuota(workspaceId: string): Promise<Quota> {
   if (owner) return accountQuota(owner);
   return {
     ownerId: null,
+    suspended: false,
     planName: "",
     limits: UNLIMITED,
     usage: { subscribers: 0, sendsPerMonth: 0, workspaces: 0 },
@@ -82,8 +101,11 @@ export async function workspaceQuota(workspaceId: string): Promise<Quota> {
   };
 }
 
+const SUSPENDED = "This account is suspended, so nothing can be sent or added.";
+
 /** Why `count` more emails can't go out this month, or null when they can. */
 export function sendQuotaProblem(quota: Quota, count: number) {
+  if (quota.suspended) return SUSPENDED;
   if (count <= quota.room.sendsPerMonth) return null;
   const limit = quota.limits.sendsPerMonth!;
   const resets = nextMonthStart().toLocaleDateString("en-GB", { day: "numeric", month: "long" });
@@ -96,6 +118,7 @@ export function sendQuotaProblem(quota: Quota, count: number) {
 
 /** Why `count` more subscribers can't be added, or null when they can. */
 export function subscriberQuotaProblem(quota: Quota, count = 1) {
+  if (quota.suspended) return SUSPENDED;
   if (count <= quota.room.subscribers) return null;
   return (
     `Your ${quota.planName} plan allows ${quota.limits.subscribers!.toLocaleString("en")} ` +

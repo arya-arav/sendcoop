@@ -142,10 +142,10 @@ export async function setAccountPlan(
     });
 }
 
-/** Whether a user runs Sendcoop (set in the database only). */
+/** Whether a user runs Sendcoop (role "admin", set in the database only). */
 export async function isSuperAdmin(userId: string) {
   const [row] = await getDb().execute<{ yes: boolean }>(sql`
-    select is_super_admin as yes from users where id = ${userId}`);
+    select role = 'admin' as yes from users where id = ${userId}`);
   return Boolean(row?.yes);
 }
 
