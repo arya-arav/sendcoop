@@ -390,3 +390,33 @@ async function runUntilDone(campaignId: string) {
   }
   return current;
 }
+
+describe("plain-text campaigns", () => {
+  it("are sent as text only, personalized, with the unsubscribe link in the text", async () => {
+    const { campaign } = await setup(1);
+    const [recipient] = await sql<{ email: string }[]>`
+      select s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
+      where lm.list_id = ${campaign.listId} and s.status = 'subscribed'`;
+    await sql`update campaigns set html = '', text = ${"Hi {{first_name | there}},\n\nQuick question about your order."}
+              where id = ${campaign.id}`;
+    await runUntil(campaign.id, (c) => c?.status === "sent");
+
+    const found = (await fetch(
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${recipient!.email}"`)}`,
+    ).then((r) => r.json())) as { messages: { ID: string }[] };
+    const id = found.messages[0]!.ID;
+    const message = (await fetch(`${MAILPIT}/api/v1/message/${id}`).then((r) => r.json())) as {
+      HTML: string;
+      Text: string;
+    };
+    expect(message.HTML).toBe("");
+    expect(message.Text).toMatch(
+      /^Hi there,\r?\n\r?\nQuick question about your order\.\r?\n\r?\n--\r?\nUnsubscribe: http\S+\/u\/\S+/,
+    );
+    const headers = (await fetch(`${MAILPIT}/api/v1/message/${id}/headers`).then((r) =>
+      r.json(),
+    )) as Record<string, string[]>;
+    expect(headers["Content-Type"]?.[0]).toMatch(/^text\/plain/);
+    expect(headers["List-Unsubscribe-Post"]).toEqual(["List-Unsubscribe=One-Click"]);
+  });
+});

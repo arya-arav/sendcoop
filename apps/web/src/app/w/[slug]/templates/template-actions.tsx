@@ -13,18 +13,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { createTemplateAction, deleteTemplateAction } from "./actions";
+import { createTemplateAction, deleteTemplateAction, type NewTemplateFrom } from "./actions";
 
-/** Creates a template (from a starter, or blank) and opens the editor. */
+/** Creates a template (from a starter, blank, or a code mode) and opens the editor. */
 export function UseStarterButton({
   slug,
-  starterId,
+  from,
   label,
   name,
+  primary,
 }: {
   slug: string;
-  starterId?: string;
+  from: NewTemplateFrom;
   label: string;
+  primary?: boolean;
   /** For screen readers when several buttons share a label. */
   name?: string;
 }) {
@@ -39,12 +41,12 @@ export function UseStarterButton({
       )}
       <Button
         className="w-full"
-        variant={starterId ? "outline" : "default"}
+        variant={primary ? "default" : "outline"}
         disabled={pending}
         aria-label={name ? `${label}: ${name}` : undefined}
         onClick={() =>
           startTransition(async () => {
-            const result = await createTemplateAction(slug, starterId);
+            const result = await createTemplateAction(slug, from);
             if (result?.error) setError(result.error);
           })
         }

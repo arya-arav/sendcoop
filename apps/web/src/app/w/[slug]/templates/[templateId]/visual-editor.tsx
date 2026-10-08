@@ -2,17 +2,9 @@
 
 import "grapesjs/dist/css/grapes.min.css";
 import type { Editor } from "grapesjs";
-import { ArrowLeft, Eye, Save } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { FormError } from "@/components/form";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useEffect, useRef } from "react";
 import { emailBlocks } from "@/lib/email-blocks";
-import { DeleteTemplateButton } from "../template-actions";
-
-type Status = "loading" | "saved" | "unsaved" | "saving";
+import { TemplateHeader, useTemplateSave } from "./template-header";
 
 const icon = (body: string) =>
   `<svg viewBox="0 0 24 24" width="36" height="36" style="fill:none" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -27,13 +19,6 @@ const BLOCK_ICONS: Record<string, string> = {
   ),
   "sc-product": icon('<path d="M6 8h12l-1 12H7z"/><path d="M9 8a3 3 0 0 1 6 0"/>'),
   "sc-footer": icon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15h18"/>'),
-};
-
-const STATUS_TEXT: Record<Status, string> = {
-  loading: "Loading editor…",
-  saved: "All changes saved",
-  unsaved: "Unsaved changes",
-  saving: "Saving…",
 };
 
 /**
@@ -64,11 +49,12 @@ export function VisualEditor({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
-  const [name, setName] = useState(initialName);
-  const [subject, setSubject] = useState(initialSubject);
-  const [status, setStatus] = useState<Status>("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  const state = useTemplateSave(slug, templateId, {
+    name: initialName,
+    subject: initialSubject,
+    status: "loading",
+  });
+  const { setStatus, setError, markUnsaved } = state;
 
   useEffect(() => {
     let editor: Editor | null = null;
@@ -160,7 +146,7 @@ export function VisualEditor({
         // Start with the blocks panel open: that is where building starts.
         editor?.Panels.getButton("views", "open-blocks")?.set("active", true);
         // Changes after loading mark the template unsaved.
-        editor?.on("update", () => setStatus((s) => (s === "saving" ? s : "unsaved")));
+        editor?.on("update", markUnsaved);
       });
     })();
     return () => {
@@ -172,125 +158,20 @@ export function VisualEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Warn before leaving with unsaved changes.
-  useEffect(() => {
-    if (status !== "unsaved") return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [status]);
-
   async function save() {
     const editor = editorRef.current;
     if (!editor) return;
-    setError(null);
-    setWarnings([]);
-    setStatus("saving");
     // Text being typed lives in the canvas until editing stops: stop it so
     // the latest words are saved.
     const view = editor.getEditing()?.getView() as
       { disableEditing?: () => Promise<void> } | undefined;
     await view?.disableEditing?.();
-    const source = editor.getHtml();
-    const response = await fetch(`/api/w/${slug}/templates/${templateId}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name,
-        subject,
-        design: editor.getProjectData(),
-        mjml: source,
-      }),
-    }).catch(() => null);
-    const data = (await response?.json().catch(() => null)) as {
-      error?: string;
-      warnings?: string[];
-      bytes?: number;
-      clipped?: boolean;
-    } | null;
-    if (response?.ok) {
-      setStatus("saved");
-      setWarnings([
-        ...(data?.clipped
-          ? [
-              `Gmail cuts off emails over 102 KB and this one is ${Math.round((data.bytes ?? 0) / 1024)} KB. Remove some content so the end (and your unsubscribe link) shows.`,
-            ]
-          : []),
-        ...(data?.warnings ?? []),
-      ]);
-      return;
-    }
-    setError(data?.error ?? "The template couldn't be saved. Check your connection and try again.");
-    setStatus("unsaved");
+    await state.save({ editor: "visual", design: editor.getProjectData(), mjml: editor.getHtml() });
   }
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href={`/w/${slug}/templates`}
-          aria-label="Back to templates"
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <ArrowLeft />
-        </Link>
-        <Input
-          aria-label="Template name"
-          value={name}
-          maxLength={100}
-          onChange={(e) => {
-            setName(e.target.value);
-            setStatus("unsaved");
-          }}
-          className="max-w-sm font-medium"
-        />
-        <p role="status" className="text-sm text-muted-foreground">
-          {STATUS_TEXT[status]}
-        </p>
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            href={`/w/${slug}/templates/${templateId}/preview`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <Eye />
-            Preview
-          </Link>
-          <DeleteTemplateButton slug={slug} id={templateId} name={name} />
-          <Button onClick={save} disabled={status === "loading" || status === "saving"}>
-            <Save />
-            Save
-          </Button>
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <Label htmlFor="template-subject" className="shrink-0 text-muted-foreground">
-          Subject line
-        </Label>
-        <Input
-          id="template-subject"
-          value={subject}
-          maxLength={200}
-          placeholder="Suggested subject for campaigns. Merge tags and spintax work here too."
-          onChange={(e) => {
-            setSubject(e.target.value);
-            setStatus("unsaved");
-          }}
-        />
-      </div>
-      <FormError message={error} />
-      {warnings.length > 0 && (
-        <div
-          role="alert"
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
-        >
-          <p className="font-medium">Saved, but check this:</p>
-          <ul className="list-disc pl-5">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <TemplateHeader slug={slug} templateId={templateId} state={state} onSave={save} />
       <div ref={container} className="min-h-0 flex-1 overflow-hidden rounded-lg border" />
     </div>
   );

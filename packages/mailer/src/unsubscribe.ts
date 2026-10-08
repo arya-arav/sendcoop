@@ -26,7 +26,9 @@ export function withUnsubscribeLink(
 ): { html: string; text: string } {
   const href = escapeHtml(pageUrl);
   let html: string;
-  if (hasPlaceholder(body.html)) {
+  if (!body.html.trim()) {
+    html = ""; // a plain-text email: the link goes in the text
+  } else if (hasPlaceholder(body.html)) {
     html = body.html.replace(PLACEHOLDER, href);
   } else {
     const footer =

@@ -1,4 +1,4 @@
-import { ArrowLeft, FilePlus } from "lucide-react";
+import { AlignLeft, ArrowLeft, Code, FilePlus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,9 +10,34 @@ import { starterPreviews } from "@/lib/starter-previews";
 import { STARTERS, type StarterCategory } from "@/lib/starters";
 import { cn } from "@/lib/utils";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import type { NewTemplateFrom } from "../actions";
 import { UseStarterButton } from "../template-actions";
 
 export const metadata: Metadata = { title: "New template" };
+
+const FROM_SCRATCH = [
+  {
+    title: "Blank",
+    description: "A logo, a headline, a button and a footer to build on with drag and drop.",
+    label: "Start from scratch",
+    icon: FilePlus,
+    from: { kind: "visual" },
+  },
+  {
+    title: "HTML code",
+    description: "Paste or write your own HTML, with a live preview.",
+    label: "Write HTML",
+    icon: Code,
+    from: { kind: "html" },
+  },
+  {
+    title: "Plain text",
+    description: "No design, just words: reads like a personal note.",
+    label: "Write plain text",
+    icon: AlignLeft,
+    from: { kind: "text" },
+  },
+] satisfies { from: NewTemplateFrom; [key: string]: unknown }[];
 
 const CATEGORIES: StarterCategory[] = ["Affiliate", "Ecommerce", "Lead generation", "Newsletter"];
 
@@ -65,26 +90,30 @@ export default async function NewTemplatePage({
       </nav>
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {!category && (
-          <li>
-            <Card className="h-full">
-              <div className="flex h-64 items-center justify-center bg-muted/40">
-                <FilePlus className="size-10 text-muted-foreground" aria-hidden="true" />
-              </div>
-              <CardHeader>
-                <CardTitle>
-                  <h2>Blank</h2>
-                </CardTitle>
-                <CardDescription>
-                  A logo, a headline, a button and a footer to build on.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto">
-                <UseStarterButton slug={slug} label="Start from scratch" />
-              </CardContent>
-            </Card>
-          </li>
-        )}
+        {!category &&
+          FROM_SCRATCH.map((option) => (
+            <li key={option.title}>
+              <Card className="h-full pt-0">
+                <div className="flex h-64 items-center justify-center rounded-t-xl border-b bg-muted/40">
+                  <option.icon className="size-10 text-muted-foreground" aria-hidden="true" />
+                </div>
+                <CardHeader>
+                  <CardTitle>
+                    <h2>{option.title}</h2>
+                  </CardTitle>
+                  <CardDescription>{option.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="mt-auto">
+                  <UseStarterButton
+                    slug={slug}
+                    from={option.from}
+                    label={option.label}
+                    primary={option.from.kind === "visual"}
+                  />
+                </CardContent>
+              </Card>
+            </li>
+          ))}
         {starters.map((starter) => (
           <li key={starter.id}>
             <Card className="h-full overflow-hidden pt-0">
@@ -114,7 +143,7 @@ export default async function NewTemplatePage({
               <CardContent className="mt-auto">
                 <UseStarterButton
                   slug={slug}
-                  starterId={starter.id}
+                  from={{ kind: "visual", starterId: starter.id }}
                   label="Use this starter"
                   name={starter.name}
                 />

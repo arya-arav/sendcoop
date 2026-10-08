@@ -68,3 +68,21 @@ describe("listUnsubscribeHeaders", () => {
     );
   });
 });
+
+describe("plain-text emails", () => {
+  it("get the unsubscribe link in the text only, and no HTML part", async () => {
+    const out = withUnsubscribeLink({ html: "", text: "Hi Ana" }, URL);
+    expect(out.html).toBe("");
+    expect(out.text).toBe(`Hi Ana\n\n--\nUnsubscribe: ${URL}\n`);
+    const raw = (
+      await buildRawMessage({
+        from: { email: "news@mail.acme.test" },
+        to: "ana@example.com",
+        subject: "Quick question",
+        ...out,
+      })
+    ).toString();
+    expect(raw).toMatch(/^Content-Type: text\/plain/m);
+    expect(raw).not.toContain("text/html");
+  });
+});

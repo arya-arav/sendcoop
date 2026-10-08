@@ -45,47 +45,57 @@ export default async function TemplatePreviewPage({
         </p>
       </div>
 
-      <section aria-label="Checks" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {checks.map((check) => (
-          <Card key={check.id} size="sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                {check.ok ? (
-                  <CircleCheck className="size-4 text-green-600" aria-label="OK" />
-                ) : (
-                  <CircleAlert className="size-4 text-destructive" aria-label="Needs attention" />
-                )}
-                <h2>{check.label}</h2>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">{check.detail}</CardContent>
-          </Card>
-        ))}
-      </section>
+      {/* Plain-text templates have no HTML: nothing to check or render. */}
+      {template.html && (
+        <>
+          <section aria-label="Checks" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {checks.map((check) => (
+              <Card key={check.id} size="sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    {check.ok ? (
+                      <CircleCheck className="size-4 text-green-600" aria-label="OK" />
+                    ) : (
+                      <CircleAlert
+                        className="size-4 text-destructive"
+                        aria-label="Needs attention"
+                      />
+                    )}
+                    <h2>{check.label}</h2>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-muted-foreground">{check.detail}</CardContent>
+              </Card>
+            ))}
+          </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_auto]">
-        <figure className="grid gap-2">
-          <figcaption className="text-sm font-medium">Desktop</figcaption>
-          <iframe
-            title="Desktop preview"
-            sandbox=""
-            srcDoc={template.html}
-            className="h-[720px] w-full rounded-lg border bg-white"
-          />
-        </figure>
-        <figure className="grid gap-2">
-          <figcaption className="text-sm font-medium">Phone</figcaption>
-          <iframe
-            title="Phone preview"
-            sandbox=""
-            srcDoc={template.html}
-            className="h-[720px] w-[375px] max-w-full rounded-[2rem] border-8 border-zinc-800 bg-white"
-          />
-        </figure>
-      </div>
+          <div className="grid items-start gap-6 lg:grid-cols-[1fr_auto]">
+            <figure className="grid gap-2">
+              <figcaption className="text-sm font-medium">Desktop</figcaption>
+              <iframe
+                title="Desktop preview"
+                sandbox=""
+                srcDoc={template.html}
+                className="h-[720px] w-full rounded-lg border bg-white"
+              />
+            </figure>
+            <figure className="grid gap-2">
+              <figcaption className="text-sm font-medium">Phone</figcaption>
+              <iframe
+                title="Phone preview"
+                sandbox=""
+                srcDoc={template.html}
+                className="h-[720px] w-[375px] max-w-full rounded-[2rem] border-8 border-zinc-800 bg-white"
+              />
+            </figure>
+          </div>
+        </>
+      )}
 
       <figure className="grid gap-2">
-        <figcaption className="text-sm font-medium">Plain-text version</figcaption>
+        <figcaption className="text-sm font-medium">
+          {template.html ? "Plain-text version" : "The email (sent as plain text)"}
+        </figcaption>
         <pre className="max-h-80 overflow-auto rounded-lg border bg-muted/40 p-4 text-sm whitespace-pre-wrap">
           {template.text || "(empty)"}
         </pre>

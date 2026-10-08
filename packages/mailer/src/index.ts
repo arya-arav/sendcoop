@@ -17,6 +17,7 @@ export type OutgoingMessage = {
   to: string;
   replyTo?: string;
   subject: string;
+  /** Empty for a plain-text email: then only the text part is sent. */
   html: string;
   text: string;
   headers?: Record<string, string>;
@@ -38,7 +39,7 @@ export async function buildRawMessage(message: OutgoingMessage, dkim?: DkimKey):
     to: message.to,
     replyTo: message.replyTo,
     subject: message.subject,
-    html: message.html,
+    html: message.html || undefined,
     text: message.text,
     headers: message.headers,
     dkim: dkim

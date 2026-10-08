@@ -28,8 +28,10 @@ export async function sendCampaign(
 ) {
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
-  const domain = await addSendingDomain(workspaceId, `mail.${slug}.test`);
-  const list = await createList(workspaceId, { name: "Deals", description: null });
+  // Unique per call, so one test can send several campaigns.
+  const n = Math.random().toString(36).slice(2, 8);
+  const domain = await addSendingDomain(workspaceId, `mail-${n}.${slug}.test`);
+  const list = await createList(workspaceId, { name: `Deals ${n}`, description: null });
   if (!domain.ok || !list.ok) throw new Error("setup");
   const server = await createSendingServer(workspaceId, {
     name: "Mailpit",
