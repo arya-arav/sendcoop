@@ -148,7 +148,10 @@ export async function saveUtmcapConnection(
   connection: Omit<UtmcapConnection, "connectedAt"> & { webhookSecret: string },
 ) {
   await getIntegrationSecret(workspaceId, "utmcap");
+  // Kept: what was learnt before, such as the tracking domains.
+  const previous = await getIntegrationConfig(workspaceId, "utmcap");
   await setIntegrationConfig(workspaceId, "utmcap", {
+    ...previous,
     apiKey: encryptSecret(connection.apiKey),
     sourceId: connection.sourceId,
     sourceName: connection.sourceName,

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { canManage } from "@/lib/permissions";
 import { withinRateLimit } from "@/lib/rate-limit";
 import { connectUtmcap } from "@/lib/utmcap-connect";
+import { reconcileUtmcap } from "@/lib/utmcap-reconcile";
 import { requireMemberWorkspace } from "@/lib/workspace";
 
 export async function connectUtmcapAction(slug: string, apiKey: string) {
@@ -67,6 +68,21 @@ export async function listUtmcapCampaignsAction(
   } catch (error) {
     if (error instanceof UtmcapError) {
       return { ok: false, error: `UTMCAP couldn't list your campaigns: ${error.message}` };
+    }
+    throw error;
+  }
+}
+
+/** UTMCAP's numbers for the Sendcoop source next to Sendcoop's, last 30 days. */
+export async function reconcileUtmcapAction(slug: string) {
+  const { workspace } = await requireMemberWorkspace(slug);
+  try {
+    const rows = await reconcileUtmcap(workspace.id, 30);
+    if (!rows) return { ok: false as const, error: "Connect UTMCAP first." };
+    return { ok: true as const, rows };
+  } catch (error) {
+    if (error instanceof UtmcapError) {
+      return { ok: false as const, error: `UTMCAP's report didn't load: ${error.message}` };
     }
     throw error;
   }

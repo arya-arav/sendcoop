@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { connectUtmcapAction, disconnectUtmcapAction } from "./actions";
+import { Reconcile } from "./reconcile";
 
 /** Connect UTMCAP with an API key: Sendcoop sets up its traffic source and webhook there. */
 export function UtmcapCard({
@@ -34,7 +35,15 @@ export function UtmcapCard({
         <CardDescription>
           Send email clicks through your UTMCAP campaigns. Sendcoop becomes a traffic source in
           UTMCAP, and every conversion UTMCAP records on those clicks comes back here, credited to
-          the email, with status changes and chargebacks.
+          the email, with status changes and chargebacks.{" "}
+          <a
+            href="https://github.com/arya-arav/sendcoop/blob/main/docs/utmcap.md"
+            className="underline underline-offset-4"
+            target="_blank"
+            rel="noreferrer"
+          >
+            How it works
+          </a>
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -56,6 +65,7 @@ export function UtmcapCard({
               <dt className="text-muted-foreground">Connected</dt>
               <dd suppressHydrationWarning>{new Date(connection.connectedAt).toLocaleString()}</dd>
             </dl>
+            <Reconcile slug={slug} />
             {editable && (
               <Button
                 variant="outline"

@@ -1,4 +1,4 @@
-import { getIntegrationSecret, saveUtmcapConnection } from "@sendcoop/db";
+import { getIntegrationSecret, rememberUtmcapDomains, saveUtmcapConnection } from "@sendcoop/db";
 import { UtmcapClient, UtmcapError } from "@sendcoop/utmcap";
 
 // One-click UTMCAP setup (D56). With the user's API key, Sendcoop registers
@@ -69,6 +69,10 @@ export async function connectUtmcap(workspaceId: string, workspaceName: string, 
       },
       `sendcoop-webhook-${workspaceId}-${Date.now()}`,
     );
+    // Links to the account's tracking domains become UTMCAP links (sc_cid, sub1-4).
+    const campaigns = await client.listCampaigns().catch(() => []);
+    const domains = campaigns.flatMap((c) => (c.domain ? [c.domain.split(":")[0]!] : []));
+    await rememberUtmcapDomains(workspaceId, domains);
     await saveUtmcapConnection(workspaceId, {
       apiKey,
       sourceId: source.id,

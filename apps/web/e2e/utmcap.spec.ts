@@ -236,3 +236,42 @@ test("a chargeback in UTMCAP removes the revenue in Sendcoop", async ({ page, re
     )
     .toContain("$0.00");
 });
+
+test("the reconciliation matches UTMCAP's numbers for an email campaign", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  // Connecting learns the account's tracking domain from its campaigns
+  fake.addCampaign("Older campaign");
+  const slug = await connected(page, "utmcap-reconcile");
+  const offer = fake.addCampaign("Hair growth");
+  const { ucid } = await clickThrough(page, request, slug, offer.url, "Hair push");
+  expect(fake.clicks.at(-1)!.subs.sub1).toBe("hair-push");
+
+  // Two sales on the click and one still pending in UTMCAP
+  await fake.convert(ucid, { conversionId: "H-1", payout: 30 });
+  await fake.convert(ucid, { conversionId: "H-2", payout: 45 });
+  await fake.convert(ucid, { conversionId: "H-3", payout: 99, status: "pending" });
+
+  await page.goto(`/w/${slug}/integrations`);
+  const row = page.getByRole("table", { name: "UTMCAP reconciliation" }).getByRole("row", {
+    name: /Hair push/,
+  });
+  await expect
+    .poll(
+      async () => {
+        await page.getByRole("button", { name: /Compare/ }).click();
+        await expect(page.getByRole("button", { name: "Compare again" })).toBeEnabled();
+        return (await row.count()) ? row.textContent() : null;
+      },
+      { timeout: 20_000 },
+    )
+    .toContain("Matches");
+  await expect(row.getByRole("cell")).toHaveText([
+    "Hair push",
+    "2 · 75.00",
+    "2 · 75.00",
+    "Matches",
+  ]);
+});

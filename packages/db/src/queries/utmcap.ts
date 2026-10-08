@@ -162,3 +162,19 @@ export async function finishUtmcapEvent(
         error = ${error}
     where workspace_id = ${workspaceId} and event_id = ${eventId}`);
 }
+
+/** Sendcoop's side of the reconciliation (D60): UTMCAP conversions per campaign, as reported. */
+export async function utmcapTotalsByCampaign(workspaceId: string, from: Date, to: Date) {
+  return getDb().execute<{
+    campaign_id: string | null;
+    campaign_name: string | null;
+    conversions: number;
+    revenue: number;
+  }>(sql`
+    select v.campaign_id, c.name as campaign_name, count(*)::int as conversions,
+           coalesce(sum(v.value), 0)::float8 as revenue
+    from conversions v left join campaigns c on c.id = v.campaign_id
+    where v.workspace_id = ${workspaceId} and v.source = 'utmcap' and v.status = 'approved'
+      and v.created_at >= ${from.toISOString()} and v.created_at < ${to.toISOString()}
+    group by v.campaign_id, c.name`);
+}
