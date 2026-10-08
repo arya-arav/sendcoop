@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/form";
 import { authClient } from "@/lib/auth-client";
 
-export function LoginForm() {
+/** next: where to go once logged in (a path here). */
+export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -34,7 +35,7 @@ export function LoginForm() {
       );
       return;
     }
-    router.push("/");
+    router.push(next ?? "/");
     router.refresh();
   }
 

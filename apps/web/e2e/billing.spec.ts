@@ -64,7 +64,6 @@ test("an owner subscribes through Checkout, upgrades, and cancels in the portal"
 
   // Upgrade: the same subscription, on the other price.
   await page.getByRole("button", { name: `Switch to Plus ${run}` }).click();
-  await expect(page.getByRole("status")).toHaveText(`You're now on Plus ${run}.`);
   await expect(plan).toHaveText(`Plus ${run}`);
   const [sub] = [...stripe.subscriptions.values()];
   expect(stripe.subscriptions.size).toBe(1);

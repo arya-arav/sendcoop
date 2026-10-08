@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { AuthCard } from "@/components/auth-card";
+import { safeNext } from "@/lib/safe-next";
 import { SignupForm } from "./signup-form";
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string; email?: string }>;
+}) {
+  const { next, email } = await searchParams;
+  const to = safeNext(next);
   return (
     <AuthCard
       title="Create your account"
@@ -10,13 +17,16 @@ export default function SignupPage() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium underline">
+          <Link
+            href={to ? `/login?next=${encodeURIComponent(to)}` : "/login"}
+            className="font-medium underline"
+          >
             Log in
           </Link>
         </>
       }
     >
-      <SignupForm />
+      <SignupForm next={to} email={email?.slice(0, 200)} />
     </AuthCard>
   );
 }

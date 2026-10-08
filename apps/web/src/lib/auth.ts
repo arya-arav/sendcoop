@@ -14,6 +14,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins";
+import { appUrl } from "./app-url";
 import { sendSystemEmail } from "./mailer";
 
 export const auth = betterAuth({
@@ -70,6 +71,26 @@ export const auth = betterAuth({
       // The plan limits how many workspaces an account owns (D73).
       allowUserToCreateOrganization: async (user) =>
         (await accountQuota(user.id)).room.workspaces > 0,
+      // Invitations (D74): a week to accept, by the invited email only.
+      invitationExpiresIn: 7 * 24 * 60 * 60,
+      cancelPendingInvitationsOnReInvite: true,
+      requireEmailVerificationOnInvitation: true,
+      sendInvitationEmail: async ({ id, email, organization, inviter }) => {
+        const url = `${appUrl()}/invite/${id}`;
+        const who = inviter.user.name;
+        await sendSystemEmail({
+          to: email,
+          subject: `${who} invited you to ${organization.name} on Sendcoop`,
+          text: `Hi,
+
+${who} invited you to join ${organization.name} on Sendcoop.
+
+Accept the invitation: ${url}
+
+It expires in 7 days. If you weren't expecting it, ignore this email.`,
+          html: `<p>Hi,</p><p>${escapeHtml(who)} invited you to join <strong>${escapeHtml(organization.name)}</strong> on Sendcoop.</p><p><a href="${url}">Accept the invitation</a></p><p>It expires in 7 days. If you weren't expecting it, ignore this email.</p>`,
+        });
+      },
       schema: {
         organization: { modelName: "workspaces" },
         member: { modelName: "memberships", fields: { organizationId: "workspaceId" } },

@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/form";
 import { authClient } from "@/lib/auth-client";
 
-export function SignupForm() {
+/** next: where to go once confirmed (a path here); email: prefilled (invitations). */
+export function SignupForm({ next, email: invited }: { next?: string; email?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -22,7 +23,7 @@ export function SignupForm() {
       email,
       password: String(form.get("password")),
       // Where the verification link sends them after confirming.
-      callbackURL: "/",
+      callbackURL: next ?? "/",
     });
 
     if (error) {
@@ -37,7 +38,14 @@ export function SignupForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <FormError message={error} />
       <Field label="Your name" name="name" required autoComplete="name" maxLength={100} />
-      <Field label="Work email" name="email" type="email" required autoComplete="email" />
+      <Field
+        label="Work email"
+        name="email"
+        type="email"
+        required
+        autoComplete="email"
+        defaultValue={invited}
+      />
       <Field
         label="Password"
         name="password"

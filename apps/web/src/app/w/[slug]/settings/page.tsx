@@ -23,7 +23,12 @@ const sections = [
     icon: MousePointerClick,
     path: "/settings/tracking",
   },
-  { title: "Team", description: "Invite people and set their roles.", icon: Users, path: null },
+  {
+    title: "Team",
+    description: "Invite people and set their roles.",
+    icon: Users,
+    path: "/settings/team",
+  },
   {
     title: "Billing",
     description: "Your plan, usage and invoices.",
