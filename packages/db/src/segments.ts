@@ -41,6 +41,10 @@ export const BUILTIN_FIELDS: SegmentFieldInfo[] = [
   { key: "source", label: "Source", kind: "enum", options: SOURCE_OPTIONS, alwaysSet: true },
   { key: "created_at", label: "Date added", kind: "date", alwaysSet: true },
   { key: "subscribed_at", label: "Date subscribed", kind: "date" },
+  // From conversions (D53): only approved ones count.
+  { key: "lifetime_value", label: "Lifetime value", kind: "number", alwaysSet: true },
+  { key: "conversion_count", label: "Number of purchases", kind: "number", alwaysSet: true },
+  { key: "last_conversion_at", label: "Last purchase", kind: "date" },
 ];
 
 /** Every field a segment can test, for this workspace's custom fields. */
@@ -127,7 +131,32 @@ const tagCondition = z.object({
   op: z.enum(["has", "not_has"]),
   tagId: z.string().max(64),
 });
-const condition = z.discriminatedUnion("type", [fieldCondition, listCondition, tagCondition]);
+/** What someone did (or didn't) with the emails: "clicked in Spring sale and didn't buy". */
+export const ACTIVITY_EVENTS = [
+  { value: "received", label: "receive an email" },
+  { value: "opened", label: "open an email" },
+  { value: "clicked", label: "click in an email" },
+  { value: "converted", label: "buy / convert" },
+] as const;
+export const ACTIVITY_OPERATORS = [
+  { value: "did", label: "did" },
+  { value: "did_not", label: "didn't" },
+] as const;
+const activityCondition = z.object({
+  type: z.literal("activity"),
+  op: z.enum(["did", "did_not"]),
+  event: z.enum(["received", "opened", "clicked", "converted"]),
+  /** One campaign, or any (null). For "converted": sales credited to that campaign. */
+  campaignId: z.string().max(64).nullable(),
+  /** Within the last N days, or ever (null). */
+  withinDays: z.number().int().min(1).max(3650).nullable(),
+});
+const condition = z.discriminatedUnion("type", [
+  fieldCondition,
+  listCondition,
+  tagCondition,
+  activityCondition,
+]);
 const match = z.enum(["all", "any"]);
 const group = z.object({
   type: z.literal("group"),
@@ -153,7 +182,13 @@ export const EMPTY_RULES: SegmentRules = { match: "all", conditions: [] };
  */
 export function segmentRulesProblem(
   rules: SegmentRules,
-  context: { fields: SegmentFieldInfo[]; listIds: Set<string>; tagIds: Set<string> },
+  context: {
+    fields: SegmentFieldInfo[];
+    listIds: Set<string>;
+    tagIds: Set<string>;
+    /** Campaigns activity conditions may name. */
+    campaignIds: Set<string>;
+  },
 ): string | null {
   const all = rules.conditions.flatMap((c) => (c.type === "group" ? c.conditions : [c]));
   if (rules.conditions.some((c) => c.type === "group" && c.conditions.length === 0)) {
@@ -172,6 +207,12 @@ export function segmentRulesProblem(
     }
     if (c.type === "tag") {
       if (!context.tagIds.has(c.tagId)) return "Choose a tag for every tag condition.";
+      continue;
+    }
+    if (c.type === "activity") {
+      if (c.campaignId !== null && !context.campaignIds.has(c.campaignId)) {
+        return "A condition names a campaign that no longer exists.";
+      }
       continue;
     }
     const field = fields.get(c.field);

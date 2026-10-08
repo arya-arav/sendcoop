@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ACTIVITY_EVENTS,
+  ACTIVITY_OPERATORS,
   LIST_OPERATORS,
   operatorsFor,
   type SegmentCondition,
@@ -33,6 +35,7 @@ export type SegmentEditorProps = {
   fields: SegmentFieldInfo[];
   lists: Option[];
   tags: Option[];
+  campaigns: Option[];
 };
 
 function newCondition(fields: SegmentFieldInfo[]): SegmentCondition {
@@ -49,6 +52,7 @@ export function SegmentEditor({
   fields,
   lists,
   tags,
+  campaigns,
 }: SegmentEditorProps) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -62,8 +66,9 @@ export function SegmentEditor({
       fields,
       listIds: new Set(lists.map((l) => l.id)),
       tagIds: new Set(tags.map((t) => t.id)),
+      campaignIds: new Set(campaigns.map((c) => c.id)),
     }),
-    [fields, lists, tags],
+    [fields, lists, tags, campaigns],
   );
   const problem = segmentRulesProblem(rules, context);
 
@@ -122,6 +127,7 @@ export function SegmentEditor({
                   fields={fields}
                   lists={lists}
                   tags={tags}
+                  campaigns={campaigns}
                   onChange={(group) => setItem(index, group)}
                   onRemove={() => removeItem(index)}
                 />
@@ -132,6 +138,7 @@ export function SegmentEditor({
                   fields={fields}
                   lists={lists}
                   tags={tags}
+                  campaigns={campaigns}
                   onChange={(c) => setItem(index, c)}
                   onRemove={() => removeItem(index)}
                 />
@@ -223,6 +230,7 @@ function GroupBox({
   fields,
   lists,
   tags,
+  campaigns,
   onChange,
   onRemove,
 }: {
@@ -230,6 +238,7 @@ function GroupBox({
   fields: SegmentFieldInfo[];
   lists: Option[];
   tags: Option[];
+  campaigns: Option[];
   onChange: (group: SegmentGroup) => void;
   onRemove: () => void;
 }) {
@@ -252,6 +261,7 @@ function GroupBox({
           fields={fields}
           lists={lists}
           tags={tags}
+          campaigns={campaigns}
           onChange={(next) =>
             onChange({ ...group, conditions: group.conditions.map((x, j) => (j === i ? next : x)) })
           }
@@ -282,6 +292,7 @@ function ConditionRow({
   fields,
   lists,
   tags,
+  campaigns,
   onChange,
   onRemove,
 }: {
@@ -289,6 +300,7 @@ function ConditionRow({
   fields: SegmentFieldInfo[];
   lists: Option[];
   tags: Option[];
+  campaigns: Option[];
   onChange: (condition: SegmentCondition) => void;
   onRemove: () => void;
 }) {
@@ -298,7 +310,15 @@ function ConditionRow({
   function pickSubject(value: string) {
     if (value === "list") onChange({ type: "list", op: "in", listId: lists[0]?.id ?? "" });
     else if (value === "tag") onChange({ type: "tag", op: "has", tagId: tags[0]?.id ?? "" });
-    else {
+    else if (value === "activity") {
+      onChange({
+        type: "activity",
+        op: "did",
+        event: "clicked",
+        campaignId: null,
+        withinDays: null,
+      });
+    } else {
       const next = fields.find((f) => `field:${f.key}` === value)!;
       onChange({
         type: "field",
@@ -310,13 +330,15 @@ function ConditionRow({
   }
 
   const operators =
-    condition.type === "list"
-      ? LIST_OPERATORS
-      : condition.type === "tag"
-        ? TAG_OPERATORS
-        : field
-          ? operatorsFor(field)
-          : [];
+    condition.type === "activity"
+      ? ACTIVITY_OPERATORS
+      : condition.type === "list"
+        ? LIST_OPERATORS
+        : condition.type === "tag"
+          ? TAG_OPERATORS
+          : field
+            ? operatorsFor(field)
+            : [];
   const needsValue =
     condition.type === "field" &&
     (field ? operatorsFor(field).find((o) => o.value === condition.op)?.needsValue : false);
@@ -338,6 +360,7 @@ function ConditionRow({
         ))}
         {lists.length > 0 && <NativeSelectOption value="list">List</NativeSelectOption>}
         {tags.length > 0 && <NativeSelectOption value="tag">Tag</NativeSelectOption>}
+        <NativeSelectOption value="activity">Email activity</NativeSelectOption>
       </NativeSelect>
 
       <NativeSelect
@@ -352,6 +375,54 @@ function ConditionRow({
         ))}
       </NativeSelect>
 
+      {condition.type === "activity" && (
+        <>
+          <NativeSelect
+            aria-label="Activity"
+            value={condition.event}
+            onChange={(e) =>
+              onChange({ ...condition, event: e.target.value as typeof condition.event })
+            }
+          >
+            {ACTIVITY_EVENTS.map((a) => (
+              <NativeSelectOption key={a.value} value={a.value}>
+                {a.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <NativeSelect
+            aria-label="Campaign"
+            value={condition.campaignId ?? ""}
+            onChange={(e) => onChange({ ...condition, campaignId: e.target.value || null })}
+          >
+            <NativeSelectOption value="">in any campaign</NativeSelectOption>
+            {campaigns.map((c) => (
+              <NativeSelectOption key={c.id} value={c.id}>
+                in {c.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <Input
+            aria-label="Within the last days"
+            className="w-36"
+            type="number"
+            min={1}
+            max={3650}
+            placeholder="ever (or days)"
+            value={condition.withinDays ?? ""}
+            onChange={(e) => {
+              const days = Math.trunc(Number(e.target.value));
+              onChange({
+                ...condition,
+                withinDays: e.target.value && days >= 1 ? Math.min(days, 3650) : null,
+              });
+            }}
+          />
+          {condition.withinDays !== null && (
+            <span className="text-sm text-muted-foreground">days</span>
+          )}
+        </>
+      )}
       {condition.type === "list" && (
         <NativeSelect
           aria-label="List"

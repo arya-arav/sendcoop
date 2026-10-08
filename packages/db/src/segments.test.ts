@@ -12,7 +12,12 @@ const fields = segmentFields([
   { key: "lead_score", label: "Lead score", type: "number", options: [] },
   { key: "birthday", label: "Birthday", type: "date", options: [] },
 ]);
-const context = { fields, listIds: new Set(["list-1"]), tagIds: new Set(["tag-1"]) };
+const context = {
+  fields,
+  listIds: new Set(["list-1"]),
+  tagIds: new Set(["tag-1"]),
+  campaignIds: new Set(["campaign-1"]),
+};
 const problem = (rules: SegmentRules) => segmentRulesProblem(rules, context);
 
 describe("segmentFields", () => {
@@ -124,5 +129,41 @@ describe("segmentRulesSchema", () => {
       ],
     };
     expect(segmentRulesSchema.safeParse(nested).success).toBe(false);
+  });
+});
+
+describe("activity conditions (D53)", () => {
+  const activity = (over: Record<string, unknown>) =>
+    segmentRulesSchema.parse({
+      match: "all",
+      conditions: [
+        {
+          type: "activity",
+          op: "did",
+          event: "clicked",
+          campaignId: null,
+          withinDays: null,
+          ...over,
+        },
+      ],
+    });
+
+  it("accepts any campaign or a known one, ever or within days", () => {
+    expect(problem(activity({}))).toBeNull();
+    expect(problem(activity({ campaignId: "campaign-1", withinDays: 30 }))).toBeNull();
+    expect(problem(activity({ campaignId: "gone" }))).toMatch(/campaign that no longer exists/);
+  });
+
+  it("checks the event, operator and days", () => {
+    expect(() => activity({ event: "forwarded" })).toThrow();
+    expect(() => activity({ op: "maybe" })).toThrow();
+    expect(() => activity({ withinDays: 0 })).toThrow();
+  });
+
+  it("offers conversion fields with number and date operators", () => {
+    const ltv = fields.find((f) => f.key === "lifetime_value")!;
+    expect(ltv.kind).toBe("number");
+    expect(operatorsFor(ltv).map((o) => o.value)).not.toContain("is_set");
+    expect(fields.find((f) => f.key === "last_conversion_at")?.kind).toBe("date");
   });
 });

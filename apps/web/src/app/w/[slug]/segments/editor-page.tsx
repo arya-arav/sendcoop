@@ -19,7 +19,7 @@ export async function SegmentEditorPage({
   if (!canManage(role)) notFound();
   const segment = load ? await load(workspace.id) : null;
   if (load && !segment) notFound();
-  const { fields, lists, tags } = await segmentContext(workspace.id);
+  const { fields, lists, tags, campaigns } = await segmentContext(workspace.id);
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6">
@@ -41,6 +41,7 @@ export async function SegmentEditorPage({
         fields={fields}
         lists={lists.map(({ id, name }) => ({ id, name }))}
         tags={tags.map(({ id, name }) => ({ id, name }))}
+        campaigns={campaigns}
       />
     </div>
   );

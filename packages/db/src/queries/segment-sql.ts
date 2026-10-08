@@ -68,7 +68,15 @@ function conditionSql(c: SegmentCondition): SQL {
     return c.op === "has" ? tagged : not(tagged);
   }
 
+  if (c.type === "activity") return activitySql(c);
+
   const value = (c.value ?? "").trim();
+  const computed = CONVERSION_FIELDS[c.field as keyof typeof CONVERSION_FIELDS];
+  if (computed) {
+    return c.field === "last_conversion_at"
+      ? timestampSql(computed, c.op, value)
+      : numberSql(computed, c.op, value);
+  }
   if (c.field.startsWith("custom:"))
     return customFieldSql(c.field.slice("custom:".length), c.op, value);
 
@@ -77,6 +85,60 @@ function conditionSql(c: SegmentCondition): SQL {
   if (DATE_BUILTINS.has(c.field)) return timestampSql(sql`${column}`, c.op, value);
   // status / source
   return c.op === "is" ? sql`${column}::text = ${value}` : sql`${column}::text <> ${value}`;
+}
+
+// Per subscriber, from their approved conversions (D53).
+const CONVERSION_FIELDS = {
+  lifetime_value: sql`(select coalesce(sum(cv.value), 0) from conversions cv
+    where cv.subscriber_id = ${subscribers.id} and cv.status = 'approved')`,
+  conversion_count: sql`(select count(*) from conversions cv
+    where cv.subscriber_id = ${subscribers.id} and cv.status = 'approved')`,
+  last_conversion_at: sql`(select max(cv.created_at) from conversions cv
+    where cv.subscriber_id = ${subscribers.id} and cv.status = 'approved')`,
+} as const;
+
+/**
+ * Did (or didn't) receive, open, click or convert: in one campaign or any,
+ * ever or in the last N days. Machine opens and scanner clicks don't count:
+ * messages only record a person's first open and click.
+ */
+function activitySql(c: Extract<SegmentCondition, { type: "activity" }>): SQL {
+  const campaign = c.campaignId ? sql` and campaign_id = ${c.campaignId}` : sql``;
+  const since = (column: string) =>
+    c.withinDays
+      ? sql` and ${sql.raw(column)} >= now() - make_interval(days => ${c.withinDays})`
+      : sql``;
+  const happened =
+    c.event === "converted"
+      ? sql`exists (select 1 from conversions where subscriber_id = ${subscribers.id}
+          and status = 'approved'${campaign}${since("created_at")})`
+      : c.event === "received"
+        ? sql`exists (select 1 from messages where subscriber_id = ${subscribers.id}
+            and status = 'sent'${campaign}${since("sent_at")})`
+        : c.event === "opened"
+          ? sql`exists (select 1 from messages where subscriber_id = ${subscribers.id}
+              and opened_at is not null${campaign}${since("opened_at")})`
+          : sql`exists (select 1 from messages where subscriber_id = ${subscribers.id}
+              and clicked_at is not null${campaign}${since("clicked_at")})`;
+  return c.op === "did" ? happened : sql`not ${happened}`;
+}
+
+function numberSql(column: SQL, op: string, value: string): SQL {
+  const n = Number(value);
+  switch (op) {
+    case "eq":
+      return sql`${column} = ${n}`;
+    case "neq":
+      return sql`${column} <> ${n}`;
+    case "gt":
+      return sql`${column} > ${n}`;
+    case "gte":
+      return sql`${column} >= ${n}`;
+    case "lt":
+      return sql`${column} < ${n}`;
+    default: // lte
+      return sql`${column} <= ${n}`;
+  }
 }
 
 /** Case-insensitive text tests; null-safe for the negative ones. */
