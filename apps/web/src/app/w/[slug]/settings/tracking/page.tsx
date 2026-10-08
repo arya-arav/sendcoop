@@ -96,7 +96,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
         Settings
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tracking</h1>
+        <h1 className="text-[22px] font-semibold">Tracking</h1>
         <p className="text-sm text-muted-foreground">
           Links in your campaigns are recorded when they&apos;re sent. Affiliate links are marked,
           so reports can show which emails earn money.

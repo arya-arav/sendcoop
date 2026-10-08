@@ -62,8 +62,8 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
   await requireMemberWorkspace(slug);
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+    <div className="grid gap-6">
+      <h1 className="text-[22px] font-semibold">Settings</h1>
       <div className="grid gap-4 sm:grid-cols-2">
         {sections.map((section) => {
           const card = (

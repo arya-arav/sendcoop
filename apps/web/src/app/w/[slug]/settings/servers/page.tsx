@@ -21,7 +21,7 @@ export default async function ServersPage({ params }: { params: Promise<{ slug: 
   const servers = await listSendingServers(workspace.id);
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/settings`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -31,7 +31,7 @@ export default async function ServersPage({ params }: { params: Promise<{ slug: 
       </Link>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sending servers</h1>
+          <h1 className="text-[22px] font-semibold">Sending servers</h1>
           <p className="text-sm text-muted-foreground">
             The service that delivers your campaigns: Amazon SES or any SMTP provider.
           </p>

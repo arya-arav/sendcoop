@@ -36,7 +36,7 @@ export default async function ImportMappingPage({
   if (!upload) notFound();
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/contacts/import`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -49,7 +49,7 @@ export default async function ImportMappingPage({
         <div className="flex items-start gap-3">
           <FileSpreadsheet className="mt-1 size-6 text-muted-foreground" aria-hidden="true" />
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight break-all">{upload.fileName}</h1>
+            <h1 className="text-[22px] font-semibold break-all">{upload.fileName}</h1>
             <p className="text-sm text-muted-foreground">
               {formatBytes(upload.fileSize)} · {upload.columns.length} columns separated by{" "}
               {DELIMITER_NAMES[upload.delimiter] ?? `“${upload.delimiter}”`}

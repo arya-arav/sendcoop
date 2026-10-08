@@ -33,7 +33,7 @@ export default async function WebhooksPage({ params }: { params: Promise<{ slug:
   const urlOf = new Map(endpoints.map((e) => [e.id, e.url]));
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/settings`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -42,7 +42,7 @@ export default async function WebhooksPage({ params }: { params: Promise<{ slug:
         Settings
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
+        <h1 className="text-[22px] font-semibold">Webhooks</h1>
         <p className="text-sm text-muted-foreground">
           Sendcoop POSTs JSON to your endpoints when these things happen, signed with the webhook
           secret on the{" "}

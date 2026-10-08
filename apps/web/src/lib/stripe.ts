@@ -3,6 +3,7 @@ import {
   getPlanByStripePrice,
   getPlanByKey,
   setAccountPlan,
+  upsertInvoice,
 } from "@sendcoop/db";
 import Stripe from "stripe";
 
@@ -72,4 +73,31 @@ export async function syncSubscription(sub: Stripe.Subscription) {
     cancelAtPeriodEnd: !ended && sub.cancel_at_period_end,
   });
   return userId;
+}
+
+const INVOICE_STATUSES = ["draft", "open", "paid", "uncollectible", "void"] as const;
+
+/** Stores an invoice as Stripe has it now (the admin's Invoices, the customer's billing page). */
+export async function syncInvoice(invoice: Stripe.Invoice) {
+  if (!invoice.id) return;
+  const status = INVOICE_STATUSES.find((s) => s === invoice.status) ?? "open";
+  const at = (seconds: number | null | undefined) => (seconds ? new Date(seconds * 1000) : null);
+  await upsertInvoice({
+    stripeInvoiceId: invoice.id,
+    stripeCustomerId:
+      typeof invoice.customer === "string" ? invoice.customer : (invoice.customer?.id ?? null),
+    number: invoice.number ?? null,
+    status,
+    description: invoice.lines?.data?.[0]?.description ?? invoice.description ?? "",
+    amountDueCents: invoice.amount_due ?? 0,
+    amountPaidCents: invoice.amount_paid ?? 0,
+    currency: (invoice.currency ?? "usd").toUpperCase(),
+    attemptCount: invoice.attempt_count ?? 0,
+    hostedUrl: invoice.hosted_invoice_url ?? null,
+    pdfUrl: invoice.invoice_pdf ?? null,
+    periodStart: at(invoice.period_start),
+    periodEnd: at(invoice.period_end),
+    paidAt: at(invoice.status_transitions?.paid_at),
+    createdAt: at(invoice.created) ?? new Date(),
+  });
 }

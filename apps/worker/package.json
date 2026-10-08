@@ -9,7 +9,8 @@
     "start": "node --env-file-if-exists=../../.env dist/index.js",
     "lint": "eslint .",
     "typecheck": "tsc",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "load-test": "tsx --env-file-if-exists=../../.env scripts/load-test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1147.0",
@@ -19,6 +20,7 @@
     "@sendcoop/redis": "workspace:*",
     "@sendcoop/storage": "workspace:*",
     "@sendcoop/utmcap": "workspace:*",
+    "@sentry/node": "^11.6.0",
     "bullmq": "^6.3.11",
     "csv-parse": "^7.0.3",
     "drizzle-orm": "^0.45.3",

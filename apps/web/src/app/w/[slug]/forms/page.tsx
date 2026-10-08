@@ -23,10 +23,10 @@ export default async function FormsPage({ params }: { params: Promise<{ slug: st
   const editable = canManage(role);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Signup forms</h1>
+          <h1 className="text-[22px] font-semibold">Signup forms</h1>
           <p className="text-sm text-muted-foreground">
             Collect subscribers on a hosted page or any website.
           </p>

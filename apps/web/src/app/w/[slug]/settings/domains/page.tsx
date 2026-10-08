@@ -21,7 +21,7 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
   const domains = await listSendingDomains(workspace.id);
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/settings`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -30,7 +30,7 @@ export default async function DomainsPage({ params }: { params: Promise<{ slug: 
         Settings
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sending domains</h1>
+        <h1 className="text-[22px] font-semibold">Sending domains</h1>
         <p className="text-sm text-muted-foreground">
           Gmail and Yahoo reject bulk mail from domains without SPF, DKIM and DMARC. Add yours and
           we&apos;ll give you the records to publish.

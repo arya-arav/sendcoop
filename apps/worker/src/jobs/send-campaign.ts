@@ -19,10 +19,14 @@ import {
   markMessageSent,
   openPixelUrl,
   prepareCampaignMessages,
-  queuedMessageBatchesTimed,
+  queuedMessageBatchPages,
+  recordBatchProgress,
+  releaseMessages,
   refreshCampaignProgress,
   storeCampaignLinks,
+  stalledSendingCampaigns,
   startDueCampaigns,
+  touchCampaignProgress,
   skipUnsendableMessages,
   unsubscribeUrls,
   sendQuotaProblem,
@@ -109,16 +113,48 @@ export async function prepareCampaign(
     }
   }
   // Batches for a later local time (subscriber timezones) wait until then.
-  const batches = await queuedMessageBatchesTimed(campaignId, BATCH_SIZE);
-  await enqueueSendBatches(
-    batches.map((b) => ({
-      campaignId,
-      workspaceId,
-      messageIds: b.messageIds,
-      notBefore: b.sendAfter,
-    })),
-  );
-  if (batches.length === 0) await refreshCampaignProgress(campaignId);
+  const queued = await enqueueQueuedMessages(campaignId, workspaceId);
+  if (queued === 0) await refreshCampaignProgress(campaignId);
+}
+
+/**
+ * Queues send batches for a campaign's queued messages, a page at a time.
+ * round gives the jobs new ids, for messages queued before (resume, retry).
+ * Returns how many batches it queued.
+ */
+export async function enqueueQueuedMessages(
+  campaignId: string,
+  workspaceId: string,
+  { round }: { round?: string } = {},
+) {
+  let queued = 0;
+  for await (const batches of queuedMessageBatchPages(campaignId, BATCH_SIZE)) {
+    await enqueueSendBatches(
+      batches.map((b) => ({
+        campaignId,
+        workspaceId,
+        messageIds: b.messageIds,
+        notBefore: b.sendAfter,
+      })),
+      { round },
+    );
+    queued += batches.length;
+  }
+  return queued;
+}
+
+/**
+ * Re-queues sending campaigns that stopped moving (a maintenance job, D80):
+ * their batch jobs were lost, say when a worker died while queueing them.
+ */
+export async function requeueStalledCampaigns() {
+  const stalled = await stalledSendingCampaigns();
+  for (const { id, workspace_id } of stalled) {
+    const batches = await enqueueQueuedMessages(id, workspace_id, { round: String(Date.now()) });
+    await touchCampaignProgress(id);
+    console.log(`[worker] campaign ${id} had stalled: queued ${batches} batches again`);
+  }
+  return stalled.length;
 }
 
 /** Starts scheduled campaigns whose time has come (a maintenance job). */
@@ -195,6 +231,8 @@ export async function sendBatch({
   }
 
   const driver = createDriver(context.config, { pool: true });
+  // Claimed messages this batch has dealt with (sent or failed for good).
+  const handled = new Set<string>();
   let sent = 0;
   let failed = 0;
   try {
@@ -245,18 +283,22 @@ export async function sendBatch({
       try {
         const result = await driver.send(raw, { from: context.from, to: [message.email] });
         await markMessageSent(message.id, result.messageId, handedOverAt);
+        handled.add(message.id);
         sent++;
       } catch (error) {
         // The server is down or asks us to slow down: stop, and let the job
         // retry later. Messages already sent in this batch stay sent.
         if (isTemporary(error)) throw error;
         await markMessageFailed(message.id, describe(error));
+        handled.add(message.id);
         failed++;
       }
     }
   } finally {
     driver.close();
-    await refreshCampaignProgress(campaignId);
+    // Paused, rate-limited or interrupted: the rest go back to the queue.
+    await releaseMessages(batch.filter((m) => !handled.has(m.id)).map((m) => m.id));
+    await recordBatchProgress(campaignId, sent, failed);
   }
   return { sent, failed };
 }

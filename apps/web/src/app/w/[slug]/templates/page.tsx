@@ -33,10 +33,10 @@ export default async function TemplatesPage({ params }: { params: Promise<{ slug
   const editable = canManage(role);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
+          <h1 className="text-[22px] font-semibold">Templates</h1>
           <p className="text-sm text-muted-foreground">
             Reusable email designs. Start one from the gallery or from scratch.
           </p>

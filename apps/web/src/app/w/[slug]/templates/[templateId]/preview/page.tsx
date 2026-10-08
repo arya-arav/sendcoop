@@ -29,7 +29,7 @@ export default async function TemplatePreviewPage({
     : { href: `/w/${slug}/templates`, label: "Templates" };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={back.href}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -38,7 +38,7 @@ export default async function TemplatePreviewPage({
         {back.label}
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{template.name}</h1>
+        <h1 className="text-[22px] font-semibold">{template.name}</h1>
         <p className="text-sm text-muted-foreground">
           The last saved version. Merge tags like {"{{first_name}}"} are filled in for each
           recipient when sent.

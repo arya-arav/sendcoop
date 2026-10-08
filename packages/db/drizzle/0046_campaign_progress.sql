@@ -1,0 +1,2 @@
+ALTER TABLE "campaigns" ADD COLUMN "progress_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "messages_queued_order" ON "messages" USING btree ("campaign_id",coalesce("send_after", '-infinity'::timestamptz),"id") WHERE "messages"."status" = 'queued';

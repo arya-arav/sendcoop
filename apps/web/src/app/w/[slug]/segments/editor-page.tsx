@@ -22,7 +22,7 @@ export async function SegmentEditorPage({
   const { fields, lists, tags, campaigns } = await segmentContext(workspace.id);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/segments`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -30,9 +30,7 @@ export async function SegmentEditorPage({
         <ArrowLeft className="size-4" aria-hidden="true" />
         Segments
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {segment ? segment.name : "New segment"}
-      </h1>
+      <h1 className="text-[22px] font-semibold">{segment ? segment.name : "New segment"}</h1>
       <SegmentEditor
         slug={slug}
         segmentId={segment?.id ?? null}

@@ -37,7 +37,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
   const seats = team.length + invitations.length;
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/settings`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -46,7 +46,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         Settings
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
+        <h1 className="text-[22px] font-semibold">Team</h1>
         <p className="text-sm text-muted-foreground">
           Owners and admins change anything. Members see contacts, campaigns and reports, but
           can&apos;t change them. Only the owner manages billing.

@@ -134,3 +134,52 @@
     @apply font-sans;
   }
 }
+
+/* Help guides (D83): Markdown rendered as HTML. */
+@layer components {
+  .help-prose {
+    @apply text-[15px] leading-7 text-foreground;
+  }
+  .help-prose > * + * {
+    @apply mt-4;
+  }
+  .help-prose h2 {
+    @apply mt-10 scroll-mt-20 text-xl font-semibold tracking-tight;
+  }
+  .help-prose h3 {
+    @apply mt-8 text-base font-semibold;
+  }
+  .help-prose a {
+    @apply font-medium underline underline-offset-4;
+  }
+  .help-prose ul {
+    @apply list-disc pl-6;
+  }
+  .help-prose ol {
+    @apply list-decimal pl-6;
+  }
+  .help-prose li + li {
+    @apply mt-1.5;
+  }
+  .help-prose code {
+    @apply rounded bg-muted px-1 py-0.5 font-mono text-[13px];
+  }
+  .help-prose pre {
+    @apply overflow-x-auto rounded-lg border bg-muted p-4 text-[13px] leading-6;
+  }
+  .help-prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .help-prose table {
+    @apply block w-full overflow-x-auto text-sm;
+  }
+  .help-prose th {
+    @apply border-b px-3 py-2 text-left font-medium whitespace-nowrap;
+  }
+  .help-prose td {
+    @apply border-b px-3 py-2 align-top;
+  }
+  .help-prose blockquote {
+    @apply border-l-2 pl-4 text-muted-foreground;
+  }
+}

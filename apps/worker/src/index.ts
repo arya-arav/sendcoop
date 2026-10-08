@@ -20,6 +20,7 @@ import {
 } from "@sendcoop/queue";
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
+import { reportError } from "./sentry";
 import { createServer } from "node:http";
 import {
   processAutomationRun,
@@ -36,6 +37,7 @@ import {
   decideAbTests,
   prepareCampaign,
   processSendBatch,
+  requeueStalledCampaigns,
   startScheduledCampaigns,
 } from "./jobs/send-campaign";
 
@@ -117,6 +119,9 @@ const workers = [
           );
         }
       }
+      if (job.name === MAINTENANCE_JOBS.stalledCampaigns.name) {
+        await requeueStalledCampaigns();
+      }
       if (job.name === MAINTENANCE_JOBS.webhookDeliveries.name) {
         await sendWebhookDeliveries();
       }
@@ -141,9 +146,10 @@ const workers = [
 await scheduleMaintenanceJobs();
 
 for (const worker of workers) {
-  worker.on("failed", (job, error) =>
-    console.error(`[${service}] ${worker.name} job ${job?.id} failed`, error),
-  );
+  worker.on("failed", (job, error) => {
+    console.error(`[${service}] ${worker.name} job ${job?.id} failed`, error);
+    reportError(error, { queue: worker.name, jobId: job?.id, job: job?.name });
+  });
 }
 
 // Health check for deploys (and for the browser tests to wait on).

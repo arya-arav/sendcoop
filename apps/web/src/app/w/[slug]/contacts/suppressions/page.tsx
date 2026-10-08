@@ -51,7 +51,7 @@ export default async function SuppressionsPage({
   const base = `/w/${slug}/contacts/suppressions`;
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/contacts`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -62,7 +62,7 @@ export default async function SuppressionsPage({
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Suppression list</h1>
+          <h1 className="text-[22px] font-semibold">Suppression list</h1>
           <p className="text-sm text-muted-foreground">
             Campaigns never go to these addresses, even if they&apos;re subscribed or imported
             again. Hard bounces and spam complaints are added automatically.

@@ -39,7 +39,7 @@ export default async function ServerPage({
         <ArrowLeft className="size-4" aria-hidden="true" />
         Sending servers
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">{server.name}</h1>
+      <h1 className="text-[22px] font-semibold">{server.name}</h1>
       <ServerEditor
         slug={slug}
         serverId={server.id}

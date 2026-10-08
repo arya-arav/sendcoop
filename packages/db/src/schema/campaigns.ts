@@ -112,6 +112,8 @@ export const campaigns = pgTable(
     error: text(),
     startedAt: timestamp({ withTimezone: true }),
     finishedAt: timestamp({ withTimezone: true }),
+    /** Last time a batch sent something (D80): a sending campaign quiet for long is stuck. */
+    progressAt: timestamp({ withTimezone: true }),
     /** What the campaign cost (list rental, ads, copywriting), for ROI in reports (D51). */
     cost: numeric({ precision: 12, scale: 2, mode: "number" }),
     createdAt: createdAt(),
@@ -122,6 +124,9 @@ export const campaigns = pgTable(
 
 export const messageStatus = pgEnum("message_status", [
   "queued",
+  // Claimed by a send batch (D80), so no other batch sends it too; back to
+  // queued if the batch stops before it, or its worker dies.
+  "sending",
   "sent",
   "failed",
   "skipped",
@@ -157,6 +162,8 @@ export const messages = pgTable(
     /** First open by a person (machine opens don't count). */
     openedAt: timestamp({ withTimezone: true }),
     revenue: numeric({ precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    /** When a send batch claimed it (status "sending"). */
+    claimedAt: timestamp({ withTimezone: true }),
     /** Not before this (subscriber-timezone sends); null means right away. */
     sendAfter: timestamp({ withTimezone: true }),
     sentAt: timestamp({ withTimezone: true }),
@@ -180,6 +187,14 @@ export const messages = pgTable(
       .where(sql`${t.automationRunId} is not null`),
     index().on(t.campaignId, t.status),
     index().on(t.subscriberId),
+    // Platform-wide sending stats (the admin dashboard).
+    index("messages_sent_at")
+      .on(t.sentAt)
+      .where(sql`${t.status} = 'sent'`),
+    // Reading a campaign's queued messages in pages, in send order (D80).
+    index("messages_queued_order")
+      .on(t.campaignId, sql`coalesce(${t.sendAfter}, '-infinity'::timestamptz)`, t.id)
+      .where(sql`${t.status} = 'queued'`),
     // Provider feedback (bounces, complaints) names messages by their id.
     index().on(t.providerMessageId),
     // Usage: emails an account sent this month (D73).

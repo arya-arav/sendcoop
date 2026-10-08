@@ -11,7 +11,7 @@ export default async function PlanPage({ params }: { params: Promise<{ planId: s
   if (planId !== "new" && !plan) notFound();
   return (
     <div className="grid max-w-2xl gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">{plan ? plan.name : "New plan"}</h1>
+      <h1 className="text-[22px] font-semibold">{plan ? plan.name : "New plan"}</h1>
       <PlanForm
         planId={plan?.id ?? null}
         initial={

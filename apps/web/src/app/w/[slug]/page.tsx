@@ -62,9 +62,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
   ];
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-[22px] font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Welcome, {user.name.split(" ")[0]}.</p>
       </div>
 

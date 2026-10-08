@@ -24,7 +24,7 @@ export default async function CustomFieldsPage({ params }: { params: Promise<{ s
   const atLimit = fields.length >= MAX_CUSTOM_FIELDS;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/contacts`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -35,7 +35,7 @@ export default async function CustomFieldsPage({ params }: { params: Promise<{ s
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Custom fields</h1>
+          <h1 className="text-[22px] font-semibold">Custom fields</h1>
           <p className="text-sm text-muted-foreground">
             Extra details stored on each subscriber. Use them in segments and as merge tags.
           </p>

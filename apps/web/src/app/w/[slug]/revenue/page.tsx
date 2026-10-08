@@ -109,10 +109,10 @@ export default async function RevenuePage({
     `/w/${slug}/revenue?${new URLSearchParams({ by: grouping, period, ...over })}`;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Revenue</h1>
+          <h1 className="text-[22px] font-semibold">Revenue</h1>
           <p className="text-sm text-muted-foreground">
             Approved sales and leads credited to your emails, in {currency}. Clicks are people, not
             scanners.

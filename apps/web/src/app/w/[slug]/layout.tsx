@@ -33,6 +33,7 @@ export default async function WorkspaceLayout({
         current={{ id: workspace.id, slug: workspace.slug, name: workspace.name }}
         role={role}
         user={{ name: user.name, email: user.email }}
+        isAdmin={(user as { role?: string | null }).role === "admin"}
       />
       <SidebarInset>
         {impersonating && (
@@ -50,7 +51,7 @@ export default async function WorkspaceLayout({
             </form>
           </div>
         )}
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
           <SidebarTrigger className="-ml-1" />
           <span className="truncate text-sm text-muted-foreground">{workspace.name}</span>
         </header>

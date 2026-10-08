@@ -86,9 +86,9 @@ export default async function DeliverabilityPage({
   const paused = campaigns.filter((c) => c.status === "paused");
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Deliverability</h1>
+        <h1 className="text-[22px] font-semibold">Deliverability</h1>
         <p className="text-sm text-muted-foreground">
           How mailbox providers see your emails over the last 30 days. Campaigns pause themselves
           when bounces or spam complaints get too high, before they hurt your reputation.

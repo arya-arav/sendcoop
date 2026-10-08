@@ -46,8 +46,10 @@ export function ShopifyCard({
                 Add the website pixel above to your theme (theme.liquid, in the &lt;head&gt;).
               </li>
               <li>
-                In Shopify: Settings &gt; Notifications &gt; Webhooks, create two webhooks in JSON
-                with this URL: <strong>Order creation</strong> and <strong>Refund create</strong>.
+                In Shopify: Settings &gt; Notifications &gt; Webhooks, create three webhooks in JSON
+                with this URL: <strong>Order creation</strong>, <strong>Order payment</strong> (so
+                orders paid later, like bank transfers, count once paid) and{" "}
+                <strong>Refund create</strong>.
               </li>
               <li>Paste the secret Shopify shows below the webhooks (&quot;signed with&quot;).</li>
             </ol>

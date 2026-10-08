@@ -26,7 +26,7 @@ export async function FormEditorPage({
   ]);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/forms`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -34,7 +34,7 @@ export async function FormEditorPage({
         <ArrowLeft className="size-4" aria-hidden="true" />
         Signup forms
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">{form ? form.name : "New form"}</h1>
+      <h1 className="text-[22px] font-semibold">{form ? form.name : "New form"}</h1>
       <FormEditor
         slug={slug}
         formId={form?.id ?? null}

@@ -27,7 +27,7 @@ export async function accountUsage(userId: string): Promise<Usage> {
       (select count(*)::int from messages
         where workspace_id in (${ownedWorkspaces(userId)})
           and created_at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'
-          and status in ('queued', 'sent', 'held')) as sends,
+          and status in ('queued', 'sending', 'sent', 'held')) as sends,
       (select count(*)::int from (${ownedWorkspaces(userId)}) w) as workspaces`);
   return { subscribers: row!.subscribers, sendsPerMonth: row!.sends, workspaces: row!.workspaces };
 }
@@ -57,13 +57,21 @@ export async function accountQuota(userId: string): Promise<Quota> {
   const [plan, usage, [owner]] = await Promise.all([
     getAccountPlan(userId),
     accountUsage(userId),
-    getDb().execute<{ banned: boolean; created_at: Date; trusted: boolean | null }>(sql`
-      select u.banned, u.created_at, (s.overrides ->> 'trusted')::boolean as trusted
+    getDb().execute<{
+      banned: boolean;
+      created_at: Date;
+      trusted: boolean | null;
+      admin: boolean;
+    }>(sql`
+      select u.banned, u.created_at, (s.overrides ->> 'trusted')::boolean as trusted,
+             coalesce(u.role, '') = 'admin' as admin
       from users u left join subscriptions s on s.user_id = u.id
       where u.id = ${userId}`),
   ]);
   const suspended = Boolean(owner?.banned);
-  const step = owner && !owner.trusted ? warmupLimit(new Date(owner.created_at)) : null;
+  // Super-admins run the platform: no warm-up for them.
+  const step =
+    owner && !owner.trusted && !owner.admin ? warmupLimit(new Date(owner.created_at)) : null;
   const warmup = step
     ? await (async () => {
         const sentToday = await sendsInLastDay(userId);
@@ -102,7 +110,7 @@ async function sendsInLastDay(userId: string) {
     select count(*)::int as n from messages
     where workspace_id in (${ownedWorkspaces(userId)})
       and created_at >= now() - interval '1 day'
-      and status in ('queued', 'sent', 'held')`);
+      and status in ('queued', 'sending', 'sent', 'held')`);
   return row?.n ?? 0;
 }
 

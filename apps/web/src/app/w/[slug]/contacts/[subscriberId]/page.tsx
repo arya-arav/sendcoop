@@ -72,7 +72,7 @@ export default async function SubscriberPage({
   const { stats } = profile;
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/contacts`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -82,7 +82,7 @@ export default async function SubscriberPage({
       </Link>
       <div className="grid gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{profile.email}</h1>
+          <h1 className="text-[22px] font-semibold">{profile.email}</h1>
           <Badge variant="secondary" className="capitalize">
             {profile.status}
           </Badge>

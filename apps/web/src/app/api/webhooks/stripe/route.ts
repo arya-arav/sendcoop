@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { getStripe, syncSubscription } from "@/lib/stripe";
+import { getStripe, syncInvoice, syncSubscription } from "@/lib/stripe";
 
 // Stripe posts subscription changes here (Developers > Webhooks, with the
 // events below). Each event is signed with STRIPE_WEBHOOK_SECRET. The
@@ -37,6 +37,11 @@ export async function POST(request: Request) {
     }
   } else if (SUBSCRIPTION_EVENTS.has(event.type)) {
     subscriptionId = (event.data.object as Stripe.Subscription).id;
+  }
+  // Invoices: read back too, so the newest state wins.
+  if (event.type.startsWith("invoice.")) {
+    const id = (event.data.object as Stripe.Invoice).id;
+    if (id) await syncInvoice(await stripe.invoices.retrieve(id));
   }
   if (subscriptionId) {
     await syncSubscription(await stripe.subscriptions.retrieve(subscriptionId));

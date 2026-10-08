@@ -34,13 +34,13 @@ export default async function CampaignsPage({ params }: { params: Promise<{ slug
   const editable = canManage(role);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <LiveRefresh
         active={campaigns.some((c) => c.status === "queued" || c.status === "sending")}
       />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
+          <h1 className="text-[22px] font-semibold">Campaigns</h1>
           <p className="text-sm text-muted-foreground">
             One-off emails to your lists and segments.
           </p>

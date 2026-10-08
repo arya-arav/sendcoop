@@ -114,10 +114,10 @@ export default async function ContactsPage({
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Contacts</h1>
+          <h1 className="text-[22px] font-semibold">Contacts</h1>
           <p className="text-sm text-muted-foreground" aria-live="polite">
             {total === 0
               ? "Everyone you can email from this workspace."
@@ -154,7 +154,7 @@ export default async function ContactsPage({
             <p className="font-medium">No subscribers yet</p>
             <p className="text-sm text-muted-foreground">
               {editable
-                ? "Import a CSV or add people one at a time. Signup forms are coming."
+                ? "Import a CSV, add people one at a time, or collect them with a signup form."
                 : "An owner or admin can add the first subscribers."}
             </p>
           </div>

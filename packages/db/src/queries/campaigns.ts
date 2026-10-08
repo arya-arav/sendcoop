@@ -201,6 +201,7 @@ export async function claimCampaign(
   const claimed = await moveStatus(workspaceId, campaignId, "queued", {
     status: "sending",
     startedAt: new Date(),
+    progressAt: new Date(),
   });
   if (claimed || !resume) return claimed;
   const current = await getCampaign(workspaceId, campaignId);
@@ -270,6 +271,21 @@ export async function loadMessageBatch(
   campaignId: string,
   messageIds: string[],
 ) {
+  // Claim them first: a batch queued twice (a retry, a re-queued stalled
+  // campaign) can't send the same email twice, since only one claim wins.
+  const claimed = await getDb()
+    .update(messages)
+    .set({ status: "sending", claimedAt: new Date() })
+    .where(
+      and(
+        eq(messages.workspaceId, workspaceId),
+        eq(messages.campaignId, campaignId),
+        eq(messages.status, "queued"),
+        inArray(messages.id, messageIds),
+      ),
+    )
+    .returning({ id: messages.id });
+  if (claimed.length === 0) return [];
   return getDb()
     .select({
       id: messages.id,
@@ -286,11 +302,29 @@ export async function loadMessageBatch(
       and(
         eq(messages.workspaceId, workspaceId),
         eq(messages.campaignId, campaignId),
-        eq(messages.status, "queued"),
-        inArray(messages.id, messageIds),
+        eq(messages.status, "sending"),
+        inArray(
+          messages.id,
+          claimed.map((m) => m.id),
+        ),
       ),
     )
     .orderBy(asc(messages.id));
+}
+
+/** Gives claimed messages a batch didn't get to back to the queue. */
+export async function releaseMessages(messageIds: string[]) {
+  if (messageIds.length === 0) return;
+  // A canceled campaign's messages are skipped, as cancelling did to the rest.
+  const canceled = sql`(select ${campaigns.status} from ${campaigns} where ${campaigns.id} = ${messages.campaignId}) = 'canceled'`;
+  await getDb()
+    .update(messages)
+    .set({
+      status: sql`case when ${canceled} then 'skipped'::message_status else 'queued'::message_status end`,
+      error: sql`case when ${canceled} then 'Canceled' else ${messages.error} end`,
+      claimedAt: null,
+    })
+    .where(and(inArray(messages.id, messageIds), eq(messages.status, "sending")));
 }
 
 /** sentAt is when the message was handed to the server (what rate limits count). */
@@ -389,14 +423,14 @@ export async function markMessageSent(
   await getDb()
     .update(messages)
     .set({ status: "sent", providerMessageId, sentAt })
-    .where(and(eq(messages.id, messageId), eq(messages.status, "queued")));
+    .where(and(eq(messages.id, messageId), eq(messages.status, "sending")));
 }
 
 export async function markMessageFailed(messageId: string, error: string) {
   await getDb()
     .update(messages)
     .set({ status: "failed", error: error.slice(0, 500) })
-    .where(and(eq(messages.id, messageId), eq(messages.status, "queued")));
+    .where(and(eq(messages.id, messageId), eq(messages.status, "sending")));
 }
 
 /**
@@ -412,7 +446,7 @@ export async function refreshCampaignProgress(campaignId: string) {
     .groupBy(messages.status);
   const by = Object.fromEntries(rows.map((r) => [r.status, r.n])) as Record<string, number>;
   // Held A/B remainders still have to go out.
-  const done = (by.queued ?? 0) === 0 && (by.held ?? 0) === 0;
+  const done = (by.queued ?? 0) === 0 && (by.held ?? 0) === 0 && (by.sending ?? 0) === 0;
   // An automation's email keeps sending as long as the automation runs.
   await db
     .update(campaigns)
@@ -431,11 +465,106 @@ export async function refreshCampaignProgress(campaignId: string) {
 }
 
 /**
+ * After a send batch (D80): adds its sent and failed counts to the campaign,
+ * and only when nothing is left to send does the full recount and finish it.
+ * Counting every message after every batch made a big campaign slower the
+ * bigger it got (a million recipients: 10,000 counts of up to a million rows,
+ * all updating one row).
+ */
+export async function recordBatchProgress(campaignId: string, sent: number, failed: number) {
+  const db = getDb();
+  if (sent > 0 || failed > 0) {
+    await db
+      .update(campaigns)
+      .set({
+        sentCount: sql`${campaigns.sentCount} + ${sent}`,
+        failedCount: sql`${campaigns.failedCount} + ${failed}`,
+        progressAt: new Date(),
+      })
+      .where(eq(campaigns.id, campaignId));
+  }
+  // An index probe, not a count.
+  const [left] = await db.execute<{ yes: boolean }>(sql`
+    select exists (
+      select 1 from messages
+      where campaign_id = ${campaignId} and status in ('queued', 'held', 'sending')
+    ) as yes`);
+  if (!left?.yes) await refreshCampaignProgress(campaignId);
+}
+
+/**
  * A timestamp-without-timezone column comes back as a Date read as UTC;
  * this turns it back into the wall-clock text Postgres stored.
  */
 function localString(value: Date) {
   return value.toISOString().slice(0, 19);
+}
+
+type QueuedBatch = { sendAfter: Date | null; messageIds: string[] };
+
+/**
+ * A campaign's queued messages as batches (each sharing one send time; null:
+ * now), a page of rows at a time (D80). Loading a million queued messages at
+ * once blocked the worker long enough to lose its job, half-way through
+ * queueing them.
+ */
+export async function* queuedMessageBatchPages(
+  campaignId: string,
+  size = 100,
+  pageRows = 20_000,
+): AsyncGenerator<QueuedBatch[]> {
+  let after: { at: string; id: string } | null = null;
+  for (;;) {
+    const rows: { id: string; send_after: Date | null; at: string }[] = await getDb().execute(sql`
+      select id, send_after, coalesce(send_after, '-infinity'::timestamptz)::text as at
+      from messages
+      where campaign_id = ${campaignId} and status = 'queued'
+        ${after ? sql`and (coalesce(send_after, '-infinity'::timestamptz), id) > (${after.at}::timestamptz, ${after.id}::uuid)` : sql``}
+      order by coalesce(send_after, '-infinity'::timestamptz), id
+      limit ${pageRows}`);
+    if (rows.length === 0) return;
+    const batches: QueuedBatch[] = [];
+    for (const row of rows) {
+      const sendAfter = row.send_after ? new Date(row.send_after) : null;
+      const last = batches.at(-1);
+      const sameTime = last && last.sendAfter?.getTime() === sendAfter?.getTime();
+      if (last && sameTime && last.messageIds.length < size) last.messageIds.push(row.id);
+      else batches.push({ sendAfter, messageIds: [row.id] });
+    }
+    yield batches;
+    const tail = rows.at(-1)!;
+    after = { at: tail.at, id: tail.id };
+    if (rows.length < pageRows) return;
+  }
+}
+
+/**
+ * Sending campaigns that have stopped moving (D80): messages due, nothing
+ * sent for `minutes`. Campaigns on servers with hourly or daily limits are
+ * left alone, since those wait on purpose.
+ */
+export async function stalledSendingCampaigns(minutes = 10) {
+  // Claims a dead worker left behind go back to the queue first.
+  await getDb().execute(sql`
+    update messages set status = 'queued', claimed_at = null
+    where status = 'sending' and claimed_at < now() - make_interval(mins => ${minutes}::int)`);
+  return getDb().execute<{ id: string; workspace_id: string }>(sql`
+    select c.id, c.workspace_id from campaigns c
+    left join sending_servers s on s.id = c.sending_server_id
+    where c.status = 'sending' and c.kind = 'broadcast'
+      and coalesce(c.progress_at, c.started_at) < now() - make_interval(mins => ${minutes}::int)
+      and s.max_per_hour is null and s.max_per_day is null
+      and exists (select 1 from messages m
+                  where m.campaign_id = c.id and m.status = 'queued'
+                    and (m.send_after is null or m.send_after <= now()))`);
+}
+
+/** Marks a stalled campaign as moving again, after its batches are queued anew. */
+export async function touchCampaignProgress(campaignId: string) {
+  await getDb()
+    .update(campaigns)
+    .set({ progressAt: new Date() })
+    .where(eq(campaigns.id, campaignId));
 }
 
 /**

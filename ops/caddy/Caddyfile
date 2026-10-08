@@ -1,0 +1,10 @@
+# HTTPS in front of Sendcoop (D82). Caddy gets and renews certificates.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+# Clicks, opens, postbacks and webhooks (the edge app).
+{$TRACKING_DOMAIN} {
+	reverse_proxy edge:3001
+}

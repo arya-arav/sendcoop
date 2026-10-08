@@ -20,6 +20,8 @@ export const QUEUES = {
 /** Recurring jobs on the maintenance queue, by name. */
 export const MAINTENANCE_JOBS = {
   verifyDomains: { name: "verify-domains", everyMs: 10 * 60_000 },
+  /** Re-queues sending campaigns whose batch jobs were lost (D80). */
+  stalledCampaigns: { name: "stalled-campaigns", everyMs: 2 * 60_000 },
   /** Sends queued outgoing webhooks (D78). */
   webhookDeliveries: { name: "webhook-deliveries", everyMs: 3_000 },
   /** Suspends accounts whose last week drew too many complaints or bounces (D76). */
@@ -140,6 +142,18 @@ export async function enqueueSendBatches(
 ) {
   if (jobs.length === 0) return;
   const now = Date.now();
+  // A few hundred at a time: one call with thousands of jobs can time out
+  // half-way (D80).
+  for (let i = 0; i < jobs.length; i += 500) {
+    await addSendJobs(jobs.slice(i, i + 500), now, round);
+  }
+}
+
+async function addSendJobs(
+  jobs: (SendBatchJob & { notBefore?: Date | null })[],
+  now: number,
+  round: string | undefined,
+) {
   await queue<SendBatchJob>(QUEUES.sends).addBulk(
     jobs.map(({ notBefore, ...data }) => ({
       name: "send",
@@ -171,4 +185,15 @@ export async function scheduleMaintenanceJobs() {
 export async function closeQueues() {
   await Promise.all([...(globalForQueues.__sendcoopQueues?.values() ?? [])].map((q) => q.close()));
   globalForQueues.__sendcoopQueues?.clear();
+}
+
+/** Jobs in a queue by state, for monitoring (and the load test, D80). */
+export async function queueCounts(name: (typeof QUEUES)[keyof typeof QUEUES]) {
+  const counts = await queue(name).getJobCounts("waiting", "active", "delayed", "failed");
+  return {
+    waiting: counts.waiting ?? 0,
+    active: counts.active ?? 0,
+    delayed: counts.delayed ?? 0,
+    failed: counts.failed ?? 0,
+  };
 }

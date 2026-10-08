@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -74,3 +75,41 @@ export const subscriptions = pgTable("subscriptions", {
 
 export type Plan = typeof plans.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
+
+export const invoiceStatus = pgEnum("invoice_status", [
+  "draft",
+  "open", // issued, not paid yet
+  "paid",
+  "uncollectible", // Stripe gave up collecting it
+  "void",
+]);
+
+/** Stripe invoices, kept as the billing webhook reports them (admin Invoices). */
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: id(),
+    userId: uuid().references(() => users.id, { onDelete: "set null" }),
+    stripeInvoiceId: text().notNull().unique(),
+    stripeCustomerId: text(),
+    number: text(),
+    status: invoiceStatus().notNull(),
+    /** What it was for, e.g. the plan's name. */
+    description: text().notNull().default(""),
+    amountDueCents: integer().notNull().default(0),
+    amountPaidCents: integer().notNull().default(0),
+    currency: text().notNull().default("USD"),
+    /** Payment attempts that failed (Stripe retries). */
+    attemptCount: integer().notNull().default(0),
+    hostedUrl: text(),
+    pdfUrl: text(),
+    periodStart: timestamp({ withTimezone: true }),
+    periodEnd: timestamp({ withTimezone: true }),
+    paidAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index().on(t.userId, t.createdAt), index().on(t.createdAt)],
+);
+
+export type Invoice = typeof invoices.$inferSelect;

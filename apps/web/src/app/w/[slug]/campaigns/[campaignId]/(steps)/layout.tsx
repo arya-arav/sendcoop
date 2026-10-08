@@ -23,7 +23,7 @@ export default async function CampaignLayout({
   const status = STATUS_LABELS[campaign.status];
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/campaigns`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -32,7 +32,7 @@ export default async function CampaignLayout({
         Campaigns
       </Link>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{campaign.name}</h1>
+        <h1 className="text-[22px] font-semibold">{campaign.name}</h1>
         <Badge variant={status.variant}>{status.label}</Badge>
       </div>
       {campaign.status === "draft" && (

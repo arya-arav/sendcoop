@@ -39,6 +39,7 @@ import { pingRedis } from "@sendcoop/redis";
 import { verifyUtmcapSignature } from "@sendcoop/utmcap";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
+import { reportError } from "./sentry";
 import { PIXEL_JS } from "./pixel";
 
 const service: ServiceName = "edge";
@@ -48,6 +49,12 @@ const service: ServiceName = "edge";
 // (D48), WooCommerce (D49), leads (D50), UTMCAP (D58, D59), automation events
 // (D64). Kept small and fast: a click is one database round trip.
 export const app = new Hono();
+// Unexpected errors: logged, reported (with SENTRY_DSN), and a plain 500.
+app.onError((error, c) => {
+  console.error(`[edge] ${c.req.method} ${c.req.path} failed`, error);
+  reportError(error, { method: c.req.method, path: c.req.path });
+  return c.text("Something went wrong.", 500);
+});
 
 app.get("/health", async (c) => {
   const [postgres, redis] = await Promise.all([pingDatabase(), pingRedis()]);

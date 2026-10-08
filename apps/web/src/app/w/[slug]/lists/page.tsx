@@ -23,10 +23,10 @@ export default async function ListsPage({ params }: { params: Promise<{ slug: st
   const editable = canManage(role);
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Lists</h1>
+          <h1 className="text-[22px] font-semibold">Lists</h1>
           <p className="text-sm text-muted-foreground">
             Group subscribers by offer, lead source or product.
           </p>

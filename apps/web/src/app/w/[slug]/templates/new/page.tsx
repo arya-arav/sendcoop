@@ -58,7 +58,7 @@ export default async function NewTemplatePage({
   const base = `/w/${slug}/templates/new`;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/templates`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -67,7 +67,7 @@ export default async function NewTemplatePage({
         Templates
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">New template</h1>
+        <h1 className="text-[22px] font-semibold">New template</h1>
         <p className="text-sm text-muted-foreground">
           Start from a ready-made design and make it yours, or start from scratch.
         </p>

@@ -48,7 +48,7 @@ export async function listCustomers({ q = "", limit = 50 }: { q?: string; limit?
            (select count(*)::int from messages m
              where m.workspace_id in (select workspace_id from owned o where o.user_id = u.id)
                and m.created_at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'
-               and m.status in ('queued', 'sent', 'held')) as sends
+               and m.status in ('queued', 'sending', 'sent', 'held')) as sends
     from users u
     left join subscriptions s on s.user_id = u.id
     left join plans p on p.id = s.plan_id
@@ -80,9 +80,10 @@ export async function getCustomer(userId: string) {
     role: string | null;
     banned: boolean;
     ban_reason: string | null;
+    email_verified: boolean;
     created_at: Date;
   }>(
-    sql`select id, name, email, role, banned, ban_reason, created_at from users where id = ${userId}`,
+    sql`select id, name, email, role, banned, ban_reason, email_verified, created_at from users where id = ${userId}`,
   );
   if (!user) return null;
   const workspaces = await db.execute<{ id: string; name: string; slug: string; role: string }>(sql`
@@ -103,6 +104,7 @@ export async function getCustomer(userId: string) {
     role: user.role,
     banned: user.banned,
     banReason: user.ban_reason,
+    emailVerified: user.email_verified,
     createdAt: new Date(user.created_at),
     workspaces: [...workspaces],
     overrides: sub?.overrides ?? null,

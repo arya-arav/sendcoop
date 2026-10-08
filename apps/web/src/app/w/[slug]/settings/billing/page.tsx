@@ -4,6 +4,7 @@ import {
   getWorkspacePlan,
   LIMIT_LABELS,
   listPlans,
+  listUserInvoices,
   nextMonthStart,
   workspaceQuota,
   type PlanFeatures,
@@ -98,12 +99,14 @@ export default async function BillingPage({
     workspaceQuota(workspace.id),
   ]);
   const isOwner = current.ownerId === user.id;
+  // Only the account's owner sees what it paid.
+  const invoices = isOwner ? await listUserInvoices(user.id) : [];
   const billing = Boolean(getStripe());
   const paying = Boolean(current.stripeSubscriptionId);
   const day = (d: Date) => d.toLocaleDateString("en-GB", { dateStyle: "medium" });
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/settings`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -112,7 +115,7 @@ export default async function BillingPage({
         Settings
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
+        <h1 className="text-[22px] font-semibold">Billing</h1>
         <p className="text-sm text-muted-foreground">
           Plans are per account: every workspace you own shares your plan.
         </p>
@@ -213,6 +216,71 @@ export default async function BillingPage({
           ))}
         </TableBody>
       </Table>
+
+      {isOwner && invoices.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Invoices</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table aria-label="Invoices">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Links</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoices.map((i) => (
+                  <TableRow key={i.id}>
+                    <TableCell>
+                      {i.number ?? "Draft"}
+                      <span className="block text-xs text-muted-foreground">{i.description}</span>
+                    </TableCell>
+                    <TableCell>{day(i.paidAt ?? i.createdAt)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMoney(
+                        (i.status === "paid" ? i.amountPaidCents : i.amountDueCents) / 100,
+                        i.currency,
+                      )}
+                    </TableCell>
+                    <TableCell className="capitalize">{i.status}</TableCell>
+                    <TableCell className="text-right">
+                      {i.hostedUrl && (
+                        <a
+                          href={i.hostedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          View
+                        </a>
+                      )}
+                      {i.pdfUrl && (
+                        <a
+                          href={i.pdfUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="ml-3 hover:underline"
+                        >
+                          PDF
+                        </a>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

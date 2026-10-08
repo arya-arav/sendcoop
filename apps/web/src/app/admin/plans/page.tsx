@@ -21,7 +21,7 @@ export default async function PlansPage() {
     <div className="grid gap-4">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Plans</h1>
+          <h1 className="text-[22px] font-semibold">Plans</h1>
           <p className="text-sm text-muted-foreground">
             What each plan costs and allows. Customers see public plans on their billing page.
           </p>

@@ -14,11 +14,13 @@ export function AppSidebar({
   current,
   role,
   user,
+  isAdmin = false,
 }: {
   workspaces: WorkspaceSummary[];
   current: WorkspaceSummary;
   role: string;
   user: { name: string; email: string };
+  isAdmin?: boolean;
 }) {
   return (
     <Sidebar collapsible="icon">
@@ -29,7 +31,7 @@ export function AppSidebar({
         <NavMain slug={current.slug} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser user={user} admin={isAdmin ? "panel" : undefined} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

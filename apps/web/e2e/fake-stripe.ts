@@ -41,6 +41,8 @@ type Session = {
 };
 
 export type FakeStripe = {
+  /** Price ids to amounts in cents, for the invoices it issues. */
+  prices: Map<string, number>;
   subscriptions: Map<string, Sub>;
   webhooks: { type: string; status: number }[];
   /** Ends a subscription now, as an unpaid one ends after Stripe's retries. */
@@ -68,7 +70,38 @@ export async function startFakeStripe(): Promise<FakeStripe> {
   const customers = new Map<string, Record<string, unknown>>();
   const sessions = new Map<string, Session>();
   const subscriptions = new Map<string, Sub>();
+  const prices = new Map<string, number>();
   const webhooks: FakeStripe["webhooks"] = [];
+
+  const invoices = new Map<string, Record<string, unknown>>();
+  let invoiceNumber = 0;
+  /** Bills a subscription's current price, paid at once (as with a card). */
+  const issueInvoice = async (subscription: Sub, description: string) => {
+    const iid = newId("in");
+    const now = Math.floor(Date.now() / 1000);
+    const amount = prices.get(subscription.items.data[0]!.price.id) ?? 1900;
+    const invoice = {
+      id: iid,
+      object: "invoice",
+      customer: subscription.customer,
+      subscription: subscription.id,
+      number: `FAKE-${String(++invoiceNumber).padStart(4, "0")}`,
+      status: "paid",
+      amount_due: amount,
+      amount_paid: amount,
+      currency: "usd",
+      attempt_count: 1,
+      hosted_invoice_url: `${BASE}/invoice/${iid}`,
+      invoice_pdf: `${BASE}/invoice/${iid}.pdf`,
+      period_start: now,
+      period_end: now + MONTH,
+      created: now,
+      status_transitions: { paid_at: now },
+      lines: { object: "list", data: [{ description }] },
+    };
+    invoices.set(iid, invoice);
+    await sendWebhook("invoice.paid", invoice);
+  };
 
   const sendWebhook = async (type: string, object: unknown) => {
     const payload = JSON.stringify({
@@ -115,6 +148,9 @@ export async function startFakeStripe(): Promise<FakeStripe> {
     // The API (what the Stripe SDK calls)
     if (parts[0] === "v1") {
       const [, resource, id, sub] = parts;
+      if (resource === "balance") {
+        return json(res, 200, { object: "balance", livemode: false, available: [], pending: [] });
+      }
       if (resource === "customers" && req.method === "POST") {
         const customer = { id: newId("cus"), object: "customer", ...form };
         customers.set(customer.id, customer);
@@ -145,15 +181,27 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       if (resource === "subscriptions" && id) {
         const subscription = subscriptions.get(id);
         if (!subscription) return notFound(res);
+        if (req.method === "DELETE") {
+          subscription.status = "canceled";
+          await sendWebhook("customer.subscription.deleted", subscription);
+          return json(res, 200, subscription);
+        }
         if (req.method === "POST") {
           const price = form.items?.["0"]?.price;
-          if (price) subscription.items.data[0]!.price = { id: price };
+          if (price) {
+            subscription.items.data[0]!.price = { id: price };
+            await issueInvoice(subscription, `Switch to ${price}`);
+          }
           if (form.cancel_at_period_end !== undefined) {
             subscription.cancel_at_period_end = form.cancel_at_period_end === "true";
           }
           await sendWebhook("customer.subscription.updated", subscription);
         }
         return json(res, 200, subscription);
+      }
+      if (resource === "invoices" && id) {
+        const invoice = invoices.get(id);
+        return invoice ? json(res, 200, invoice) : notFound(res);
       }
       if (resource === "billing_portal" && id === "sessions" && req.method === "POST") {
         const pid = newId("bps");
@@ -193,6 +241,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       subscriptions.set(subscription.id, subscription);
       Object.assign(session, { status: "complete", subscription: subscription.id });
       await sendWebhook("customer.subscription.created", subscription);
+      await issueInvoice(subscription, `Subscription to ${session.price}`);
       await sendWebhook("checkout.session.completed", session);
       return redirect(res, session.success_url.replace("{CHECKOUT_SESSION_ID}", session.id));
     }
@@ -222,6 +271,7 @@ export async function startFakeStripe(): Promise<FakeStripe> {
   await new Promise<void>((resolve) => server.listen(FAKE_STRIPE_PORT, "127.0.0.1", resolve));
 
   return {
+    prices,
     subscriptions,
     webhooks,
     endSubscription: async (id) => {

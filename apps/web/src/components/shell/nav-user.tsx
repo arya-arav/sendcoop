@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ChevronsUpDown, LayoutGrid, LogOut, Monitor, Moon, Shield, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,7 +18,14 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 
-export function NavUser({ user }: { user: { name: string; email: string } }) {
+/** admin: a link to the admin panel (in the app) or back to the app (in the admin). */
+export function NavUser({
+  user,
+  admin,
+}: {
+  user: { name: string; email: string };
+  admin?: "panel" | "app";
+}) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
@@ -69,6 +76,18 @@ export function NavUser({ user }: { user: { name: string; email: string } }) {
               </DropdownMenuRadioGroup>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {admin === "panel" && (
+              <DropdownMenuItem onClick={() => router.push("/admin")}>
+                <Shield />
+                Admin panel
+              </DropdownMenuItem>
+            )}
+            {admin === "app" && (
+              <DropdownMenuItem onClick={() => router.push("/")}>
+                <LayoutGrid />
+                Back to the app
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={signOut}>
               <LogOut />
               Sign out

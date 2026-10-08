@@ -27,7 +27,7 @@ export default async function ImportPage({ params }: { params: Promise<{ slug: s
   const imports = await listImports(workspace.id);
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/contacts`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -37,7 +37,7 @@ export default async function ImportPage({ params }: { params: Promise<{ slug: s
       </Link>
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Import subscribers</h1>
+        <h1 className="text-[22px] font-semibold">Import subscribers</h1>
         <p className="text-sm text-muted-foreground">
           Upload a CSV exported from another tool or a spreadsheet. You&apos;ll match its columns to
           subscriber fields next.

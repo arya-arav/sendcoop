@@ -1,0 +1,1 @@
+CREATE INDEX "messages_sent_at" ON "messages" USING btree ("sent_at") WHERE "messages"."status" = 'sent';

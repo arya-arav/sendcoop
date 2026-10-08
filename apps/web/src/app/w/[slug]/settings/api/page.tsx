@@ -31,7 +31,7 @@ export default async function ApiKeysPage({ params }: { params: Promise<{ slug: 
   const base = `${appUrl()}/api/v1`;
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Link
         href={`/w/${slug}/settings`}
         className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -40,7 +40,7 @@ export default async function ApiKeysPage({ params }: { params: Promise<{ slug: 
         Settings
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">API keys</h1>
+        <h1 className="text-[22px] font-semibold">API keys</h1>
         <p className="text-sm text-muted-foreground">
           Manage subscribers and conversions from your own code: the REST API at{" "}
           <code className="text-xs">{base}</code>, described in{" "}
