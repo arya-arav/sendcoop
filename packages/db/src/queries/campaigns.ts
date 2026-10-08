@@ -413,12 +413,18 @@ export async function refreshCampaignProgress(campaignId: string) {
   const by = Object.fromEntries(rows.map((r) => [r.status, r.n])) as Record<string, number>;
   // Held A/B remainders still have to go out.
   const done = (by.queued ?? 0) === 0 && (by.held ?? 0) === 0;
+  // An automation's email keeps sending as long as the automation runs.
   await db
     .update(campaigns)
     .set({
       sentCount: by.sent ?? 0,
       failedCount: by.failed ?? 0,
-      ...(done ? { status: "sent" as const, finishedAt: new Date() } : {}),
+      ...(done
+        ? {
+            status: sql`case when ${campaigns.kind} = 'broadcast' then 'sent'::campaign_status else ${campaigns.status} end`,
+            finishedAt: sql`case when ${campaigns.kind} = 'broadcast' then now() else ${campaigns.finishedAt} end`,
+          }
+        : {}),
     })
     .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "sending")));
   return { sent: by.sent ?? 0, failed: by.failed ?? 0, queued: by.queued ?? 0, done };

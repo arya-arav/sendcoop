@@ -13,6 +13,8 @@ export const QUEUES = {
   sends: "campaign-sends",
   /** UTMCAP webhook events, applied after the edge has answered UTMCAP. */
   utmcapEvents: "utmcap-events",
+  /** Automation runs: one job moves a run along until it waits, ends or sends. */
+  automationRuns: "automation-runs",
 } as const;
 
 /** Recurring jobs on the maintenance queue, by name. */
@@ -24,12 +26,15 @@ export const MAINTENANCE_JOBS = {
   decideAbTests: { name: "decide-ab-tests", everyMs: 30_000 },
   /** Daily currency rates for revenue in the reporting currency (the ECB publishes once a day). */
   fxRates: { name: "refresh-fx-rates", everyMs: 6 * 3600_000 },
+  /** Wakes automation runs whose wait is over (and any a lost job left behind). */
+  automationSweep: { name: "automation-sweep", everyMs: 60_000 },
 } as const;
 
 export type ImportJob = { importId: string; workspaceId: string };
 export type CampaignJob = { campaignId: string; workspaceId: string };
 export type SendBatchJob = { campaignId: string; workspaceId: string; messageIds: string[] };
 export type UtmcapEventJob = { workspaceId: string; eventId: string };
+export type AutomationRunJob = { runId: string };
 
 /** A fresh connection: BullMQ workers need their own (blocking commands). */
 export function queueConnection(): ConnectionOptions {
@@ -79,6 +84,27 @@ export async function enqueueUtmcapEvent(job: UtmcapEventJob) {
     backoff: { type: "exponential", delay: 30_000 },
     ...keep,
   });
+}
+
+/**
+ * Moves an automation run along, now or at a time (the end of a wait).
+ * `key` makes the job id: the same key queues it once.
+ */
+export async function enqueueAutomationRun(
+  runId: string,
+  { at, key = "now" }: { at?: Date; key?: string } = {},
+) {
+  await queue<AutomationRunJob>(QUEUES.automationRuns).add(
+    "advance",
+    { runId },
+    {
+      jobId: `${runId}_${key}`,
+      delay: at ? Math.max(0, at.getTime() - Date.now()) : 0,
+      attempts: 5,
+      backoff: { type: "exponential", delay: 15_000 },
+      ...keep,
+    },
+  );
 }
 
 /** Queues a campaign's prepare step (job id = campaign id, so at most once). */

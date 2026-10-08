@@ -13,11 +13,13 @@ import {
   queueConnection,
   scheduleMaintenanceJobs,
   type SendBatchJob,
+  type AutomationRunJob,
   type UtmcapEventJob,
 } from "@sendcoop/queue";
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
+import { processAutomationRun, sweepAutomationRuns } from "./jobs/automation-runs";
 import { refreshFxRates } from "./jobs/fx-rates";
 import { processImport } from "./jobs/import-subscribers";
 import { applyUtmcapEvent } from "./jobs/utmcap-events";
@@ -59,6 +61,15 @@ const workers = [
     connection: queueConnection(),
     concurrency: Number(process.env.SEND_CONCURRENCY ?? 5),
   }),
+  // Automation runs, one step after another.
+  new Worker<AutomationRunJob>(
+    QUEUES.automationRuns,
+    (job) => processAutomationRun(job.data.runId),
+    {
+      connection: queueConnection(),
+      concurrency: 10,
+    },
+  ),
   // UTMCAP conversion webhooks, kept by the edge.
   new Worker<UtmcapEventJob>(QUEUES.utmcapEvents, (job) => applyUtmcapEvent(job.data), {
     connection: queueConnection(),
@@ -76,6 +87,9 @@ const workers = [
       if (job.name === MAINTENANCE_JOBS.startScheduled.name) {
         const started = await startScheduledCampaigns();
         if (started > 0) console.log(`[${service}] scheduled campaigns started: ${started}`);
+      }
+      if (job.name === MAINTENANCE_JOBS.automationSweep.name) {
+        await sweepAutomationRuns();
       }
       if (job.name === MAINTENANCE_JOBS.fxRates.name) {
         const result = await refreshFxRates();

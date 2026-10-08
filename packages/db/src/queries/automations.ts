@@ -169,3 +169,34 @@ export async function automationOfCampaign(workspaceId: string, campaignId: stri
     .where(and(eq(campaigns.workspaceId, workspaceId), eq(campaigns.id, campaignId)));
   return row?.automationId ?? null;
 }
+
+/**
+ * Goes live or pauses (D63). Live: its email campaigns send; paused: they
+ * stop and can be edited (queued emails wait), and runs stand still.
+ */
+export async function setAutomationStatus(
+  workspaceId: string,
+  automationId: string,
+  status: "active" | "paused",
+) {
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(automations)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(automations.workspaceId, workspaceId), eq(automations.id, automationId)));
+    await tx
+      .update(campaigns)
+      .set(
+        status === "active"
+          ? { status: "sending", startedAt: sql`coalesce(${campaigns.startedAt}, now())` }
+          : { status: "draft" },
+      )
+      .where(
+        and(
+          eq(campaigns.workspaceId, workspaceId),
+          eq(campaigns.automationId, automationId),
+          eq(campaigns.kind, "automation"),
+        ),
+      );
+  });
+}

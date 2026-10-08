@@ -13,6 +13,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { activateAutomation, pauseAutomation } from "@/lib/automation-control";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 
@@ -89,4 +90,20 @@ export async function editAutomationEmailAction(
     return { ok: false as const, error: "Save the automation first, then write this email." };
   }
   redirect(`/w/${slug}/campaigns/${campaignId}/design`);
+}
+
+export async function activateAutomationAction(slug: string, automationId: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) return { ok: false as const, error: NOT_ALLOWED };
+  const result = await activateAutomation(workspace.id, automationId);
+  revalidatePath(`/w/${slug}/automations`, "layout");
+  return result;
+}
+
+export async function pauseAutomationAction(slug: string, automationId: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) return { ok: false as const, error: NOT_ALLOWED };
+  const result = await pauseAutomation(workspace.id, automationId);
+  revalidatePath(`/w/${slug}/automations`, "layout");
+  return result;
 }

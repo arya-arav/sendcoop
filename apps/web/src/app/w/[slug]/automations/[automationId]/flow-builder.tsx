@@ -28,7 +28,18 @@ import {
   ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowLeft, Clock, GitBranch, Mail, Play, Save, Square, Trash2, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  GitBranch,
+  Mail,
+  Pause,
+  Play,
+  Save,
+  Square,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { FormError } from "@/components/form";
@@ -37,7 +48,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { editAutomationEmailAction, saveAutomationAction } from "../actions";
+import {
+  activateAutomationAction,
+  editAutomationEmailAction,
+  pauseAutomationAction,
+  saveAutomationAction,
+} from "../actions";
 
 type Option = { id: string; name: string };
 export type BuilderContext = {
@@ -448,10 +464,38 @@ export function FlowBuilder({
               </Button>
             );
           })}
-          <Button disabled={pending || locked} onClick={() => save()} className="ml-2">
+          <Button
+            variant="outline"
+            disabled={pending || locked}
+            onClick={() => save()}
+            className="ml-2"
+          >
             <Save />
             {pending ? "Saving…" : "Save"}
           </Button>
+          {locked ? (
+            <Button
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await pauseAutomationAction(slug, automationId);
+                  if (!result.ok) setError(result.error);
+                })
+              }
+            >
+              <Pause />
+              Pause
+            </Button>
+          ) : (
+            <Button
+              disabled={pending || readiness !== null}
+              title={readiness ?? undefined}
+              onClick={() => save(() => activateAutomationAction(slug, automationId))}
+            >
+              <Play />
+              {status === "paused" ? "Resume" : "Go live"}
+            </Button>
+          )}
         </div>
       </div>
       {locked && (
