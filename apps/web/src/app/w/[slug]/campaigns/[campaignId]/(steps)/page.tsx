@@ -1,4 +1,12 @@
-import { abResults, campaignReport, getCampaign, getVariantB, networkName } from "@sendcoop/db";
+import {
+  abResults,
+  campaignReport,
+  getCampaign,
+  getReportingCurrency,
+  getVariantB,
+  networkName,
+} from "@sendcoop/db";
+import { formatMoney } from "@/lib/money";
 import { CalendarClock } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +85,10 @@ export default async function CampaignPage({
   }
 
   const ab = campaign.abTest ? await abResults(campaign.id) : null;
-  const { report, links } = (await campaignReport(workspace.id, campaign.id))!;
+  const [{ report, links }, currency] = await Promise.all([
+    campaignReport(workspace.id, campaign.id).then((r) => r!),
+    getReportingCurrency(workspace.id),
+  ]);
   const n = (value: number) => value.toLocaleString("en");
   const count = (value: number, one: string, many: string) =>
     `${n(value)} ${value === 1 ? one : many}`;
@@ -111,15 +122,15 @@ export default async function CampaignPage({
     },
     {
       label: "Revenue",
-      value: report.revenue.toLocaleString("en", { style: "currency", currency: "USD" }),
+      value: formatMoney(report.revenue, currency),
       detail:
         campaign.cost !== null && campaign.cost > 0
-          ? `Return ${(((report.revenue - campaign.cost) / campaign.cost) * 100).toLocaleString("en", { maximumFractionDigits: 1 })}% on ${campaign.cost.toLocaleString("en", { style: "currency", currency: "USD" })} cost`
+          ? `Return ${(((report.revenue - campaign.cost) / campaign.cost) * 100).toLocaleString("en", { maximumFractionDigits: 1 })}% on ${formatMoney(campaign.cost, currency)} cost`
           : "From tracked conversions",
     },
   ];
   const variantB = campaign.abTest ? await getVariantB(campaign.id) : null;
-  const money = (n: number) => n.toLocaleString("en", { style: "currency", currency: "USD" });
+  const money = (n: number) => formatMoney(n, currency);
 
   return (
     <div className="grid gap-6">
@@ -187,7 +198,7 @@ export default async function CampaignPage({
         </section>
       )}
       {campaign.status !== "queued" && canManage(role) && (
-        <CostForm slug={slug} campaignId={campaign.id} cost={campaign.cost} />
+        <CostForm slug={slug} campaignId={campaign.id} cost={campaign.cost} currency={currency} />
       )}
       {campaign.abTest && ab && (
         <Card>

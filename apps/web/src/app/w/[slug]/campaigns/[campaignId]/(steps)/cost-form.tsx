@@ -12,10 +12,12 @@ export function CostForm({
   slug,
   campaignId,
   cost,
+  currency,
 }: {
   slug: string;
   campaignId: string;
   cost: number | null;
+  currency: string;
 }) {
   const [value, setValue] = useState(cost === null ? "" : String(cost));
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function CostForm({
       }}
     >
       <div className="grid gap-1">
-        <Label htmlFor="campaign-cost">Campaign cost (USD, optional)</Label>
+        <Label htmlFor="campaign-cost">Campaign cost ({currency}, optional)</Label>
         <Input
           id="campaign-cost"
           inputMode="decimal"

@@ -1,4 +1,10 @@
-import { getSubscriberProfile, subscriberTimeline, type TimelineEvent } from "@sendcoop/db";
+import {
+  getReportingCurrency,
+  getSubscriberProfile,
+  subscriberTimeline,
+  type TimelineEvent,
+} from "@sendcoop/db";
+import { formatMoney as money } from "@/lib/money";
 import {
   ArrowLeft,
   CircleDollarSign,
@@ -31,13 +37,6 @@ const EVENTS: Record<TimelineEvent["kind"], { icon: LucideIcon; label: string }>
   complained: { icon: ShieldAlert, label: "Marked as spam" },
 };
 
-const money = (value: number, currency = "USD") => {
-  try {
-    return value.toLocaleString("en", { style: "currency", currency });
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
-};
 const when = (at: number) =>
   new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
@@ -63,9 +62,10 @@ export default async function SubscriberPage({
 }) {
   const { slug, subscriberId } = await params;
   const { workspace } = await requireMemberWorkspace(slug);
-  const [profile, events] = await Promise.all([
+  const [profile, events, currency] = await Promise.all([
     getSubscriberProfile(workspace.id, subscriberId),
     subscriberTimeline(workspace.id, subscriberId),
+    getReportingCurrency(workspace.id),
   ]);
   if (!profile) notFound();
   const name = [profile.firstName, profile.lastName].filter(Boolean).join(" ");
@@ -114,7 +114,7 @@ export default async function SubscriberPage({
       </div>
 
       <section aria-label="Value" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Stat label="Lifetime value" value={money(stats.lifetimeValue)} />
+        <Stat label="Lifetime value" value={money(stats.lifetimeValue, currency)} />
         <Stat label="Conversions" value={String(stats.conversions)} />
         <Stat label="Emails" value={String(stats.emails)} />
         <Stat label="Opened" value={String(stats.opened)} />
@@ -122,7 +122,7 @@ export default async function SubscriberPage({
       </section>
       {stats.pendingValue > 0 && (
         <p className="-mt-3 text-sm text-muted-foreground">
-          Plus {money(stats.pendingValue)} pending (not counted until approved).
+          Plus {money(stats.pendingValue, currency)} pending (not counted until approved).
         </p>
       )}
 

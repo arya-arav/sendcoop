@@ -97,7 +97,7 @@ export async function attributeConversion(
 export async function refreshMessageRevenue(messageId: string) {
   await getDb().execute(sql`
     update messages set revenue = coalesce((
-      select sum(value) from conversions where message_id = ${messageId} and status = 'approved'
+      select sum(value_base) from conversions where message_id = ${messageId} and status = 'approved'
     ), 0)
     where id = ${messageId}`);
 }

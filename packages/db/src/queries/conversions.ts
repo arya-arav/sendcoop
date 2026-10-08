@@ -3,6 +3,7 @@ import { getDb } from "../client";
 import type { PostbackEvent } from "../postback-params";
 import type { ConversionStatus, LeadStage } from "../schema";
 import { attributeConversion, refreshMessageRevenue } from "./attribution";
+import { reportingCurrencySql } from "./currency";
 
 export type ConversionInput = {
   source: "postback" | "pixel" | "shopify" | "woocommerce" | "lead" | "utmcap" | "api";
@@ -44,17 +45,19 @@ export async function recordConversion(
     input.txid?.slice(0, 200) ?? (input.clickId ? `auto:${input.clickId}:${input.value}` : null);
   const db = getDb();
   const credit = await attributeConversion(workspaceId, input);
+  const occurredAt = (input.occurredAt ?? new Date()).toISOString();
 
   const [created] = await db.execute<{ id: string }>(sql`
     insert into conversions (workspace_id, click_id, click_row_id, message_id, campaign_id,
                              automation_id, subscriber_id, source, event, value, currency, status,
-                             external_txid, network_id, payload, lead_stage, created_at)
+                             external_txid, network_id, payload, lead_stage, created_at, fx_rate)
     values (${workspaceId}, ${input.clickId}, ${credit.clickRowId}, ${credit.messageId},
             ${credit.campaignId}, ${credit.automationId}, ${credit.subscriberId},
             ${input.source}::conversion_source, ${input.event}::conversion_event, ${input.value},
             ${input.currency}, ${input.status}::conversion_status, ${txid}, ${input.network},
             ${JSON.stringify(input.payload)}::jsonb, ${input.leadStage ?? null}::lead_stage,
-            ${(input.occurredAt ?? new Date()).toISOString()})
+            ${occurredAt},
+            sc_fx_rate(${input.currency}, ${reportingCurrencySql(workspaceId)}, ${occurredAt}::timestamptz))
     on conflict (workspace_id, external_txid) where external_txid is not null do nothing
     returning id`);
   if (created) {
@@ -83,6 +86,8 @@ export type RecentConversion = {
   network: string | null;
   value: number;
   currency: string;
+  /** In the reporting currency; null while there's no rate for `currency`. */
+  valueBase: number | null;
   status: ConversionStatus;
   txid: string | null;
   campaignId: string | null;
@@ -96,7 +101,8 @@ export type RecentConversion = {
 export async function listRecentConversions(workspaceId: string, limit = 10) {
   return getDb().execute<RecentConversion>(sql`
     select v.id, (extract(epoch from v.created_at) * 1000)::float8 as at, v.source,
-           v.network_id as network, v.value::float8 as value, v.currency, v.status,
+           v.network_id as network, v.value::float8 as value, v.currency,
+           v.value_base::float8 as "valueBase", v.status,
            v.external_txid as txid, v.campaign_id as "campaignId", c.name as "campaignName",
            coalesce(v.payload->>'test' = '1', false) as test, v.lead_stage as "leadStage"
     from conversions v

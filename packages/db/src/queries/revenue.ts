@@ -87,7 +87,7 @@ export async function revenueReport(
          and not is_bot and ${within("created_at")})::int as clicks,
       (select count(*) from conversions where workspace_id = ${workspaceId}
          and status = 'approved' and ${within("created_at")})::int as conversions,
-      (select coalesce(sum(value), 0) from conversions where workspace_id = ${workspaceId}
+      (select coalesce(sum(value_base), 0) from conversions where workspace_id = ${workspaceId}
          and status = 'approved' and ${within("created_at")})::float8 as revenue,
       (select sum(cost) from campaigns where workspace_id = ${workspaceId}
          and cost is not null and ${within("started_at")})::float8 as cost`);
@@ -106,7 +106,7 @@ export async function revenueReport(
           and not is_bot and ${within("created_at")}
         group by campaign_id
       ), v as (
-        select campaign_id, count(*)::int as conversions, sum(value)::float8 as revenue
+        select campaign_id, count(*)::int as conversions, sum(value_base)::float8 as revenue
         from conversions
         where workspace_id = ${workspaceId} and status = 'approved' and ${within("created_at")}
         group by campaign_id
@@ -144,7 +144,7 @@ export async function revenueReport(
           and not is_bot and ${within("created_at")}
         group by link_id
       ), v as (
-        select k.link_id, count(*)::int as conversions, sum(v.value)::float8 as revenue
+        select k.link_id, count(*)::int as conversions, sum(v.value_base)::float8 as revenue
         from conversions v left join clicks k on k.id = v.click_row_id
         where v.workspace_id = ${workspaceId} and v.status = 'approved'
           and ${within("v.created_at")}
@@ -195,7 +195,7 @@ export async function revenueReport(
              and not k.is_bot and ${within("k.created_at")})::int as clicks,
           (select count(*) from conversions v where v.campaign_id = c.id
              and v.status = 'approved' and ${within("v.created_at")})::int as conversions,
-          (select coalesce(sum(v.value), 0) from conversions v where v.campaign_id = c.id
+          (select coalesce(sum(v.value_base), 0) from conversions v where v.campaign_id = c.id
              and v.status = 'approved' and ${within("v.created_at")})::float8 as revenue
         from campaigns c where c.workspace_id = ${workspaceId} and c.started_at is not null
       )

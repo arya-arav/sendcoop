@@ -1,4 +1,11 @@
-import { type RevenueGrouping, type RevenueMetrics, revenueReport } from "@sendcoop/db";
+import {
+  countUnconvertedConversions,
+  getReportingCurrency,
+  type RevenueGrouping,
+  type RevenueMetrics,
+  revenueReport,
+} from "@sendcoop/db";
+import { formatMoney } from "@/lib/money";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +40,6 @@ function periodRange(period: Period) {
   };
 }
 
-const money = (n: number) => n.toLocaleString("en", { style: "currency", currency: "USD" });
 const pct = (n: number) => `${(n * 100).toLocaleString("en", { maximumFractionDigits: 1 })}%`;
 const count = (n: number) => n.toLocaleString("en");
 
@@ -49,7 +55,16 @@ function Tile({ title, value, detail }: { title: string; value: string; detail?:
   );
 }
 
-function MetricCells({ m, showSent }: { m: RevenueMetrics; showSent: boolean }) {
+function MetricCells({
+  m,
+  showSent,
+  currency,
+}: {
+  m: RevenueMetrics;
+  showSent: boolean;
+  currency: string;
+}) {
+  const money = (n: number) => formatMoney(n, currency);
   return (
     <>
       {showSent && <TableCell className="text-right tabular-nums">{count(m.sent)}</TableCell>}
@@ -83,7 +98,12 @@ export default async function RevenuePage({
   const grouping: RevenueGrouping =
     query.by === "link" || query.by === "audience" ? query.by : "campaign";
   const period: Period = query.period && query.period in PERIODS ? (query.period as Period) : "30";
-  const { totals, rows } = await revenueReport(workspace.id, grouping, periodRange(period));
+  const [{ totals, rows }, currency, unconverted] = await Promise.all([
+    revenueReport(workspace.id, grouping, periodRange(period)),
+    getReportingCurrency(workspace.id),
+    countUnconvertedConversions(workspace.id),
+  ]);
+  const money = (n: number) => formatMoney(n, currency);
   const showSent = grouping !== "link";
   const href = (over: { by?: string; period?: string }) =>
     `/w/${slug}/revenue?${new URLSearchParams({ by: grouping, period, ...over })}`;
@@ -94,8 +114,15 @@ export default async function RevenuePage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Revenue</h1>
           <p className="text-sm text-muted-foreground">
-            Approved sales and leads credited to your emails. Clicks are people, not scanners.
+            Approved sales and leads credited to your emails, in {currency}. Clicks are people, not
+            scanners.
           </p>
+          {unconverted > 0 && (
+            <p role="status" className="text-sm text-muted-foreground">
+              {unconverted} conversions are in a currency without an exchange rate yet and
+              aren&apos;t counted until one arrives.
+            </p>
+          )}
         </div>
         <nav aria-label="Period" className="flex gap-1 rounded-lg border p-1">
           {(Object.keys(PERIODS) as Period[]).map((p) => (
@@ -211,7 +238,7 @@ export default async function RevenuePage({
                         </span>
                       )}
                     </TableCell>
-                    <MetricCells m={row} showSent={showSent} />
+                    <MetricCells m={row} showSent={showSent} currency={currency} />
                   </TableRow>
                 ))}
               </TableBody>
@@ -219,7 +246,7 @@ export default async function RevenuePage({
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-medium">Total</TableCell>
-                    <MetricCells m={totals} showSent={showSent} />
+                    <MetricCells m={totals} showSent={showSent} currency={currency} />
                   </TableRow>
                 </TableFooter>
               )}

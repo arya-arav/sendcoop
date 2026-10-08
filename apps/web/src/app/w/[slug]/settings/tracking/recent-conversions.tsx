@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatMoney as money } from "@/lib/money";
 import { sendTestPostbackAction } from "./actions";
 
 const SOURCES: Record<RecentConversion["source"], string> = {
@@ -29,24 +30,18 @@ const SOURCES: Record<RecentConversion["source"], string> = {
   api: "API",
 };
 
-function money(value: number, currency: string) {
-  try {
-    return value.toLocaleString("en", { style: "currency", currency });
-  } catch {
-    // Networks sometimes send codes that aren't currencies.
-    return `${value.toFixed(2)} ${currency}`;
-  }
-}
-
 /** The latest conversions to arrive, and a test postback to check the setup end to end. */
 export function RecentConversions({
   slug,
   editable,
   conversions,
+  currency,
 }: {
   slug: string;
   editable: boolean;
   conversions: RecentConversion[];
+  /** The reporting currency. */
+  currency: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
@@ -134,7 +129,16 @@ export function RecentConversions({
                       {c.test && <Badge variant="outline">Test</Badge>}
                     </span>
                   </TableCell>
-                  <TableCell>{money(c.value, c.currency)}</TableCell>
+                  <TableCell>
+                    {money(c.value, c.currency)}
+                    {c.currency !== currency && (
+                      <span className="block text-xs text-muted-foreground">
+                        {c.valueBase === null
+                          ? "No exchange rate yet"
+                          : `≈ ${money(c.valueBase, currency)}`}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="capitalize">{c.leadStage ?? c.status}</TableCell>
                   <TableCell>
                     {c.campaignId ? (

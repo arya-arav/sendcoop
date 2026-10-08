@@ -47,13 +47,13 @@ beforeAll(async () => {
             ${l!.id}, true, now() - interval '2 days')`;
   await sql`
     insert into conversions (workspace_id, campaign_id, message_id, subscriber_id, source, event,
-                             value, currency, status, external_txid, created_at)
+                             value, currency, status, external_txid, created_at, fx_rate)
     values (${ws}, ${c!.id}, ${m!.id}, ${subscriberId}, 'shopify', 'sale', 120, 'USD',
-            'approved', 'p1', now() - interval '1 day'),
+            'approved', 'p1', now() - interval '1 day', 1),
            (${ws}, ${c!.id}, ${m!.id}, ${subscriberId}, 'pixel', 'sale', 40, 'USD',
-            'pending', 'p2', now() - interval '12 hours'),
+            'pending', 'p2', now() - interval '12 hours', 1),
            (${ws}, ${c!.id}, ${m!.id}, ${subscriberId}, 'pixel', 'sale', 99, 'USD',
-            'reversed', 'p3', now() - interval '6 hours')`;
+            'reversed', 'p3', now() - interval '6 hours', 1)`;
 });
 
 afterAll(async () => {

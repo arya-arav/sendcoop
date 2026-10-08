@@ -4,6 +4,8 @@ import {
   getIntegrationConfig,
   getIntegrationSecret,
   getOrCreateWebhookSigningSecret,
+  getReportingCurrency,
+  REPORTING_CURRENCIES,
   getUtmSettings,
   listLists,
   listRecentConversions,
@@ -19,6 +21,7 @@ import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { ApiCard } from "./api-card";
 import { AffiliateDomainsForm } from "./affiliate-domains-form";
+import { CurrencyForm } from "./currency-form";
 import { LeadsCard } from "./leads-card";
 import { PixelCard } from "./pixel-card";
 import { PostbackCard } from "./postback-card";
@@ -48,6 +51,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
     leadsKey,
     leadsConfig,
     lists,
+    currency,
   ] = await Promise.all([
     getAffiliateDomains(workspace.id),
     getUtmSettings(workspace.id),
@@ -65,6 +69,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
     editable ? getIntegrationSecret(workspace.id, "leads") : null,
     getIntegrationConfig(workspace.id, "leads"),
     editable ? listLists(workspace.id) : [],
+    getReportingCurrency(workspace.id),
   ]);
   const tracking = (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
   const postbackUrl = postbackKey
@@ -118,6 +123,12 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
 
       <AffiliateDomainsForm slug={slug} editable={canManage(role)} initial={domains} />
       <UtmForm slug={slug} editable={canManage(role)} initial={utm} />
+      <CurrencyForm
+        slug={slug}
+        editable={editable}
+        currency={currency}
+        currencies={[...REPORTING_CURRENCIES]}
+      />
       <PostbackCard
         slug={slug}
         editable={editable}
@@ -146,7 +157,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
         lists={lists.map((l) => ({ id: l.id, name: l.name }))}
         listId={typeof leadsConfig.listId === "string" ? leadsConfig.listId : null}
       />
-      <RecentConversions slug={slug} editable={editable} conversions={recent} />
+      <RecentConversions slug={slug} editable={editable} conversions={recent} currency={currency} />
     </div>
   );
 }

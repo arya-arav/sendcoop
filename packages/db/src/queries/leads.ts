@@ -4,6 +4,7 @@ import { LEAD_STATUS, type ParsedLead } from "../lead-params";
 import { listMemberships, lists, subscribers } from "../schema";
 import { refreshMessageRevenue } from "./attribution";
 import { recordConversion } from "./conversions";
+import { reportingCurrencySql } from "./currency";
 
 // Leads (D50): a conversion with event "lead" whose stage moves along as the
 // lead is worked. Only a sold lead counts as revenue, with the value it sold
@@ -35,6 +36,8 @@ export async function recordLead(
       status = ${status}::conversion_status,
       value = coalesce(${lead.value}, value),
       currency = case when ${lead.value}::numeric is null then currency else ${lead.currency} end,
+      fx_rate = case when ${lead.value}::numeric is null then fx_rate
+        else sc_fx_rate(${lead.currency}, ${reportingCurrencySql(workspaceId)}, created_at) end,
       updated_at = now()
     where workspace_id = ${workspaceId} and external_txid = ${txid}
       and (lead_stage is distinct from ${lead.stage}::lead_stage

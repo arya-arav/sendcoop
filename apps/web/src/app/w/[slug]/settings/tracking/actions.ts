@@ -6,7 +6,9 @@ import {
   listLists,
   rotateIntegrationSecret,
   setAffiliateDomains,
+  REPORTING_CURRENCIES,
   setIntegrationConfig,
+  setReportingCurrency,
   setWebhookSigningSecret,
   setUtmSettings,
 } from "@sendcoop/db";
@@ -163,5 +165,19 @@ export async function saveLeadListAction(slug: string, listId: string | null) {
   const config = await getIntegrationConfig(workspace.id, "leads");
   await setIntegrationConfig(workspace.id, "leads", { ...config, listId: listId || null });
   revalidatePath(`/w/${slug}/settings/tracking`);
+  return { ok: true as const };
+}
+
+/** The reporting currency: every conversion is converted again. */
+export async function saveCurrencyAction(slug: string, currency: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  if (!(REPORTING_CURRENCIES as readonly string[]).includes(currency)) {
+    return { ok: false as const, error: "Choose one of the listed currencies." };
+  }
+  await setReportingCurrency(workspace.id, currency);
+  revalidatePath(`/w/${slug}`, "layout");
   return { ok: true as const };
 }

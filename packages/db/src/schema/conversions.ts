@@ -1,9 +1,11 @@
 import {
+  date,
   index,
   jsonb,
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   uniqueIndex,
   uuid,
@@ -62,6 +64,15 @@ export const conversions = pgTable(
     event: conversionEvent().notNull().default("sale"),
     value: numeric({ precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     currency: text().notNull().default("USD"),
+    /**
+     * From currency to the workspace's reporting currency, at the rate of the
+     * day it arrived (D54); null while no rate is known for the currency.
+     */
+    fxRate: numeric({ precision: 18, scale: 8, mode: "number" }),
+    /** value in the reporting currency: what revenue adds up. */
+    valueBase: numeric({ precision: 12, scale: 2, mode: "number" }).generatedAlwaysAs(
+      sql`round(value * fx_rate, 2)`,
+    ),
     status: conversionStatus().notNull().default("approved"),
     /** Leads only. */
     leadStage: leadStage(),
@@ -103,6 +114,20 @@ export const networks = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index().on(t.workspaceId)],
+);
+
+/**
+ * Daily reference rates (ECB): units of a currency per euro. Conversions use
+ * the rate of the day they arrived, or the nearest day known.
+ */
+export const fxRates = pgTable(
+  "fx_rates",
+  {
+    currency: text().notNull(),
+    day: date({ mode: "string" }).notNull(),
+    perEur: numeric({ precision: 18, scale: 8, mode: "number" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.currency, t.day] })],
 );
 
 export const integrationKind = pgEnum("integration_kind", [

@@ -90,9 +90,9 @@ export async function getSubscriberProfile(
          and workspace_id = ${workspaceId} and clicked_at is not null)::int as clicked,
       (select count(*) from conversions where subscriber_id = ${subscriberId}
          and workspace_id = ${workspaceId} and status = 'approved')::int as conversions,
-      (select coalesce(sum(value), 0) from conversions where subscriber_id = ${subscriberId}
+      (select coalesce(sum(value_base), 0) from conversions where subscriber_id = ${subscriberId}
          and workspace_id = ${workspaceId} and status = 'approved')::float8 as "lifetimeValue",
-      (select coalesce(sum(value), 0) from conversions where subscriber_id = ${subscriberId}
+      (select coalesce(sum(value_base), 0) from conversions where subscriber_id = ${subscriberId}
          and workspace_id = ${workspaceId} and status = 'pending')::float8 as "pendingValue",
       greatest(
         (select max(${ms("created_at")}) from clicks where subscriber_id = ${subscriberId}

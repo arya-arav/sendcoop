@@ -89,7 +89,7 @@ function conditionSql(c: SegmentCondition): SQL {
 
 // Per subscriber, from their approved conversions (D53).
 const CONVERSION_FIELDS = {
-  lifetime_value: sql`(select coalesce(sum(cv.value), 0) from conversions cv
+  lifetime_value: sql`(select coalesce(sum(cv.value_base), 0) from conversions cv
     where cv.subscriber_id = ${subscribers.id} and cv.status = 'approved')`,
   conversion_count: sql`(select count(*) from conversions cv
     where cv.subscriber_id = ${subscribers.id} and cv.status = 'approved')`,

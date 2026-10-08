@@ -17,6 +17,7 @@ import {
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
+import { refreshFxRates } from "./jobs/fx-rates";
 import { processImport } from "./jobs/import-subscribers";
 import {
   decideAbTests,
@@ -68,6 +69,14 @@ const workers = [
       if (job.name === MAINTENANCE_JOBS.startScheduled.name) {
         const started = await startScheduledCampaigns();
         if (started > 0) console.log(`[${service}] scheduled campaigns started: ${started}`);
+      }
+      if (job.name === MAINTENANCE_JOBS.fxRates.name) {
+        const result = await refreshFxRates();
+        if (result) {
+          console.log(
+            `[${service}] FX rates for ${result.day}: ${result.stored} currencies, ${result.converted} conversions converted`,
+          );
+        }
       }
       if (job.name === MAINTENANCE_JOBS.verifyDomains.name) {
         const result = await verifyDueDomains(systemTxtLookup());

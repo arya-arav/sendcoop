@@ -20,6 +20,8 @@ export const MAINTENANCE_JOBS = {
   startScheduled: { name: "start-scheduled", everyMs: 15_000 },
   /** Ends A/B tests whose time is up and sends the winner to the rest. */
   decideAbTests: { name: "decide-ab-tests", everyMs: 30_000 },
+  /** Daily currency rates for revenue in the reporting currency (the ECB publishes once a day). */
+  fxRates: { name: "refresh-fx-rates", everyMs: 6 * 3600_000 },
 } as const;
 
 export type ImportJob = { importId: string; workspaceId: string };

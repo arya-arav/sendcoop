@@ -61,6 +61,8 @@ export const trackingSettings = pgTable("tracking_settings", {
   trackOpens: boolean().notNull().default(true),
   /** How long after an email click a sale matched only by email still counts (days). */
   attributionWindowDays: integer().notNull().default(7),
+  /** Reports add revenue up in this currency (D54); conversions in others are converted. */
+  currency: text().notNull().default("USD"),
   updatedAt: updatedAt(),
 });
 

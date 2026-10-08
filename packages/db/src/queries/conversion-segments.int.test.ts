@@ -63,9 +63,9 @@ beforeAll(async () => {
   ) => {
     await sql`
       insert into conversions (workspace_id, campaign_id, subscriber_id, source, event, value,
-                               status, external_txid, created_at)
+                               status, external_txid, created_at, fx_rate)
       values (${ws}, ${campaignId}, ${ids[who]!}, 'pixel', 'sale', ${value},
-              ${status}::conversion_status, ${`${who}-${value}`}, now() - ${ago}::interval)`;
+              ${status}::conversion_status, ${`${who}-${value}`}, now() - ${ago}::interval, 1)`;
   };
   await sale("ann", spring, 150, "2 days");
   await sale("dan", summer, 30, "60 days");
