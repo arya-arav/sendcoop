@@ -12,6 +12,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
+import { withinRateLimit } from "@/lib/rate-limit";
 import { requireMemberWorkspace } from "@/lib/workspace";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -85,6 +86,9 @@ export async function setWebhookEndpointEnabledAction(
 export async function testWebhookEndpointAction(slug: string, endpointId: string): Promise<Result> {
   const workspace = await managerWorkspace(slug);
   if (!workspace) return { ok: false, error: NO_PERMISSION };
+  if (!(await withinRateLimit(`webhook-test:${workspace.id}`, 10, 60))) {
+    return { ok: false, error: "Wait a minute before sending more tests." };
+  }
   if (!(await queueTestWebhook(workspace.id, endpointId))) {
     return { ok: false, error: "No such endpoint." };
   }

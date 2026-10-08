@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { canManage } from "@/lib/permissions";
+import { withinRateLimit } from "@/lib/rate-limit";
 import { requireMemberWorkspace } from "@/lib/workspace";
 
 // Team actions go through Better Auth's organization API, which checks the
@@ -44,6 +45,9 @@ export async function inviteMemberAction(
   const role = roleSchema.safeParse(input.role);
   if (!role.success) return { ok: false, error: "Choose a role." };
 
+  if (!(await withinRateLimit(`invite:${workspace.id}`, 20, 3600))) {
+    return { ok: false, error: "That's a lot of invitations. Try again in an hour." };
+  }
   const plan = await getWorkspacePlan(workspace.id);
   const limit = plan.limits.teamMembers;
   if (limit !== null && (await teamSeatsUsed(workspace.id)) >= limit) {

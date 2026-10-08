@@ -1,6 +1,7 @@
 import { createImport, findMemberWorkspace, listCustomFields, suggestMapping } from "@sendcoop/db";
 import { FileTooLargeError, putStream, readHead, remove } from "@sendcoop/storage";
 import { headers } from "next/headers";
+import { crossSite } from "@/lib/api-auth";
 import { auth } from "@/lib/auth";
 import { CsvFormatError, detectCsvFormat, MAX_IMPORT_BYTES } from "@/lib/csv-format";
 import { canManage } from "@/lib/permissions";
@@ -14,9 +15,8 @@ const error = (status: number, message: string) => Response.json({ error: messag
  * (not multipart), so it streams to storage without being held in memory.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
-  // Cookie auth: only accept requests from our own pages.
-  const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(process.env.BETTER_AUTH_URL!).origin) {
+  // Cookie auth: only accept requests from our own pages (always with an Origin).
+  if (!request.headers.get("origin") || crossSite(request.headers)) {
     return error(403, "Cross-site upload refused.");
   }
 

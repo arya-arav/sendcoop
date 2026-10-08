@@ -1,6 +1,8 @@
+import { type LookupAddress, lookup as dnsLookup } from "node:dns";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { signConversionBody } from "@sendcoop/db";
+import { Agent, fetch } from "undici";
 
 // Calling the user's webhooks (automation actions D67, events D78). They
 // point anywhere, so a webhook may not reach our own network (SSRF):
@@ -65,6 +67,29 @@ export async function webhookUrlProblem(raw: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * Connects only to public addresses. webhookUrlProblem checks the name
+ * first, but a name can resolve differently a moment later (DNS rebinding):
+ * this checks the addresses the connection actually uses.
+ */
+export const publicOnly = new Agent({
+  connect: {
+    lookup(hostname, options, callback) {
+      dnsLookup(hostname, { ...options, all: true }, (error, addresses) => {
+        if (error) return callback(error, "", 4);
+        const list = addresses as unknown as LookupAddress[];
+        const allowLocal = process.env.SENDCOOP_ALLOW_PRIVATE_WEBHOOKS === "1";
+        if (list.length === 0 || (!allowLocal && list.some((a) => isPrivateAddress(a.address)))) {
+          return callback(new Error("Webhooks can't go to private or internal addresses."), "", 4);
+        }
+        if ((options as { all?: boolean }).all)
+          return (callback as (e: null, a: LookupAddress[]) => void)(null, list);
+        callback(null, list[0]!.address, list[0]!.family);
+      });
+    },
+  },
+});
+
 export type WebhookOutcome = {
   ok: boolean;
   status: number | null;
@@ -88,6 +113,7 @@ export async function deliverWebhook(
     try {
       const response = await fetch(url, {
         method: "POST",
+        dispatcher: publicOnly,
         redirect: "manual",
         signal: AbortSignal.timeout(10_000),
         headers: {
