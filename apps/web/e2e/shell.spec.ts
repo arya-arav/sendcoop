@@ -12,7 +12,7 @@ test("sidebar shows navigation, with unbuilt sections marked as coming soon", as
   for (const item of ["Dashboard", "Contacts", "Lists"]) {
     await expect(sidebar.getByRole("link", { name: item })).toBeVisible();
   }
-  for (const item of ["Campaigns", "Revenue", "Integrations"]) {
+  for (const item of ["Automations", "Revenue", "Integrations"]) {
     await expect(sidebar.getByRole("button", { name: item })).toBeDisabled();
   }
 });

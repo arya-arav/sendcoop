@@ -6,6 +6,7 @@ import {
   createCampaign,
   createList,
   createSendingServer,
+  EMPTY_AUDIENCE,
   getCampaign,
   getSql,
   prepareCampaignMessages,
@@ -106,8 +107,7 @@ async function setup(recipients: number, limits?: SendingLimits) {
     text: "Hello",
     sendingDomainId: domain.domain.id,
     sendingServerId: server.id,
-    listId: list.list.id,
-    segmentId: null,
+    audience: { ...EMPTY_AUDIENCE, lists: [list.list.id] },
   });
   expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
   return { campaign, subject, serverId: server.id };
@@ -246,7 +246,7 @@ describe("suppression", () => {
     const emails = (
       await sql<{ email: string }[]>`
         select s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
-        where lm.list_id = ${campaign.listId} and s.status = 'subscribed' order by s.email`
+        where lm.list_id = ${campaign.audience.lists[0]!} and s.status = 'subscribed' order by s.email`
     ).map((r) => r.email);
     const [early, global, workspace, unsubscribed, kept] = emails as [
       string,
@@ -292,7 +292,7 @@ describe("personalization", () => {
     const [named, anonymous] = (
       await sql<{ id: string; email: string }[]>`
         select s.id, s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
-        where lm.list_id = ${campaign.listId} and s.status = 'subscribed' order by s.email`
+        where lm.list_id = ${campaign.audience.lists[0]!} and s.status = 'subscribed' order by s.email`
     ).map((r) => r) as [{ id: string; email: string }, { id: string; email: string }];
     await sql`update subscribers set first_name = 'Ana', fields = ${JSON.stringify({ coupon: "SAVE<20>" })}::jsonb
               where id = ${named.id}`;
@@ -396,7 +396,7 @@ describe("plain-text campaigns", () => {
     const { campaign } = await setup(1);
     const [recipient] = await sql<{ email: string }[]>`
       select s.email from subscribers s join list_memberships lm on lm.subscriber_id = s.id
-      where lm.list_id = ${campaign.listId} and s.status = 'subscribed'`;
+      where lm.list_id = ${campaign.audience.lists[0]!} and s.status = 'subscribed'`;
     await sql`update campaigns set html = '', text = ${"Hi {{first_name | there}},\n\nQuick question about your order."}
               where id = ${campaign.id}`;
     await runUntil(campaign.id, (c) => c?.status === "sent");

@@ -148,6 +148,20 @@
       "when": 1791417793771,
       "tag": "0020_template_subject",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791419005121,
+      "tag": "0021_campaign_audience",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791419014993,
+      "tag": "0022_campaign_drop_list_segment",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,14 @@
-import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../client";
-import { type Campaign, campaigns, messages, segments, subscribers, templates } from "../schema";
-import { subscriberConditions } from "./subscribers";
+import {
+  type Campaign,
+  campaigns,
+  EMPTY_AUDIENCE,
+  messages,
+  subscribers,
+  templates,
+} from "../schema";
+import { audienceSql } from "./audience";
 import { suppressedSql } from "./suppressions";
 
 // Scoped by workspaceId. Status changes only happen from the expected previous
@@ -18,8 +25,7 @@ export type CampaignInput = Pick<
   | "text"
   | "sendingDomainId"
   | "sendingServerId"
-  | "listId"
-  | "segmentId"
+  | "audience"
 >;
 
 export async function createCampaign(workspaceId: string, input: CampaignInput) {
@@ -56,6 +62,59 @@ export async function createCampaignFromTemplate(
     html: template.html,
     text: template.text,
   });
+}
+
+/** A new, empty draft for the campaign builder. */
+export async function createDraftCampaign(workspaceId: string, fromName: string) {
+  return createCampaign(workspaceId, {
+    name: "Untitled campaign",
+    subject: "",
+    fromName,
+    fromLocal: "news",
+    replyTo: null,
+    html: "",
+    text: "",
+    sendingDomainId: null,
+    sendingServerId: null,
+    audience: EMPTY_AUDIENCE,
+  });
+}
+
+/** For the campaigns list: no content. */
+export async function listCampaigns(workspaceId: string) {
+  return getDb()
+    .select({
+      id: campaigns.id,
+      name: campaigns.name,
+      status: campaigns.status,
+      recipientCount: campaigns.recipientCount,
+      sentCount: campaigns.sentCount,
+      createdAt: campaigns.createdAt,
+      startedAt: campaigns.startedAt,
+    })
+    .from(campaigns)
+    .where(eq(campaigns.workspaceId, workspaceId))
+    .orderBy(desc(campaigns.createdAt));
+}
+
+/** Changes a draft. False if the campaign doesn't exist or is no longer a draft. */
+export async function updateDraftCampaign(
+  workspaceId: string,
+  campaignId: string,
+  changes: Partial<CampaignInput>,
+) {
+  const rows = await getDb()
+    .update(campaigns)
+    .set(changes)
+    .where(
+      and(
+        eq(campaigns.id, campaignId),
+        eq(campaigns.workspaceId, workspaceId),
+        eq(campaigns.status, "draft"),
+      ),
+    )
+    .returning({ id: campaigns.id });
+  return rows.length > 0;
 }
 
 export async function getCampaign(workspaceId: string, campaignId: string) {
@@ -123,28 +182,13 @@ export const failCampaign = (workspaceId: string, campaignId: string, error: str
  */
 export async function prepareCampaignMessages(campaign: Campaign): Promise<number> {
   const db = getDb();
-  let segmentRules = null;
-  if (campaign.segmentId) {
-    const [segment] = await db
-      .select({ rules: segments.rules })
-      .from(segments)
-      .where(
-        and(eq(segments.id, campaign.segmentId), eq(segments.workspaceId, campaign.workspaceId)),
-      );
-    if (!segment) return 0;
-    segmentRules = segment.rules;
-  }
-  const audience = subscriberConditions(campaign.workspaceId, {
-    status: "subscribed",
-    listId: campaign.listId ?? undefined,
-    segment: segmentRules ?? undefined,
-  });
+  const audience = await audienceSql(campaign.workspaceId, campaign.audience);
 
   await db.execute(sql`
     insert into ${messages} (workspace_id, campaign_id, subscriber_id, email)
     select ${campaign.workspaceId}, ${campaign.id}, ${subscribers.id}, ${subscribers.email}
     from ${subscribers}
-    where ${audience} and not ${suppressedSql(campaign.workspaceId, subscribers.email)}
+    where ${audience}
     on conflict (campaign_id, subscriber_id) do nothing`);
 
   const [counted] = await db

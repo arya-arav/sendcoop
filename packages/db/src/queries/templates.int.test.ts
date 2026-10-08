@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getDb, getSql } from "../client";
-import { workspaces } from "../schema";
+import { EMPTY_AUDIENCE, workspaces } from "../schema";
 import { createCampaignFromTemplate, getCampaign } from "./campaigns";
 import { createTemplate, listTemplates, updateTemplate } from "./templates";
 
@@ -16,8 +16,7 @@ const settings = {
   replyTo: null,
   sendingDomainId: null,
   sendingServerId: null,
-  listId: null,
-  segmentId: null,
+  audience: EMPTY_AUDIENCE,
 };
 
 beforeAll(async () => {

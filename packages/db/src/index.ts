@@ -10,6 +10,7 @@ export * from "./segments";
 export * from "./sending-domains";
 export * from "./signed-links";
 export * from "./schema";
+export * from "./queries/audience";
 export * from "./queries/bulk";
 export * from "./queries/campaigns";
 export * from "./queries/custom-fields";

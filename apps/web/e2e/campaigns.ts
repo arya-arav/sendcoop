@@ -5,6 +5,7 @@ import {
   createList,
   createSendingServer,
   createSubscriber,
+  EMPTY_AUDIENCE,
   getSql,
   queueCampaign,
 } from "@sendcoop/db";
@@ -56,8 +57,7 @@ export async function sendCampaign(
     replyTo: null,
     sendingDomainId: domain.domain.id,
     sendingServerId: server.id,
-    listId: list.list.id,
-    segmentId: null,
+    audience: { ...EMPTY_AUDIENCE, lists: [list.list.id] },
   };
   const campaign = templateId
     ? await createCampaignFromTemplate(workspaceId, templateId, settings)

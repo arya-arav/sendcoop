@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -10,8 +11,29 @@ import {
 } from "drizzle-orm/pg-core";
 import { workspaces } from "./auth";
 import { createdAt, id, updatedAt } from "./columns";
-import { lists, segments, subscribers } from "./contacts";
+import { subscribers } from "./contacts";
 import { sendingDomains, sendingServers } from "./sending";
+
+/**
+ * Who a campaign goes to: everyone subscribed, or anyone in the chosen lists
+ * or segments; minus anyone in the excluded ones. Suppressed and
+ * unsubscribed people never get campaigns.
+ */
+export type CampaignAudience = {
+  everyone: boolean;
+  lists: string[];
+  segments: string[];
+  excludeLists: string[];
+  excludeSegments: string[];
+};
+
+export const EMPTY_AUDIENCE: CampaignAudience = {
+  everyone: false,
+  lists: [],
+  segments: [],
+  excludeLists: [],
+  excludeSegments: [],
+};
 
 export const campaignStatus = pgEnum("campaign_status", [
   "draft",
@@ -42,9 +64,8 @@ export const campaigns = pgTable(
     text: text().notNull(),
     sendingDomainId: uuid().references(() => sendingDomains.id, { onDelete: "set null" }),
     sendingServerId: uuid().references(() => sendingServers.id, { onDelete: "set null" }),
-    // Audience: a list or a segment (one of the two).
-    listId: uuid().references(() => lists.id, { onDelete: "set null" }),
-    segmentId: uuid().references(() => segments.id, { onDelete: "set null" }),
+    // Audience: who gets it (see CampaignAudience).
+    audience: jsonb().$type<CampaignAudience>().notNull().default(EMPTY_AUDIENCE),
     status: campaignStatus().notNull().default("draft"),
     recipientCount: integer().notNull().default(0),
     sentCount: integer().notNull().default(0),
