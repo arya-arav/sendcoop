@@ -133,3 +133,44 @@ export async function getOrCreateWebhookSigningSecret(workspaceId: string, kind:
   await setWebhookSigningSecret(workspaceId, kind, secret);
   return secret;
 }
+
+export type UtmcapConnection = {
+  apiKey: string;
+  sourceId: string;
+  sourceName: string;
+  webhookId: string;
+  connectedAt: string;
+};
+
+/** UTMCAP (D56): the user's API key and what Sendcoop set up in their account. */
+export async function saveUtmcapConnection(
+  workspaceId: string,
+  connection: Omit<UtmcapConnection, "connectedAt"> & { webhookSecret: string },
+) {
+  await getIntegrationSecret(workspaceId, "utmcap");
+  await setIntegrationConfig(workspaceId, "utmcap", {
+    apiKey: encryptSecret(connection.apiKey),
+    sourceId: connection.sourceId,
+    sourceName: connection.sourceName,
+    webhookId: connection.webhookId,
+    signingSecret: encryptSecret(connection.webhookSecret),
+    connectedAt: new Date().toISOString(),
+  });
+}
+
+export async function getUtmcapConnection(workspaceId: string): Promise<UtmcapConnection | null> {
+  const config = await getIntegrationConfig(workspaceId, "utmcap");
+  if (typeof config.apiKey !== "string" || typeof config.sourceId !== "string") return null;
+  return {
+    apiKey: decryptSecret(config.apiKey),
+    sourceId: config.sourceId,
+    sourceName: String(config.sourceName ?? "Sendcoop"),
+    webhookId: String(config.webhookId ?? ""),
+    connectedAt: String(config.connectedAt ?? ""),
+  };
+}
+
+/** Forgets the key; Sendcoop's source and webhook stay in UTMCAP until the user removes them. */
+export async function clearUtmcapConnection(workspaceId: string) {
+  await setIntegrationConfig(workspaceId, "utmcap", {});
+}

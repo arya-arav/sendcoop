@@ -23,6 +23,7 @@
     "@sendcoop/queue": "workspace:*",
     "@sendcoop/redis": "workspace:*",
     "@sendcoop/storage": "workspace:*",
+    "@sendcoop/utmcap": "workspace:*",
     "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

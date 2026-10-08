@@ -7,6 +7,10 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const isCI = Boolean(process.env.CI);
 
+// The UTMCAP tests run a fake UTMCAP on this port (e2e/utmcap.ts); the servers
+// started here inherit it. Locally, start `pnpm dev` with the same variable.
+process.env.UTMCAP_API_URL ??= "http://127.0.0.1:3009/api/v1";
+
 // Needs Postgres, Redis and Mailpit running (`pnpm services:up` locally,
 // service containers in CI). Locally, set PW_CHANNEL=msedge to use the
 // installed Edge instead of downloading Playwright's Chromium.

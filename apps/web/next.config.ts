@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
     "@sendcoop/queue",
     "@sendcoop/redis",
     "@sendcoop/storage",
+    "@sendcoop/utmcap",
   ],
   // BullMQ loads its Lua scripts from files at runtime, so it can't be bundled.
   serverExternalPackages: [
