@@ -20,6 +20,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test": "vitest run",
     "seed:subscribers": "tsx --env-file-if-exists=../../.env src/scripts/seed-subscribers.ts",
+    "seed:revenue": "tsx --env-file-if-exists=../../.env src/scripts/seed-revenue.ts",
     "bench:subscribers": "tsx --env-file-if-exists=../../.env src/scripts/bench-subscribers.ts"
   },
   "dependencies": {

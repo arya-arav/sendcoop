@@ -28,6 +28,7 @@ export * from "./queries/bulk";
 export * from "./queries/clicks";
 export * from "./queries/conversions";
 export * from "./queries/currency";
+export * from "./queries/dashboard";
 export * from "./queries/campaigns";
 export * from "./queries/custom-fields";
 export * from "./queries/domain-verification";
