@@ -8,8 +8,10 @@ import {
   createList,
   createSendingServer,
   EMPTY_AUDIENCE,
+  getAffiliateDomains,
   getCampaign,
   getSql,
+  listCampaignLinks,
   prepareCampaignMessages,
   queueCampaign,
   queuedMessageBatches,
@@ -20,6 +22,7 @@ import {
   recordFeedback,
   resumeCampaign,
   scheduleCampaign,
+  setAffiliateDomains,
   setAbTest,
   type SendingLimits,
 } from "@sendcoop/db";
@@ -676,4 +679,57 @@ describe("pause, resume and cancel", () => {
     expect(await resumeCampaign(ws, campaign.id)).toBeNull();
     expect(await cancelCampaign(ws, campaign.id)).toBe(false);
   }, 60_000);
+});
+
+describe("link extraction", () => {
+  it("stores each campaign's links when sending, with affiliate links marked", async () => {
+    await setAffiliateDomains(ws, ["https://www.MyPartner.com/"]);
+    const { campaign } = await setup(2, undefined, { draft: true });
+    await sql`update campaigns set html = ${`
+      <p><a href="https://vendor.hop.clickbank.net/?affiliate=me">Get the guide</a></p>
+      <p><a href="https://go.mypartner.com/offer?x=1&amp;y=2"><img src="p.png" alt="Partner deal"></a></p>
+      <p><a href="https://blog.example.com/post">Read the post</a></p>
+      <p><a href="mailto:hi@example.com">Email us</a> <a href="{{unsubscribe_url}}">Unsubscribe</a></p>`}
+      where id = ${campaign.id}`;
+    expect(await queueCampaign(ws, campaign.id)).not.toBeNull();
+    await runUntil(campaign.id, (c) => c?.status === "sent");
+
+    const stored = (await listCampaignLinks(ws, campaign.id)).map(
+      ({ variant, position, url, label, isAffiliate, networkId }) => ({
+        variant,
+        position,
+        url,
+        label,
+        isAffiliate,
+        networkId,
+      }),
+    );
+    expect(stored).toEqual([
+      {
+        variant: "a",
+        position: 0,
+        url: "https://vendor.hop.clickbank.net/?affiliate=me",
+        label: "Get the guide",
+        isAffiliate: true,
+        networkId: "clickbank",
+      },
+      {
+        variant: "a",
+        position: 1,
+        url: "https://go.mypartner.com/offer?x=1&y=2",
+        label: "Partner deal",
+        isAffiliate: true,
+        networkId: "custom",
+      },
+      {
+        variant: "a",
+        position: 2,
+        url: "https://blog.example.com/post",
+        label: "Read the post",
+        isAffiliate: false,
+        networkId: null,
+      },
+    ]);
+    expect(await getAffiliateDomains(ws)).toEqual(["mypartner.com"]);
+  });
 });

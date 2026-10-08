@@ -25,7 +25,11 @@ type Recipient = string | { email: string; firstName: string };
 export async function sendCampaign(
   slug: string,
   recipients: Recipient[],
-  { maxPerSecond = null, templateId }: { maxPerSecond?: number | null; templateId?: string } = {},
+  {
+    maxPerSecond = null,
+    templateId,
+    html = "<html><body><p>Big savings today.</p></body></html>",
+  }: { maxPerSecond?: number | null; templateId?: string; html?: string } = {},
 ) {
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
@@ -65,7 +69,7 @@ export async function sendCampaign(
         ...settings,
         name: "Flash sale",
         subject: "Flash sale: 40% off today",
-        html: "<html><body><p>Big savings today.</p></body></html>",
+        html,
         text: "Big savings today.",
       });
   if (!campaign) throw new Error("template not found");

@@ -2,6 +2,7 @@
 // talk to Postgres directly.
 
 export { getDb, getSql, pingDatabase, type Db } from "./client";
+export * from "./affiliate-networks";
 export * from "./custom-fields";
 export * from "./domain-verification";
 export * from "./imports";
@@ -21,6 +22,7 @@ export * from "./queries/forms";
 export * from "./queries/health";
 export * from "./queries/import-batch";
 export * from "./queries/imports";
+export * from "./queries/links";
 export * from "./queries/lists";
 export * from "./queries/media";
 export * from "./queries/segments";

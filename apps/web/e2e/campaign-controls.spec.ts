@@ -24,7 +24,8 @@ test("a sending campaign is paused, resumed and finishes", async ({ page }) => {
   await page.goto(`/w/${slug}/campaigns`);
   const row = page.getByRole("row").filter({ hasText: "Flash sale" });
   await expect(row).toContainText("Sending", { timeout: 15_000 });
-  await row.getByRole("link", { name: "Flash sale" }).click();
+  // (The list refreshes itself while sending; go straight to the campaign.)
+  await page.goto(`/w/${slug}/campaigns/${campaignId}`);
   await expect(page.getByRole("progressbar", { name: "Sending progress" })).toBeVisible();
 
   await page.getByRole("button", { name: "Pause Flash sale" }).click();

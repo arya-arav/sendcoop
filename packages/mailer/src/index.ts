@@ -5,6 +5,7 @@ import nodemailer from "nodemailer";
 import { z } from "zod";
 
 export * from "./html-to-text";
+export * from "./links";
 export * from "./personalize";
 export * from "./preheader";
 export * from "./sns";

@@ -1,4 +1,4 @@
-import { Globe, KeyRound, ReceiptText, Send, Users } from "lucide-react";
+import { Globe, KeyRound, MousePointerClick, ReceiptText, Send, Users } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,12 @@ const sections = [
     description: "Amazon SES or SMTP: the service that delivers your email.",
     icon: Send,
     path: "/settings/servers",
+  },
+  {
+    title: "Tracking",
+    description: "Which links are affiliate links, for revenue and click reports.",
+    icon: MousePointerClick,
+    path: "/settings/tracking",
   },
   { title: "Team", description: "Invite people and set their roles.", icon: Users, path: null },
   {

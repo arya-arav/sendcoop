@@ -1,4 +1,4 @@
-import { abResults, getCampaign, getVariantB } from "@sendcoop/db";
+import { abResults, getCampaign, getVariantB, listCampaignLinks, networkName } from "@sendcoop/db";
 import { CalendarClock } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +76,7 @@ export default async function CampaignPage({
   }
 
   const ab = campaign.abTest ? await abResults(campaign.id) : null;
+  const links = await listCampaignLinks(workspace.id, campaign.id);
   const variantB = campaign.abTest ? await getVariantB(campaign.id) : null;
   const money = (n: number) => n.toLocaleString("en", { style: "currency", currency: "USD" });
 
@@ -170,6 +171,53 @@ export default async function CampaignPage({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {money(ab[v].revenue)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+      {links.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Links</h2>
+            </CardTitle>
+            <CardDescription>
+              Every link in the email, in order. Clicks per link arrive with click tracking.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">#</TableHead>
+                  {campaign.abTest && <TableHead>Version</TableHead>}
+                  <TableHead>Link</TableHead>
+                  <TableHead>Type</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {links.map((link) => (
+                  <TableRow key={link.id}>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {link.position + 1}
+                    </TableCell>
+                    {campaign.abTest && <TableCell>{link.variant.toUpperCase()}</TableCell>}
+                    <TableCell className="max-w-md">
+                      <p className="truncate font-medium">{link.label ?? link.url}</p>
+                      {link.label && (
+                        <p className="truncate text-xs text-muted-foreground">{link.url}</p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {link.isAffiliate ? (
+                        <Badge>Affiliate: {networkName(link.networkId)}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Link</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

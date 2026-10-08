@@ -15,6 +15,7 @@ import {
   prepareCampaignMessages,
   queuedMessageBatchesTimed,
   refreshCampaignProgress,
+  storeCampaignLinks,
   startDueCampaigns,
   skipUnsendableMessages,
   unsubscribeUrls,
@@ -22,6 +23,7 @@ import {
 import {
   buildRawMessage,
   createDriver,
+  extractLinks,
   type DkimKey,
   listUnsubscribeHeaders,
   mergeValuesFor,
@@ -65,6 +67,24 @@ export async function prepareCampaign(
   await prepareCampaignMessages(campaign);
   // A/B test: only the test share goes now; the rest wait for the winner.
   await assignAbVariants(campaign);
+  // The email's links, for click tracking and per-link reports.
+  await storeCampaignLinks(
+    workspaceId,
+    campaignId,
+    "a",
+    extractLinks(campaign.html, campaign.text),
+  );
+  if (campaign.abTest) {
+    const variantB = await getVariantB(campaignId);
+    if (variantB) {
+      await storeCampaignLinks(
+        workspaceId,
+        campaignId,
+        "b",
+        extractLinks(variantB.html, variantB.text),
+      );
+    }
+  }
   // Batches for a later local time (subscriber timezones) wait until then.
   const batches = await queuedMessageBatchesTimed(campaignId, BATCH_SIZE);
   await enqueueSendBatches(
