@@ -64,6 +64,13 @@ jobs:
       REDIS_URL: redis://redis:6379
       SMTP_HOST: mailpit
       MAILPIT_URL: http://mailpit:8025
+      S3_ENDPOINT: http://s3:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: sendcoop-media
+      S3_ACCESS_KEY_ID: sendcoop
+      S3_SECRET_ACCESS_KEY: ci-only-s3-secret
+      S3_FORCE_PATH_STYLE: "true"
+      S3_PUBLIC_URL: http://s3:9000/sendcoop-media
     services:
       postgres:
         image: postgres:18-alpine
@@ -83,6 +90,12 @@ jobs:
         image: axllent/mailpit:latest
         env:
           MP_MAX_MESSAGES: 50000
+      # S3-compatible storage for uploaded images (RustFS runs without arguments).
+      s3:
+        image: rustfs/rustfs:1.0.1
+        env:
+          RUSTFS_ACCESS_KEY: sendcoop
+          RUSTFS_SECRET_KEY: ci-only-s3-secret
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -92,6 +105,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
+      - name: Create the media bucket (waits for the S3 service to start)
+        run: for i in $(seq 1 30); do pnpm media:setup && exit 0; sleep 2; done; exit 1
       - run: pnpm test:integration
       - run: pnpm turbo run build --filter=@sendcoop/web --filter=@sendcoop/worker
       - run: pnpm test:e2e

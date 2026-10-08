@@ -18,7 +18,8 @@
     "ALLOW_PRIVATE_SMTP_HOSTS",
     "SES_ENDPOINT",
     "DNS_SERVERS",
-    "SNS_TEST_CERT_URL"
+    "SNS_TEST_CERT_URL",
+    "S3_*"
   ],
   "tasks": {
     "dev": {

@@ -44,6 +44,20 @@ services:
       # Keep enough mail for bulk-send tests (the default is 500).
       MP_MAX_MESSAGES: 50000
 
+  # S3-compatible storage for uploaded images (production: AWS S3 or
+  # Cloudflare R2). RustFS rather than MinIO, which no longer publishes images.
+  s3:
+    image: rustfs/rustfs:1.0.1
+    environment:
+      RUSTFS_ACCESS_KEY: sendcoop
+      RUSTFS_SECRET_KEY: sendcoop-dev-secret
+    ports:
+      - "9020:9000" # S3 API
+      - "9021:9001" # web console
+    volumes:
+      - s3:/data
+
 volumes:
   postgres:
   redis:
+  s3:

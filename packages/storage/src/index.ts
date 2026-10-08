@@ -5,9 +5,10 @@ import { dirname, join, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-// File storage for uploads (CSV imports now, images later). Local disk for
-// development; an S3-compatible driver replaces it before production (D28),
-// behind the same functions. Keys look like "imports/<workspace>/<id>.csv".
+// Private file storage for uploads such as CSV imports, on local disk.
+// Before production this moves to a private S3 bucket behind the same
+// functions. Keys look like "imports/<workspace>/<id>.csv". Public media
+// (email images) is in ./media.ts.
 
 export class FileTooLargeError extends Error {
   constructor(readonly limitBytes: number) {

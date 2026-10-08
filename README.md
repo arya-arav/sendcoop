@@ -34,8 +34,9 @@ All apps read the single `.env` at the repo root.
 ```sh
 pnpm install
 cp .env.example .env
-pnpm services:up    # start Postgres, Redis, Mailpit
+pnpm services:up    # start Postgres, Redis, Mailpit, S3 storage (RustFS)
 pnpm db:migrate     # apply database migrations
+pnpm media:setup    # create the public media bucket (once)
 pnpm dev          # start web, edge and worker together
 pnpm typecheck
 pnpm lint

@@ -1,4 +1,4 @@
-import { getTemplate } from "@sendcoop/db";
+import { getTemplate, listMedia } from "@sendcoop/db";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -31,6 +31,12 @@ export default async function TemplatePage({
       design={template.design}
       mjml={template.mjml}
       assets={`${appUrl()}/email`}
+      images={(await listMedia(workspace.id)).map((m) => ({
+        src: m.url,
+        width: m.width,
+        height: m.height,
+        name: m.fileName,
+      }))}
     />
   );
 }

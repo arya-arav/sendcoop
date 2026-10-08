@@ -6,3 +6,4 @@ export * from "./imports";
 export * from "./sending";
 export * from "./suppressions";
 export * from "./templates";
+export * from "./media";

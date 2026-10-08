@@ -17,6 +17,7 @@
     "services:logs": "docker compose logs -f",
     "db:generate": "pnpm --filter @sendcoop/db db:generate",
     "db:migrate": "pnpm --filter @sendcoop/db db:migrate",
+    "media:setup": "pnpm --filter @sendcoop/storage media:setup",
     "db:studio": "pnpm --filter @sendcoop/db db:studio",
     "test": "turbo run test",
     "test:e2e": "pnpm --filter @sendcoop/web test:e2e",

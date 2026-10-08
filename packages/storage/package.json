@@ -4,15 +4,21 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./media": "./src/media.ts"
   },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "media:setup": "tsx --env-file-if-exists=../../.env src/setup-media.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",
+    "tsx": "^4.23.15",
     "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1147.0"
   }
 }

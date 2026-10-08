@@ -47,6 +47,7 @@ export function VisualEditor({
   design,
   mjml,
   assets,
+  images,
 }: {
   slug: string;
   templateId: string;
@@ -55,6 +56,8 @@ export function VisualEditor({
   mjml: string | null;
   /** Absolute URL of the placeholder images used by blocks. */
   assets: string;
+  /** The workspace's uploaded images, for the image picker. */
+  images: { src: string; width: number; height: number; name: string }[];
 }) {
   const container = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -77,6 +80,36 @@ export function VisualEditor({
         container: container.current,
         height: "100%",
         storageManager: false,
+        // Double-clicking an image opens the picker: the workspace's images,
+        // and uploads, which the server checks, resizes and stores publicly.
+        assetManager: {
+          assets: images.map((image) => ({ type: "image", ...image })),
+          upload: `/api/w/${slug}/media`,
+          multiUpload: false,
+          // Our own upload, so a refused file shows our message (and no
+          // unhandled error).
+          uploadFile: async (event: Event) => {
+            const input = event.target as HTMLInputElement | null;
+            const file = (event as DragEvent).dataTransfer?.files?.[0] ?? input?.files?.[0];
+            if (!file) return;
+            setError(null);
+            const body = new FormData();
+            body.append("file", file);
+            const response = await fetch(`/api/w/${slug}/media`, { method: "POST", body }).catch(
+              () => null,
+            );
+            const data = (await response?.json().catch(() => null)) as {
+              error?: string;
+              data?: { src: string; width: number; height: number; name: string }[];
+            } | null;
+            if (input) input.value = "";
+            if (!response?.ok || !data?.data) {
+              setError(data?.error ?? "The image couldn't be uploaded. Try again.");
+              return;
+            }
+            editor?.AssetManager.add(data.data.map((image) => ({ type: "image", ...image })));
+          },
+        },
         blockManager: {
           // Clicking a block adds it too, so building doesn't need dragging
           // (keyboard and touch users). It goes after the selected section,
