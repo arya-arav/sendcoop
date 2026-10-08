@@ -18,8 +18,11 @@ export type TriggerType = (typeof TRIGGER_TYPES)[number];
 export type AutomationTrigger =
   | { type: "joined_list"; listId: string }
   | { type: "tag_added"; tagId: string }
-  /** On a date in a custom date field (birthday, renewal), offset by days. */
-  | { type: "date_field"; field: string; offsetDays: number }
+  /**
+   * On a date in a custom date field, offset by days (negative: before). Yearly
+   * matches the day and month (birthdays, anniversaries); otherwise the exact date.
+   */
+  | { type: "date_field"; field: string; offsetDays: number; yearly?: boolean }
   /** An event sent through the API, by name. */
   | { type: "api_event"; event: string }
   /** A conversion credited to the subscriber; optionally only above a value. */

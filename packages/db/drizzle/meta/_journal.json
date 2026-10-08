@@ -260,6 +260,13 @@
       "when": 1791461469004,
       "tag": "0036_automations",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791463219730,
+      "tag": "0037_automation_events",
+      "breakpoints": true
     }
   ]
 }

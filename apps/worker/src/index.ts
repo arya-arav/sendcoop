@@ -19,7 +19,12 @@ import {
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
-import { processAutomationRun, sweepAutomationRuns } from "./jobs/automation-runs";
+import {
+  processAutomationRun,
+  startDateRuns,
+  startTriggeredRuns,
+  sweepAutomationRuns,
+} from "./jobs/automation-runs";
 import { refreshFxRates } from "./jobs/fx-rates";
 import { processImport } from "./jobs/import-subscribers";
 import { applyUtmcapEvent } from "./jobs/utmcap-events";
@@ -90,6 +95,12 @@ const workers = [
       }
       if (job.name === MAINTENANCE_JOBS.automationSweep.name) {
         await sweepAutomationRuns();
+      }
+      if (job.name === MAINTENANCE_JOBS.automationEvents.name) {
+        await startTriggeredRuns();
+      }
+      if (job.name === MAINTENANCE_JOBS.automationDates.name) {
+        await startDateRuns();
       }
       if (job.name === MAINTENANCE_JOBS.fxRates.name) {
         const result = await refreshFxRates();

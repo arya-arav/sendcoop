@@ -1,4 +1,10 @@
-import { advanceAutomationRun, dueAutomationRuns } from "@sendcoop/db";
+import {
+  advanceAutomationRun,
+  dueAutomationRuns,
+  processAutomationEvents,
+  pruneAutomationEvents,
+  startDateTriggeredRuns,
+} from "@sendcoop/db";
 import { enqueueAutomationRun, enqueueSendBatches } from "@sendcoop/queue";
 
 /**
@@ -46,4 +52,24 @@ export async function sweepAutomationRuns() {
   const minute = Math.floor(Date.now() / 60_000);
   for (const run of due) await enqueueAutomationRun(run.id, { key: `sweep-${minute}` });
   return due.length;
+}
+
+/** New events: start what they trigger, and move the new runs along. */
+export async function startTriggeredRuns() {
+  let total = 0;
+  for (let round = 0; round < 10; round++) {
+    const started = await processAutomationEvents(500);
+    for (const runId of started) await enqueueAutomationRun(runId);
+    total += started.length;
+    if (started.length === 0) break;
+  }
+  return total;
+}
+
+/** Hourly: date triggers, and old events cleared away. */
+export async function startDateRuns() {
+  const started = await startDateTriggeredRuns();
+  for (const runId of started) await enqueueAutomationRun(runId);
+  await pruneAutomationEvents();
+  return started.length;
 }

@@ -127,3 +127,38 @@ export const automationStepLogs = pgTable(
 export type Automation = typeof automations.$inferSelect;
 export type AutomationRun = typeof automationRuns.$inferSelect;
 export type AutomationRunStatus = (typeof automationRunStatus.enumValues)[number];
+
+/**
+ * What can start automation runs (D64), written by database triggers (list
+ * joined, tag added, subscription confirmed) and the API (events). The
+ * worker reads it every few seconds and starts the matching automations.
+ */
+export const automationEvents = pgTable(
+  "automation_events",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** joined_list, tag_added, api_event, converted, lead_status, … */
+    type: text().notNull(),
+    subscriberId: uuid()
+      .notNull()
+      .references(() => subscribers.id, { onDelete: "cascade" }),
+    /** The list, tag, event name or conversion it's about. */
+    ref: text(),
+    /**
+     * The sender's id for an API event: the same id starts runs once (unique per
+     * workspace and type, in migration 0037 since drizzle can't express it here).
+     */
+    externalId: text(),
+    payload: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: createdAt(),
+    processedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    index("automation_events_pending_index")
+      .on(t.createdAt)
+      .where(sql`${t.processedAt} is null`),
+  ],
+);

@@ -750,7 +750,7 @@ function TriggerForm({
     const fresh: Record<AutomationTrigger["type"], AutomationTrigger> = {
       joined_list: { type: "joined_list", listId: "" },
       tag_added: { type: "tag_added", tagId: "" },
-      date_field: { type: "date_field", field: "", offsetDays: 0 },
+      date_field: { type: "date_field", field: "", offsetDays: 0, yearly: true },
       api_event: { type: "api_event", event: "" },
       converted: { type: "converted", minValue: null },
       clicked_no_conversion: { type: "clicked_no_conversion", campaignId: null, hours: 48 },
@@ -808,6 +808,15 @@ function TriggerForm({
               onChange={(field) => onChange({ ...trigger, field })}
             />
           </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={Boolean(trigger.yearly)}
+              onChange={(e) => onChange({ ...trigger, yearly: e.target.checked })}
+            />
+            Every year (birthdays, anniversaries)
+          </label>
           <Field label="Days after (negative: before)">
             <Input
               id="trigger-offset"

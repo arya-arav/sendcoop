@@ -18,6 +18,7 @@ import {
   readHoneypotToken,
   readIntegrationSecret,
   readOpenToken,
+  recordApiEvent,
   recordClick,
   recordConversion,
   recordLead,
@@ -44,8 +45,8 @@ const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
 // postbacks (D42), the website pixel (D46), the conversion API (D47), Shopify
-// (D48), WooCommerce (D49), leads (D50), UTMCAP (D58, D59). Kept small and
-// fast: a click is one database round trip.
+// (D48), WooCommerce (D49), leads (D50), UTMCAP (D58, D59), automation events
+// (D64). Kept small and fast: a click is one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -410,6 +411,70 @@ app.post("/wh/utmcap/:key", async (c) => {
     });
   }
   return c.text(fresh ? "ok queued" : "ok duplicate");
+});
+
+/**
+ * Events from the user's own systems (D64): `{ "event": "trial_started",
+ * "email": "…", "event_id": "…", "data": {…} }`, signed like the conversion
+ * API. Automations listening for the event start for that subscriber.
+ */
+app.post("/v1/events", async (c) => {
+  const workspaceId = c.req.header("sendcoop-workspace")?.trim() ?? "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
+    return apiError(c, 401, "Send your workspace id in the Sendcoop-Workspace header.");
+  }
+  const body = await c.req.text();
+  if (body.length > 20_000) return apiError(c, 413, "The body is too large.");
+  const secret = await readIntegrationSecret(workspaceId, "api");
+  const verdict = secret
+    ? verifyConversionSignature({
+        secret,
+        timestamp: c.req.header("sendcoop-timestamp"),
+        signature: c.req.header("sendcoop-signature"),
+        body,
+      })
+    : "invalid";
+  if (verdict !== "ok") {
+    return apiError(
+      c,
+      401,
+      "The signature doesn't match. Sign '<timestamp>.<body>' with your API secret.",
+    );
+  }
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return apiError(c, 400, "The body isn't valid JSON.");
+  }
+  const event = typeof json.event === "string" ? json.event.trim() : "";
+  if (!/^[\w.:-]{1,64}$/.test(event)) {
+    return apiError(
+      c,
+      422,
+      "event must be a name of letters, numbers, dots, dashes or underscores.",
+    );
+  }
+  const email = typeof json.email === "string" ? json.email.trim().toLowerCase() : null;
+  const subscriberId =
+    typeof json.subscriber_id === "string" && /^[0-9a-f-]{36}$/i.test(json.subscriber_id)
+      ? json.subscriber_id
+      : null;
+  if (!email && !subscriberId)
+    return apiError(c, 422, "Send the subscriber's email or subscriber_id.");
+  const eventId =
+    typeof json.event_id === "string" || typeof json.event_id === "number"
+      ? String(json.event_id).slice(0, 200)
+      : null;
+  const data =
+    json.data && typeof json.data === "object" && !Array.isArray(json.data)
+      ? (json.data as Record<string, unknown>)
+      : {};
+  const result = await recordApiEvent(workspaceId, { event, email, subscriberId, eventId, data });
+  if (result === "unknown_subscriber") {
+    return apiError(c, 422, "No subscriber with that email or id in this workspace.");
+  }
+  return c.json({ result }, result === "queued" ? 202 : 200);
 });
 
 /** The website pixel (see pixel.ts). */

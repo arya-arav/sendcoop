@@ -25,6 +25,7 @@ export * from "./schema";
 export * from "./queries/ab-tests";
 export * from "./queries/attribution";
 export * from "./queries/automation-engine";
+export * from "./queries/automation-triggers";
 export * from "./queries/automations";
 export * from "./queries/audience";
 export * from "./queries/bulk";

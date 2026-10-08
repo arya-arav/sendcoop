@@ -28,6 +28,10 @@ export const MAINTENANCE_JOBS = {
   fxRates: { name: "refresh-fx-rates", everyMs: 6 * 3600_000 },
   /** Wakes automation runs whose wait is over (and any a lost job left behind). */
   automationSweep: { name: "automation-sweep", everyMs: 60_000 },
+  /** Starts automations for new events (list joined, tag added, API events, conversions). */
+  automationEvents: { name: "automation-events", everyMs: 5_000 },
+  /** Date triggers (birthdays, renewals): hourly; each subscriber once a day. */
+  automationDates: { name: "automation-dates", everyMs: 3_600_000 },
 } as const;
 
 export type ImportJob = { importId: string; workspaceId: string };
