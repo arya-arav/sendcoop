@@ -3,6 +3,7 @@ import {
   dueAutomationRuns,
   processAutomationEvents,
   pruneAutomationEvents,
+  startClickedNoConversionRuns,
   startDateTriggeredRuns,
 } from "@sendcoop/db";
 import { enqueueAutomationRun, enqueueSendBatches } from "@sendcoop/queue";
@@ -71,5 +72,12 @@ export async function startDateRuns() {
   const started = await startDateTriggeredRuns();
   for (const runId of started) await enqueueAutomationRun(runId);
   await pruneAutomationEvents();
+  return started.length;
+}
+
+/** Every few minutes: clicks that didn't turn into a sale in time. */
+export async function startClickRuns() {
+  const started = await startClickedNoConversionRuns();
+  for (const runId of started) await enqueueAutomationRun(runId);
   return started.length;
 }

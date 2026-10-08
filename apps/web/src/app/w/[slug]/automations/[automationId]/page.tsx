@@ -42,6 +42,7 @@ export default async function AutomationPage({
       initialTrigger={automation.trigger}
       initialGraph={automation.graph}
       status={automation.status}
+      initialExitOnConversion={automation.exitOnConversion}
       context={{
         lists: options(lists),
         tags: options(tags),

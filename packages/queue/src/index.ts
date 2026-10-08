@@ -32,6 +32,8 @@ export const MAINTENANCE_JOBS = {
   automationEvents: { name: "automation-events", everyMs: 5_000 },
   /** Date triggers (birthdays, renewals): hourly; each subscriber once a day. */
   automationDates: { name: "automation-dates", everyMs: 3_600_000 },
+  /** "Clicked but didn't buy": emails clicked long enough ago without a sale. */
+  automationClicks: { name: "automation-clicks", everyMs: 5 * 60_000 },
 } as const;
 
 export type ImportJob = { importId: string; workspaceId: string };

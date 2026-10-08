@@ -62,7 +62,12 @@ export type SaveAutomationResult = { ok: true } | { ok: false; error: string };
 export async function saveAutomation(
   workspaceId: string,
   automationId: string,
-  input: { name: string; trigger: AutomationTrigger; graph: AutomationGraph },
+  input: {
+    name: string;
+    trigger: AutomationTrigger;
+    graph: AutomationGraph;
+    exitOnConversion?: boolean;
+  },
 ): Promise<SaveAutomationResult> {
   const current = await getAutomation(workspaceId, automationId);
   if (!current) return { ok: false, error: "This automation doesn't exist anymore." };
@@ -89,6 +94,7 @@ export async function saveAutomation(
       name: input.name.trim().slice(0, 100) || "Untitled automation",
       trigger: input.trigger,
       graph,
+      ...(input.exitOnConversion === undefined ? {} : { exitOnConversion: input.exitOnConversion }),
       updatedAt: new Date(),
     })
     .where(and(eq(automations.workspaceId, workspaceId), eq(automations.id, automationId)));

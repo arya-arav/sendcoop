@@ -67,6 +67,17 @@ export async function processAutomationEvents(limit = 500) {
     .where(and(eq(automations.status, "active"), inArray(automations.workspaceId, workspaceIds)));
   const started: string[] = [];
   for (const event of events) {
+    // A purchase ends the sales sequences they're in (started before it).
+    if (event.type === "converted") {
+      await db.execute(sql`
+        update automation_runs r set status = 'exited', exit_reason = 'converted',
+          finished_at = now(), wait_until = null, updated_at = now()
+        from automations a
+        where a.id = r.automation_id and a.exit_on_conversion
+          and r.workspace_id = ${event.workspace_id} and r.subscriber_id = ${event.subscriber_id}
+          and r.status in ('active', 'waiting')
+          and coalesce(r.context->>'conversionId', '') <> ${String(event.payload.conversionId ?? "")}`);
+    }
     for (const automation of live) {
       if (automation.workspace_id !== event.workspace_id) continue;
       if (!triggerMatches(automation.trigger, event)) continue;
@@ -156,6 +167,62 @@ export async function startDateTriggeredRuns(now = new Date()) {
         triggerRef: `date:${today}`,
         context: { trigger: "date_field", field: t.field, date: target },
       });
+      if (runId) started.push(runId);
+    }
+  }
+  return started;
+}
+
+/**
+ * "Clicked but didn't buy" (D65): emails clicked at least N hours ago (up
+ * to a week back, to catch up after downtime) whose reader hasn't converted
+ * since. Each clicked email starts a run once.
+ */
+export async function startClickedNoConversionRuns(now = new Date()) {
+  const db = getDb();
+  const waiting = await db.execute<{
+    id: string;
+    workspace_id: string;
+    trigger: AutomationTrigger;
+  }>(sql`
+    select id, workspace_id, trigger from automations
+    where status = 'active' and trigger->>'type' = 'clicked_no_conversion'`);
+  const started: string[] = [];
+  for (const automation of waiting) {
+    const t = automation.trigger;
+    if (t.type !== "clicked_no_conversion") continue;
+    const cutoff = new Date(now.getTime() - t.hours * 3_600_000);
+    const oldest = new Date(cutoff.getTime() - 7 * 86_400_000);
+    const due = await db.execute<{
+      message_id: string;
+      subscriber_id: string;
+      campaign_id: string;
+    }>(sql`
+      select m.id as message_id, m.subscriber_id, m.campaign_id
+      from messages m join campaigns c on c.id = m.campaign_id
+      where m.workspace_id = ${automation.workspace_id} and c.kind = 'broadcast'
+        and m.subscriber_id is not null
+        and m.clicked_at <= ${cutoff.toISOString()} and m.clicked_at > ${oldest.toISOString()}
+        and ${t.campaignId ? sql`m.campaign_id = ${t.campaignId}` : sql`true`}
+        and not exists (select 1 from conversions v where v.subscriber_id = m.subscriber_id
+          and v.status = 'approved' and v.created_at >= m.clicked_at)
+        and not exists (select 1 from automation_runs r where r.automation_id = ${automation.id}
+          and r.trigger_ref = 'click:' || m.id::text)
+      limit 5000`);
+    for (const m of due) {
+      const runId = await startAutomationRun(
+        automation.workspace_id,
+        automation.id,
+        m.subscriber_id,
+        {
+          triggerRef: `click:${m.message_id}`,
+          context: {
+            trigger: "clicked_no_conversion",
+            campaignId: m.campaign_id,
+            messageId: m.message_id,
+          },
+        },
+      );
       if (runId) started.push(runId);
     }
   }

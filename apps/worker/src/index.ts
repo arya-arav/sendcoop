@@ -21,6 +21,7 @@ import { Worker } from "bullmq";
 import { createServer } from "node:http";
 import {
   processAutomationRun,
+  startClickRuns,
   startDateRuns,
   startTriggeredRuns,
   sweepAutomationRuns,
@@ -101,6 +102,9 @@ const workers = [
       }
       if (job.name === MAINTENANCE_JOBS.automationDates.name) {
         await startDateRuns();
+      }
+      if (job.name === MAINTENANCE_JOBS.automationClicks.name) {
+        await startClickRuns();
       }
       if (job.name === MAINTENANCE_JOBS.fxRates.name) {
         const result = await refreshFxRates();

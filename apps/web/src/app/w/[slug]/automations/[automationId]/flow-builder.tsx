@@ -242,6 +242,7 @@ export function FlowBuilder({
   initialTrigger,
   initialGraph,
   status,
+  initialExitOnConversion,
   context,
 }: {
   slug: string;
@@ -250,11 +251,13 @@ export function FlowBuilder({
   initialTrigger: AutomationTrigger;
   initialGraph: AutomationGraph;
   status: "draft" | "active" | "paused";
+  initialExitOnConversion: boolean;
   context: BuilderContext;
 }) {
   const start = useMemo(() => toFlow(initialGraph), [initialGraph]);
   const [name, setName] = useState(initialName);
   const [trigger, setTrigger] = useState(initialTrigger);
+  const [exitOnConversion, setExitOnConversion] = useState(initialExitOnConversion);
   const [nodes, setNodes] = useState<FlowNode[]>(start.nodes);
   const [edges, setEdges] = useState<Edge[]>(start.edges);
   const [selectedId, setSelectedId] = useState<string | null>("trigger");
@@ -407,7 +410,12 @@ export function FlowBuilder({
   function save(then?: () => Promise<unknown>) {
     setError(null);
     startTransition(async () => {
-      const result = await saveAutomationAction(slug, automationId, { name, trigger, graph });
+      const result = await saveAutomationAction(slug, automationId, {
+        name,
+        trigger,
+        graph,
+        exitOnConversion,
+      });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -678,6 +686,24 @@ export function FlowBuilder({
             </section>
           )}
 
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-primary"
+              checked={exitOnConversion}
+              disabled={locked}
+              onChange={(e) => {
+                setExitOnConversion(e.target.checked);
+                changed();
+              }}
+            />
+            <span>
+              Stop when they buy
+              <span className="block text-xs text-muted-foreground">
+                For a sales sequence: someone who converts leaves it at once.
+              </span>
+            </span>
+          </label>
           <p className="text-xs text-muted-foreground" role="note">
             {readiness ? `Before it can go live: ${readiness}` : "Ready to go live."}
           </p>

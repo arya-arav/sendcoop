@@ -267,6 +267,13 @@
       "when": 1791463219730,
       "tag": "0037_automation_events",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791463916151,
+      "tag": "0038_conversion_triggers",
+      "breakpoints": true
     }
   ]
 }

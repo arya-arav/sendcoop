@@ -42,6 +42,7 @@ const edge = z.object({
 });
 const input = z.object({
   name: z.string().max(100),
+  exitOnConversion: z.boolean().optional(),
   trigger: z.object({ type: z.string() }).passthrough(),
   graph: z.object({ nodes: z.array(node).max(100), edges: z.array(edge).max(300) }),
 });
@@ -55,6 +56,7 @@ export async function saveAutomationAction(slug: string, automationId: string, r
     name: parsed.data.name,
     trigger: parsed.data.trigger as AutomationTrigger,
     graph: parsed.data.graph as AutomationGraph,
+    exitOnConversion: parsed.data.exitOnConversion,
   });
   if (result.ok) revalidatePath(`/w/${slug}/automations`);
   return result;

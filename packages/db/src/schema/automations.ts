@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   jsonb,
   pgEnum,
@@ -34,6 +35,8 @@ export const automations = pgTable(
     status: automationStatus().notNull().default("draft"),
     trigger: jsonb().$type<AutomationTrigger>().notNull(),
     graph: jsonb().$type<AutomationGraph>().notNull(),
+    /** A sales sequence: someone who buys leaves it at once (D65). */
+    exitOnConversion: boolean().notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
