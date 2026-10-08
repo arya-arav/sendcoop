@@ -22,12 +22,17 @@ export default async function CampaignDesignPage({
   const campaign = await getCampaign(workspace.id, campaignId);
   if (!campaign) notFound();
   const contentStep = `/w/${slug}/campaigns/${campaign.id}/content`;
-  if (!canManage(role) || campaign.status !== "draft") redirect(contentStep);
+  // An automation's email belongs to its automation, which is where "back" goes.
+  const automation =
+    campaign.kind === "automation" && campaign.automationId
+      ? `/w/${slug}/automations/${campaign.automationId}`
+      : null;
+  if (!canManage(role) || campaign.status !== "draft") redirect(automation ?? contentStep);
 
   const target = {
     saveUrl: `/api/w/${slug}/campaigns/${campaign.id}/content`,
-    backHref: contentStep,
-    backLabel: "Back to the campaign",
+    backHref: automation ?? contentStep,
+    backLabel: automation ? "Back to the automation" : "Back to the campaign",
     utmcapSlug: (await getUtmcapConnection(workspace.id)) ? slug : undefined,
   };
 

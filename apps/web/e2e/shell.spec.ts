@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { signUpWithWorkspace, uniqueEmail } from "./helpers";
 
-test("sidebar shows navigation, with unbuilt sections marked as coming soon", async ({ page }) => {
+test("sidebar shows navigation to every section", async ({ page }) => {
   await signUpWithWorkspace(page, {
     name: "Nav User",
     email: uniqueEmail("nav"),
@@ -9,11 +9,8 @@ test("sidebar shows navigation, with unbuilt sections marked as coming soon", as
   });
   const sidebar = page.locator("[data-sidebar=sidebar]");
 
-  for (const item of ["Dashboard", "Contacts", "Lists", "Revenue", "Integrations"]) {
+  for (const item of ["Dashboard", "Contacts", "Lists", "Automations", "Revenue", "Integrations"]) {
     await expect(sidebar.getByRole("link", { name: item })).toBeVisible();
-  }
-  for (const item of ["Automations"]) {
-    await expect(sidebar.getByRole("button", { name: item })).toBeDisabled();
   }
 });
 
