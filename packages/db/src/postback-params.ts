@@ -23,11 +23,19 @@ const first = (params: Record<string, string>, names: string[]) => {
   return null;
 };
 
-/** "12.50", "$12.50", "12,50", "1,234.50" -> number; null when not a number. */
+/** "12.50", "$12.50", "12,50", "1,234.50", "$1,500" -> number; null when not a number. */
 export function parseAmount(raw: string | null): number | null {
-  if (!raw) return null;
+  if (!raw || !/\d/.test(raw)) return null;
   let value = raw.replace(/[^\d.,-]/g, "");
-  if (value.includes(",") && value.includes(".")) value = value.replace(/,/g, "");
+  // Both: the last one is the decimal point ("1,234.50", "1.234,50").
+  if (value.includes(",") && value.includes(".")) {
+    value =
+      value.lastIndexOf(",") > value.lastIndexOf(".")
+        ? value.replace(/\./g, "").replace(",", ".")
+        : value.replace(/,/g, "");
+  }
+  // A comma before exactly three digits groups thousands; otherwise it's the decimal point.
+  else if (/,\d{3}$/.test(value)) value = value.replace(/,/g, "");
   else if (value.includes(",")) value = value.replace(",", ".");
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;

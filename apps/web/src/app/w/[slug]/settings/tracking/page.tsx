@@ -5,6 +5,7 @@ import {
   getIntegrationSecret,
   getOrCreateWebhookSigningSecret,
   getUtmSettings,
+  listLists,
   listRecentConversions,
   POSTBACK_TEMPLATES,
   postbackUrl as networkPostbackUrl,
@@ -18,6 +19,7 @@ import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { ApiCard } from "./api-card";
 import { AffiliateDomainsForm } from "./affiliate-domains-form";
+import { LeadsCard } from "./leads-card";
 import { PixelCard } from "./pixel-card";
 import { PostbackCard } from "./postback-card";
 import { RecentConversions } from "./recent-conversions";
@@ -43,6 +45,9 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
     shopifyConfig,
     wooKey,
     wooSecret,
+    leadsKey,
+    leadsConfig,
+    lists,
   ] = await Promise.all([
     getAffiliateDomains(workspace.id),
     getUtmSettings(workspace.id),
@@ -57,6 +62,9 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
     getIntegrationConfig(workspace.id, "shopify"),
     editable ? getIntegrationSecret(workspace.id, "woocommerce") : null,
     editable ? getOrCreateWebhookSigningSecret(workspace.id, "woocommerce") : null,
+    editable ? getIntegrationSecret(workspace.id, "leads") : null,
+    getIntegrationConfig(workspace.id, "leads"),
+    editable ? listLists(workspace.id) : [],
   ]);
   const tracking = (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
   const postbackUrl = postbackKey
@@ -131,6 +139,12 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
       <WooCommerceCard
         webhookUrl={wooKey ? `${tracking}/wh/woocommerce/${wooKey}` : null}
         secret={wooSecret}
+      />
+      <LeadsCard
+        slug={slug}
+        webhookUrl={leadsKey ? `${tracking}/lead/${leadsKey}` : null}
+        lists={lists.map((l) => ({ id: l.id, name: l.name }))}
+        listId={typeof leadsConfig.listId === "string" ? leadsConfig.listId : null}
       />
       <RecentConversions slug={slug} editable={editable} conversions={recent} />
     </div>

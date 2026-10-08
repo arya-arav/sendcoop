@@ -135,7 +135,7 @@ export function RecentConversions({
                     </span>
                   </TableCell>
                   <TableCell>{money(c.value, c.currency)}</TableCell>
-                  <TableCell className="capitalize">{c.status}</TableCell>
+                  <TableCell className="capitalize">{c.leadStage ?? c.status}</TableCell>
                   <TableCell>
                     {c.campaignId ? (
                       <Link

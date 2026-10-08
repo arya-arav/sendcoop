@@ -56,7 +56,12 @@ describe("parseStatus and parseAmount", () => {
 
   it("reads amounts with symbols, commas and decimal commas", () => {
     expect(parseAmount("12,50")).toBe(12.5);
-    expect(parseAmount("abc")).toBe(0);
+    expect(parseAmount("$12.50")).toBe(12.5);
+    expect(parseAmount("$1,500")).toBe(1500);
+    expect(parseAmount("1,234.50")).toBe(1234.5);
+    expect(parseAmount("1.234,50 €")).toBe(1234.5);
+    expect(parseAmount("-20.00")).toBe(-20);
+    expect(parseAmount("abc")).toBeNull();
     expect(parseAmount(null)).toBeNull();
   });
 });

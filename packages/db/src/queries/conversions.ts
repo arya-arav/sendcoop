@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "../client";
 import type { PostbackEvent } from "../postback-params";
-import type { ConversionStatus } from "../schema";
+import type { ConversionStatus, LeadStage } from "../schema";
 import { attributeConversion, refreshMessageRevenue } from "./attribution";
 
 export type ConversionInput = {
@@ -18,6 +18,8 @@ export type ConversionInput = {
   txid: string | null;
   network: string | null;
   payload: Record<string, unknown>;
+  /** Leads only (D50). */
+  leadStage?: LeadStage | null;
 };
 
 export type ConversionResult = {
@@ -46,12 +48,13 @@ export async function recordConversion(
   const [created] = await db.execute<{ id: string }>(sql`
     insert into conversions (workspace_id, click_id, click_row_id, message_id, campaign_id,
                              automation_id, subscriber_id, source, event, value, currency, status,
-                             external_txid, network_id, payload, created_at)
+                             external_txid, network_id, payload, lead_stage, created_at)
     values (${workspaceId}, ${input.clickId}, ${credit.clickRowId}, ${credit.messageId},
             ${credit.campaignId}, ${credit.automationId}, ${credit.subscriberId},
             ${input.source}::conversion_source, ${input.event}::conversion_event, ${input.value},
             ${input.currency}, ${input.status}::conversion_status, ${txid}, ${input.network},
-            ${JSON.stringify(input.payload)}::jsonb, ${(input.occurredAt ?? new Date()).toISOString()})
+            ${JSON.stringify(input.payload)}::jsonb, ${input.leadStage ?? null}::lead_stage,
+            ${(input.occurredAt ?? new Date()).toISOString()})
     on conflict (workspace_id, external_txid) where external_txid is not null do nothing
     returning id`);
   if (created) {
@@ -86,6 +89,7 @@ export type RecentConversion = {
   campaignName: string | null;
   /** Sent with the test button in settings. */
   test: boolean;
+  leadStage: LeadStage | null;
 };
 
 /** The latest conversions to arrive, newest first: for checking a setup works. */
@@ -94,7 +98,7 @@ export async function listRecentConversions(workspaceId: string, limit = 10) {
     select v.id, (extract(epoch from v.created_at) * 1000)::float8 as at, v.source,
            v.network_id as network, v.value::float8 as value, v.currency, v.status,
            v.external_txid as txid, v.campaign_id as "campaignId", c.name as "campaignName",
-           coalesce(v.payload->>'test' = '1', false) as test
+           coalesce(v.payload->>'test' = '1', false) as test, v.lead_stage as "leadStage"
     from conversions v
     left join campaigns c on c.id = v.campaign_id
     where v.workspace_id = ${workspaceId}

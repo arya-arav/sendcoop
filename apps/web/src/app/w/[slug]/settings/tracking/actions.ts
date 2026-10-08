@@ -1,7 +1,9 @@
 "use server";
 
 import {
+  getIntegrationConfig,
   getIntegrationSecret,
+  listLists,
   rotateIntegrationSecret,
   setAffiliateDomains,
   setIntegrationConfig,
@@ -145,6 +147,21 @@ export async function saveShopifySecretAction(slug: string, secret: string) {
     };
   }
   await setWebhookSigningSecret(workspace.id, "shopify", value);
+  revalidatePath(`/w/${slug}/settings/tracking`);
+  return { ok: true as const };
+}
+
+/** The list new leads join, or none. */
+export async function saveLeadListAction(slug: string, listId: string | null) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  if (listId && !(await listLists(workspace.id)).some((l) => l.id === listId)) {
+    return { ok: false as const, error: "That list doesn't exist anymore." };
+  }
+  const config = await getIntegrationConfig(workspace.id, "leads");
+  await setIntegrationConfig(workspace.id, "leads", { ...config, listId: listId || null });
   revalidatePath(`/w/${slug}/settings/tracking`);
   return { ok: true as const };
 }

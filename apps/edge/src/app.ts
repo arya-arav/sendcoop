@@ -1,9 +1,11 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import {
+  addLeadToList,
   decorateDestination,
   findIntegrationBySecret,
   ipAllowed,
   parseApiConversion,
+  parseLead,
   parsePixelEvent,
   parsePostback,
   parseShopifyOrder,
@@ -16,6 +18,7 @@ import {
   readOpenToken,
   recordClick,
   recordConversion,
+  recordLead,
   recordHoneypot,
   recordOpen,
   refundConversion,
@@ -35,7 +38,7 @@ const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
 // postbacks (D42), the website pixel (D46), the conversion API (D47), Shopify
-// (D48), WooCommerce (D49). Kept small and fast: a click is one database round trip.
+// (D48), WooCommerce (D49), leads (D50). Kept small and fast: a click is one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -264,6 +267,34 @@ app.post("/wh/shopify/:key", async (c) => {
   }
   // Other topics: accepted, so Shopify doesn't retry them, and ignored.
   return c.text("ok ignored");
+});
+
+/**
+ * Leads from form tools and CRMs (see lead-params.ts): JSON or form fields.
+ * New leads can join a list; the same lead id later moves the lead along.
+ */
+app.post("/lead/:key", async (c) => {
+  const integration = await findIntegrationBySecret("leads", c.req.param("key"));
+  if (!integration) return c.json({ error: "Unknown lead webhook URL." }, 404);
+  const params = await requestParams(c);
+  const parsed = parseLead(params);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 422);
+  const { lead } = parsed;
+  const recorded = await recordLead(integration.workspaceId, lead, params);
+  const listId = integration.config.listId;
+  const listed =
+    recorded.result === "created" && typeof listId === "string"
+      ? await addLeadToList(integration.workspaceId, listId, lead)
+      : false;
+  return c.json(
+    {
+      result: recorded.result,
+      stage: recorded.stage,
+      attributed_by: recorded.method ?? null,
+      listed,
+    },
+    recorded.result === "created" ? 201 : 200,
+  );
 });
 
 /** WooCommerce order webhooks (see woocommerce.ts). */

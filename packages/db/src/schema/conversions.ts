@@ -31,6 +31,9 @@ export const conversionSource = pgEnum("conversion_source", [
 
 export const conversionEvent = pgEnum("conversion_event", ["sale", "lead", "signup", "custom"]);
 
+/** Where a lead is in the sales process (D50): only sold leads count as revenue. */
+export const leadStage = pgEnum("lead_stage", ["new", "qualified", "sold", "lost"]);
+
 /** As UTMCAP: only approved conversions count as revenue. */
 export const conversionStatus = pgEnum("conversion_status", [
   "pending",
@@ -60,6 +63,8 @@ export const conversions = pgTable(
     value: numeric({ precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     currency: text().notNull().default("USD"),
     status: conversionStatus().notNull().default("approved"),
+    /** Leads only. */
+    leadStage: leadStage(),
     /** The reporter's id for it (order or transaction id): duplicates are ignored. */
     externalTxid: text(),
     /** Affiliate network that reported it ("clickbank", ...). */
@@ -107,6 +112,7 @@ export const integrationKind = pgEnum("integration_kind", [
   "shopify",
   "woocommerce",
   "utmcap",
+  "leads", // lead form webhook
 ]);
 
 /**
@@ -138,4 +144,5 @@ export const integrations = pgTable(
 
 export type Conversion = typeof conversions.$inferSelect;
 export type ConversionStatus = (typeof conversionStatus.enumValues)[number];
+export type LeadStage = (typeof leadStage.enumValues)[number];
 export type IntegrationKind = (typeof integrationKind.enumValues)[number];

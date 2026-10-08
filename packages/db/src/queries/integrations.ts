@@ -14,6 +14,7 @@ const PREFIX: Record<IntegrationKind, string> = {
   shopify: "sh",
   woocommerce: "wc",
   utmcap: "ut",
+  leads: "ld",
 };
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
