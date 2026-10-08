@@ -3,6 +3,7 @@ import {
   decorateDestination,
   findIntegrationBySecret,
   ipAllowed,
+  parsePixelEvent,
   parsePostback,
   pingDatabase,
   readClickToken,
@@ -17,11 +18,14 @@ import {
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
 import { pingRedis } from "@sendcoop/redis";
 import { type Context, Hono } from "hono";
+import { cors } from "hono/cors";
+import { PIXEL_JS } from "./pixel";
 
 const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
-// postbacks (D42). Kept small and fast: a click is one database round trip.
+// postbacks (D42), the website pixel (D46). Kept small and fast: a click is
+// one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -143,4 +147,46 @@ app.on(["GET", "POST"], "/pb", async (c) => {
     payload: rest,
   });
   return c.text(`ok ${result}`);
+});
+
+/** The website pixel (see pixel.ts). */
+app.get("/sc.js", (c) => {
+  c.header("Content-Type", "text/javascript; charset=utf-8");
+  c.header("Cache-Control", "public, max-age=3600");
+  c.header("Access-Control-Allow-Origin", "*");
+  return c.body(PIXEL_JS);
+});
+
+/**
+ * Conversions from sc.js on a store's pages. Any site may send them (the
+ * pixel key is public), so they're only as trustworthy as a browser:
+ * refunds and server-side reporting go through postbacks or the API.
+ */
+app.use("/px", cors({ origin: "*", allowMethods: ["POST"], maxAge: 86_400 }));
+app.post("/px", async (c) => {
+  let body: unknown;
+  try {
+    // sendBeacon sends JSON as text/plain, which skips the CORS preflight.
+    body = JSON.parse((await c.req.text()).slice(0, 10_000));
+  } catch {
+    return c.text("invalid json", 400);
+  }
+  const event = parsePixelEvent(body);
+  if (!event) return c.text("missing key", 400);
+  const integration = await findIntegrationBySecret("pixel", event.key);
+  if (!integration) return c.text("unknown pixel key", 401);
+
+  await recordConversion(integration.workspaceId, {
+    clickId: event.clickId,
+    email: event.email,
+    event: event.event,
+    value: event.value,
+    currency: event.currency,
+    status: event.status,
+    txid: event.txid,
+    source: "pixel",
+    network: null,
+    payload: { url: event.url, origin: c.req.header("origin") ?? null },
+  });
+  return c.body(null, 204);
 });
