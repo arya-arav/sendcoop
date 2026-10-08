@@ -1,6 +1,7 @@
 import {
   assignAbVariants,
   claimCampaign,
+  clickUrl,
   decideDueAbTests,
   failCampaign,
   getCampaign,
@@ -8,6 +9,7 @@ import {
   getSendingServer,
   getSendingServerConfig,
   getVariantB,
+  listCampaignLinks,
   listSendingDomains,
   loadMessageBatch,
   markMessageFailed,
@@ -28,6 +30,7 @@ import {
   listUnsubscribeHeaders,
   mergeValuesFor,
   personalize,
+  rewriteLinks,
   type ServerConfig,
   serverConfigSchema,
   withUnsubscribeLink,
@@ -148,6 +151,11 @@ export async function sendBatch({
   const batch = await loadMessageBatch(workspaceId, campaignId, messageIds);
   // Variant B's subject and content, for A/B test recipients who get it.
   const variantB = batch.some((m) => m.variant === "b") ? await getVariantB(campaignId) : null;
+  // Link ids by version and position, for each recipient's tracked links.
+  const linkIds = { a: [] as string[], b: [] as string[] };
+  for (const link of await listCampaignLinks(workspaceId, campaignId)) {
+    linkIds[link.variant][link.position] = link.id;
+  }
   if (batch.length === 0) {
     if (skipped > 0) await refreshCampaignProgress(campaignId);
     return { sent: 0, failed: 0 };
@@ -178,8 +186,14 @@ export async function sendBatch({
 
       const unsubscribe = unsubscribeUrls(message.id);
       // Merge tags and spintax, seeded by the message so a retry reads the same.
-      const version = message.variant === "b" && variantB ? variantB : campaign;
-      const content = personalize(version, mergeValuesFor(message), message.id);
+      const variant = message.variant === "b" && variantB ? "b" : "a";
+      const version = variant === "b" ? variantB! : campaign;
+      // Each link goes through the click tracker with this recipient's own token.
+      const tracked = rewriteLinks(version, (position) => {
+        const linkId = linkIds[variant][position];
+        return linkId ? clickUrl(message.id, linkId) : null;
+      });
+      const content = personalize({ ...version, ...tracked }, mergeValuesFor(message), message.id);
       const raw = await buildRawMessage(
         {
           from: { email: context.from, name: campaign.fromName },

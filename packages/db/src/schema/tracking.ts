@@ -9,8 +9,9 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { workspaces } from "./auth";
-import { campaigns } from "./campaigns";
+import { campaigns, messages } from "./campaigns";
 import { createdAt, id, updatedAt } from "./columns";
+import { subscribers } from "./contacts";
 
 // Click and conversion tracking (phase 4 onwards).
 
@@ -57,3 +58,37 @@ export const trackingSettings = pgTable("tracking_settings", {
 });
 
 export type Link = typeof links.$inferSelect;
+
+/**
+ * One row per click on a tracked link. click_id is the short public id
+ * passed on to landing pages and affiliate networks (sc_cid, sub-ids), and
+ * comes back with conversions.
+ */
+export const clicks = pgTable(
+  "clicks",
+  {
+    id: id(),
+    /** "sc" + 16 letters and digits: fits every network's sub-id field. */
+    clickId: text().notNull(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    campaignId: uuid().references(() => campaigns.id, { onDelete: "set null" }),
+    messageId: uuid().references(() => messages.id, { onDelete: "set null" }),
+    linkId: uuid().references(() => links.id, { onDelete: "set null" }),
+    subscriberId: uuid().references(() => subscribers.id, { onDelete: "set null" }),
+    ip: text(),
+    userAgent: text(),
+    /** Security scanners and other machines (D39); left out of reports. */
+    isBot: boolean().notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("clicks_click_id_unique").on(t.clickId),
+    index().on(t.workspaceId, t.id),
+    index().on(t.campaignId),
+    index().on(t.messageId),
+  ],
+);
+
+export type Click = typeof clicks.$inferSelect;

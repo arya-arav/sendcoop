@@ -19,7 +19,8 @@
     "SES_ENDPOINT",
     "DNS_SERVERS",
     "SNS_TEST_CERT_URL",
-    "S3_*"
+    "S3_*",
+    "TRACKING_URL"
   ],
   "tasks": {
     "dev": {

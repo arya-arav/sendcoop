@@ -3,6 +3,8 @@ import { getSql } from "@sendcoop/db";
 import { closeConnections, sendCampaign } from "./campaigns";
 import { signUpWithWorkspace, uniqueEmail } from "./helpers";
 
+const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
+
 test.afterAll(closeConnections);
 
 test("a campaign's links are recorded, with affiliate links marked", async ({ page }) => {
@@ -23,7 +25,8 @@ test("a campaign's links are recorded, with affiliate links marked", async ({ pa
   await expect(page.getByRole("status")).toHaveText("Saved 1 domain.");
   await expect(page.getByLabel("Affiliate domains")).toHaveValue("mypartner.com");
 
-  const { campaignId } = await sendCampaign(slug, [uniqueEmail("links-reader")], {
+  const reader = uniqueEmail("links-reader");
+  const { campaignId } = await sendCampaign(slug, [reader], {
     html: `<html><body>
       <p><a href="https://vendor.hop.clickbank.net/?affiliate=me">Get the guide</a></p>
       <p><a href="https://go.mypartner.com/deal">Partner deal</a></p>
@@ -51,4 +54,24 @@ test("a campaign's links are recorded, with affiliate links marked", async ({ pa
     "Affiliate: Your affiliate domain",
   );
   await expect(rows.filter({ hasText: "Read the post" })).not.toContainText("Affiliate");
+
+  // The email's links go through the click tracker, and a click is recorded
+  const found = await fetch(
+    `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${reader}"`)}`,
+  ).then((r) => r.json() as Promise<{ messages: { ID: string }[] }>);
+  const email = await fetch(`${MAILPIT}/api/v1/message/${found.messages[0]!.ID}`).then(
+    (r) => r.json() as Promise<{ HTML: string; Text: string }>,
+  );
+  expect(email.HTML).not.toContain("hop.clickbank.net");
+  const tracked = [...email.HTML.matchAll(/href="(http:\/\/localhost:3001\/c\/[^"]+)"/g)].map(
+    (m) => m[1]!,
+  );
+  expect(tracked).toHaveLength(3);
+
+  const response = await page.request.get(tracked[0]!, { maxRedirects: 0 });
+  expect(response.status()).toBe(302);
+  expect(response.headers().location).toBe("https://vendor.hop.clickbank.net/?affiliate=me");
+  const [click] = await getSql()<{ n: number }[]>`
+    select count(*)::int as n from clicks where campaign_id = ${campaignId}`;
+  expect(click!.n).toBe(1);
 });

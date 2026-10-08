@@ -25,7 +25,8 @@ export default defineConfig({
     channel: process.env.PW_CHANNEL || undefined,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  // The web app and the worker (imports run there). CI runs production builds;
+  // The web app, the worker (imports and sending) and the edge app (click
+  // redirects). CI runs production builds;
   // locally an already-running `pnpm dev` is reused.
   webServer: [
     {
@@ -37,6 +38,13 @@ export default defineConfig({
     {
       command: `pnpm --filter @sendcoop/worker ${isCI ? "start" : "dev"}`,
       url: "http://localhost:3002/health",
+      reuseExistingServer: !isCI,
+      timeout: 60_000,
+    },
+    {
+      // Click redirects (tracked links in sent emails).
+      command: `pnpm --filter @sendcoop/edge ${isCI ? "start" : "dev"}`,
+      url: "http://localhost:3001/health",
       reuseExistingServer: !isCI,
       timeout: 60_000,
     },

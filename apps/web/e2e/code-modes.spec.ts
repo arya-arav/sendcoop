@@ -97,7 +97,8 @@ test("HTML-code and plain-text templates are edited, saved and sent", async ({ p
   expect(html.Subject).toBe("Ana, the spring sale is on");
   expect(html.HTML).toContain("<h1>Hi Ana</h1>");
   expect(html.HTML).toMatch(/<a href="http[^"]+\/u\/[^"]+"[^>]*>Unsubscribe<\/a>/); // footer added
-  expect(html.Text).toContain("Our spring sale (https://shop.test/sale) is on.");
+  // Links go through the click tracker, in the text version too.
+  expect(html.Text).toMatch(/Our spring sale \(http:\/\/localhost:3001\/c\/[^)]+\) is on\./);
 
   const bo = uniqueEmail("code-bo");
   await sendCampaign(slug, [{ email: bo, firstName: "Bo" }], { templateId: textTemplate });

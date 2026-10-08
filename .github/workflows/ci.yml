@@ -23,6 +23,7 @@ env:
   MAILPIT_URL: http://localhost:8025
   BETTER_AUTH_SECRET: ci-only-secret-do-not-use-anywhere-else
   BETTER_AUTH_URL: http://localhost:3000
+  TRACKING_URL: http://localhost:3001
   ENCRYPTION_KEY: Y2ktb25seS1rZXktZG8tbm90LXVzZS1hbnl3aGVyZSE=
   SPF_INCLUDE: amazonses.com
   ALLOW_PRIVATE_SMTP_HOSTS: "true"
@@ -108,7 +109,7 @@ jobs:
       - name: Create the media bucket (waits for the S3 service to start)
         run: for i in $(seq 1 30); do pnpm media:setup && exit 0; sleep 2; done; exit 1
       - run: pnpm test:integration
-      - run: pnpm turbo run build --filter=@sendcoop/web --filter=@sendcoop/worker
+      - run: pnpm turbo run build --filter=@sendcoop/web --filter=@sendcoop/worker --filter=@sendcoop/edge
       - run: pnpm test:e2e
         env:
           AUTH_RATE_LIMIT: disabled

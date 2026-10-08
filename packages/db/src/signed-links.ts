@@ -1,4 +1,4 @@
-import { readSignedId, signId } from "./signed-id";
+import { readSignedId, readSignedIds, signId, signIds } from "./signed-id";
 
 // Signed links: unsubscribe links in campaign emails (the token names the
 // message, and so the campaign and the subscriber) and webhook URLs.
@@ -32,3 +32,21 @@ export function sesWebhookUrl(
 
 /** The sending server id, or null if the token isn't valid. */
 export const readSesWebhookToken = (token: string) => readSignedId("ses-webhook", token);
+
+/** Tracked link: which message (so: subscriber and campaign) and which link. */
+export const createClickToken = (messageId: string, linkId: string) =>
+  signIds("click", [messageId, linkId]);
+
+export function readClickToken(token: string) {
+  const ids = readSignedIds("click", token, 2);
+  return ids ? { messageId: ids[0]!, linkId: ids[1]! } : null;
+}
+
+/** The tracked URL for a link in one recipient's email (served by the edge app). */
+export function clickUrl(
+  messageId: string,
+  linkId: string,
+  baseUrl = process.env.TRACKING_URL ?? "http://localhost:3001",
+) {
+  return `${baseUrl.replace(/\/$/, "")}/c/${createClickToken(messageId, linkId)}`;
+}

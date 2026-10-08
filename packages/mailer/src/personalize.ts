@@ -48,6 +48,8 @@ function spin(text: string, random: () => number) {
 export type RenderOptions = {
   /** Escape subscriber data for HTML. Fallbacks are the author's own markup and stay as written. */
   html?: boolean;
+  /** Inside a URL: values (and fallbacks) are URL-encoded. */
+  url?: boolean;
   /** Tags left as they are, for a later step (e.g. unsubscribe_url). */
   keep?: string[];
   /** Picks spintax options; leave out to keep spintax as written. */
@@ -55,7 +57,7 @@ export type RenderOptions = {
 };
 
 export function renderContent(template: string, values: MergeValues, options: RenderOptions = {}) {
-  const { html = false, keep = [], random } = options;
+  const { html = false, url = false, keep = [], random } = options;
   const filled: string[] = [];
   const marked = template.replace(TAG, (whole, rawName: string, fallback?: string) => {
     const name = rawName.toLowerCase();
@@ -66,6 +68,7 @@ export function renderContent(template: string, values: MergeValues, options: Re
       const value = values[name];
       const empty = value === null || value === undefined || String(value).trim() === "";
       text = empty ? unquote(fallback ?? "") : html ? escapeHtml(String(value)) : String(value);
+      if (url) text = encodeURIComponent(text);
     }
     filled.push(text);
     return `${MARK}${filled.length - 1}${MARK}`;
@@ -130,4 +133,9 @@ export function personalize(
     ),
     text: renderContent(content.text, values, { keep, random: seededRandom(`${seed}:text`) }),
   };
+}
+
+/** A link's URL with merge tags filled in for one subscriber (at click time). */
+export function fillUrlTemplate(url: string, values: MergeValues) {
+  return url.includes("{{") ? renderContent(url, values, { url: true }) : url;
 }

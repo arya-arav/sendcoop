@@ -51,3 +51,42 @@ export function extractLinks(html: string, text: string): ExtractedLink[] {
   }
   return links;
 }
+
+/**
+ * Puts tracked URLs into an email: each trackable link, by its position in
+ * the HTML (or plain text), gets the URL `track` returns for it (null keeps
+ * it as is). In the text version of an HTML email, URLs are matched to the
+ * HTML's links by address.
+ */
+export function rewriteLinks(
+  body: { html: string; text: string },
+  track: (position: number, url: string) => string | null,
+): { html: string; text: string } {
+  if (!body.html.trim()) {
+    let position = 0;
+    const text = body.text.replace(BARE_URL, (match) => {
+      const url = match.replace(/[.,;:!?]+$/, "");
+      if (!isTrackable(url)) return match;
+      const tracked = track(position++, url);
+      return tracked ? tracked + match.slice(url.length) : match;
+    });
+    return { html: "", text };
+  }
+
+  let position = 0;
+  const byUrl = new Map<string, string>();
+  const html = body.html.replace(ANCHOR, (whole, quote: string, rawHref: string) => {
+    const url = decode(rawHref.trim());
+    if (!isTrackable(url)) return whole;
+    const tracked = track(position++, url);
+    if (!tracked) return whole;
+    if (!byUrl.has(url)) byUrl.set(url, tracked);
+    return whole.replace(`${quote}${rawHref}${quote}`, `${quote}${tracked}${quote}`);
+  });
+  const text = body.text.replace(BARE_URL, (match) => {
+    const url = match.replace(/[.,;:!?]+$/, "");
+    const tracked = byUrl.get(url);
+    return tracked ? tracked + match.slice(url.length) : match;
+  });
+  return { html, text };
+}

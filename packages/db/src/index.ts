@@ -14,6 +14,7 @@ export * from "./schema";
 export * from "./queries/ab-tests";
 export * from "./queries/audience";
 export * from "./queries/bulk";
+export * from "./queries/clicks";
 export * from "./queries/campaigns";
 export * from "./queries/custom-fields";
 export * from "./queries/domain-verification";

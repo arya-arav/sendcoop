@@ -190,6 +190,13 @@
       "when": 1791422227668,
       "tag": "0026_links",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791422795258,
+      "tag": "0027_clicks",
+      "breakpoints": true
     }
   ]
 }
