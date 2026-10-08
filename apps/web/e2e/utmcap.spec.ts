@@ -141,3 +141,61 @@ test("a UTMCAP link inserted in the editor reaches UTMCAP with the click id and 
   });
   expect(fake.sources.find((s) => s.id === click.source_id)?.external_id_param).toBe("sc_cid");
 });
+
+/** Sends a campaign whose email links to the UTMCAP campaign, and clicks it like a person. */
+async function clickThrough(
+  page: Page,
+  request: import("@playwright/test").APIRequestContext,
+  slug: string,
+  offerUrl: string,
+  name: string,
+) {
+  const reader = uniqueEmail("utmcap-reader");
+  const { campaignId } = await sendCampaign(slug, [reader], {
+    name,
+    html: `<html><body><a href="${offerUrl}">See the offer</a></body></html>`,
+  });
+  const { links } = await waitForTrackedUrls(reader);
+  await page.waitForTimeout(5500);
+  const hop = await request.get(links[0]!, {
+    headers: { "user-agent": CHROME },
+    maxRedirects: 0,
+  });
+  await request.get(hop.headers().location!, { maxRedirects: 0 });
+  const click = fake.clicks.at(-1)!;
+  return { campaignId, ucid: click.click_id, scCid: click.external_id! };
+}
+
+test("a conversion in UTMCAP comes back by postback and shows on the Sendcoop campaign", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  const slug = await connected(page, "utmcap-postback");
+  const offer = fake.addCampaign("Solar leads");
+  const { campaignId, ucid } = await clickThrough(page, request, slug, offer.url, "June solar");
+
+  // UTMCAP records the sale and calls the Sendcoop source's postback
+  const { postback } = await fake.convert(ucid, { conversionId: "SOL-1", payout: 55 });
+  expect(postback).toMatch(
+    /^http:\/\/localhost:3001\/pb\/utmcap\?key=ut_\w{32}&sc_cid=sc\w{16}&ucid=\w+&payout=55&status=approved$/,
+  );
+
+  await page.goto(`/w/${slug}/campaigns/${campaignId}`);
+  await expect(
+    page
+      .getByRole("region", { name: "Results" })
+      .locator("[data-slot=card]")
+      .filter({ has: page.getByText("Revenue", { exact: true }) }),
+  ).toContainText("$55.00");
+  await page.goto(`/w/${slug}/settings/tracking`);
+  await expect(
+    page
+      .locator("[data-slot=card]", { hasText: "Recent conversions" })
+      .getByRole("row")
+      .filter({ hasText: "UTMCAP" }),
+  ).toContainText("June solar");
+
+  // The same postback again counts once
+  expect(await (await request.get(postback!)).text()).toBe("ok duplicate");
+});

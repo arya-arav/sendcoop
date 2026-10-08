@@ -4,12 +4,14 @@ import {
   decorateDestination,
   findIntegrationBySecret,
   ipAllowed,
+  parseAmount,
   parseApiConversion,
   parseLead,
   parsePixelEvent,
   parsePostback,
   parseShopifyOrder,
   parseShopifyRefund,
+  parseUtmcapStatus,
   parseWooOrder,
   pingDatabase,
   readClickToken,
@@ -19,6 +21,7 @@ import {
   recordClick,
   recordConversion,
   recordLead,
+  recordUtmcapConversion,
   recordHoneypot,
   recordOpen,
   refundConversion,
@@ -38,7 +41,8 @@ const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
 // postbacks (D42), the website pixel (D46), the conversion API (D47), Shopify
-// (D48), WooCommerce (D49), leads (D50). Kept small and fast: a click is one database round trip.
+// (D48), WooCommerce (D49), leads (D50), UTMCAP (D58, D59). Kept small and
+// fast: a click is one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -331,6 +335,38 @@ app.post("/wh/woocommerce/:key", async (c) => {
   for (const refund of refunds) {
     await refundConversion(integration.workspaceId, { txid: order.txid, ...refund });
   }
+  return c.text(`ok ${result}`);
+});
+
+/**
+ * UTMCAP's postback for the Sendcoop traffic source (D58): approved
+ * conversions on email clicks, with our sc_cid ({external_id}) and usually
+ * UTMCAP's click id ({utmcap_id}). See utmcap.ts.
+ */
+app.on(["GET", "POST"], "/pb/utmcap", async (c) => {
+  const params = await requestParams(c);
+  const integration = await findIntegrationBySecret("utmcap", params.key ?? "");
+  if (!integration) return c.text("unknown postback key", 401);
+  const valid = (v: string | undefined) => (v && /^[\w-]{4,64}$/.test(v) ? v : null);
+  const clickId = valid(params.sc_cid);
+  const ucid = valid(params.ucid);
+  if (!clickId && !ucid) return c.text("missing sc_cid", 400);
+  const currency = (params.cur ?? params.currency ?? "").toUpperCase();
+  const { result } = await recordUtmcapConversion(integration.workspaceId, {
+    ucid,
+    clickId,
+    conversionId: null,
+    value: Math.abs(parseAmount(params.payout ?? null) ?? 0),
+    currency: /^[A-Z]{3}$/.test(currency) ? currency : "USD",
+    status: parseUtmcapStatus(params.status),
+    via: "postback",
+    payload: {
+      sc_cid: clickId,
+      ucid,
+      payout: params.payout ?? null,
+      status: params.status ?? null,
+    },
+  });
   return c.text(`ok ${result}`);
 });
 

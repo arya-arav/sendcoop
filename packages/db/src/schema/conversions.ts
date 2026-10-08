@@ -6,6 +6,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  timestamp,
   text,
   uniqueIndex,
   uuid,
@@ -171,3 +172,38 @@ export type Conversion = typeof conversions.$inferSelect;
 export type ConversionStatus = (typeof conversionStatus.enumValues)[number];
 export type LeadStage = (typeof leadStage.enumValues)[number];
 export type IntegrationKind = (typeof integrationKind.enumValues)[number];
+
+/**
+ * UTMCAP's click id (ucid) for a Sendcoop click (sc_cid), learnt from
+ * postbacks and click lookups: UTMCAP's webhooks name only their own (D58).
+ */
+export const utmcapClicks = pgTable(
+  "utmcap_clicks",
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    ucid: text().notNull(),
+    clickId: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.ucid] }), index().on(t.clickId)],
+);
+
+/** UTMCAP webhook events already handled: a retry has the same id (D59). */
+export const utmcapEvents = pgTable(
+  "utmcap_events",
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    eventId: text().notNull(),
+    type: text().notNull(),
+    payload: jsonb().$type<Record<string, unknown>>().notNull(),
+    /** Null until the worker has applied it. */
+    processedAt: timestamp({ withTimezone: true }),
+    error: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.eventId] })],
+);
