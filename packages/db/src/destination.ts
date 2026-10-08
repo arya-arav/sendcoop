@@ -4,6 +4,8 @@
 // - Ordinary links and the workspace's own affiliate domains get UTM tags
 //   (kept if the link already has its own) and sc_cid, the click id, which
 //   landing pages, stores and UTMCAP pick up.
+// - UTMCAP campaign links get sc_cid (the Sendcoop traffic source's external
+//   id) and sub1-sub4: email campaign, automation, list or segment, link.
 // - Known affiliate networks' links get the click id in the network's sub-id
 //   parameter instead (and nothing else, since networks' redirects can drop
 //   or choke on extra parameters). The network's postback returns it.
@@ -19,6 +21,10 @@ export type DestinationOptions = {
   position: number;
   addUtm: boolean;
   utmSource: string;
+  /** The campaign's lists or segments, for UTMCAP's sub3. */
+  audience?: string | null;
+  /** The automation it was sent by, for UTMCAP's sub2 (automations arrive in phase 7). */
+  automationName?: string | null;
 };
 
 /** "October Promo: 40% off!" -> "october-promo-40-off" */
@@ -40,6 +46,20 @@ export function decorateDestination(url: string, options: DestinationOptions): s
     target = new URL(url);
   } catch {
     return url;
+  }
+
+  if (options.networkId === "utmcap") {
+    const subs: Record<string, string | null | undefined> = {
+      sc_cid: options.clickId,
+      sub1: slugForUtm(options.campaignName),
+      sub2: options.automationName ? slugForUtm(options.automationName) : null,
+      sub3: options.audience ? slugForUtm(options.audience) : null,
+      sub4: options.label ? slugForUtm(options.label) : `link-${options.position + 1}`,
+    };
+    for (const [key, value] of Object.entries(subs)) {
+      if (value) target.searchParams.set(key, value);
+    }
+    return target.toString();
   }
 
   const network = AFFILIATE_NETWORKS.find((n) => n.id === options.networkId);

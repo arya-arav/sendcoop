@@ -1,4 +1,4 @@
-import { getCampaign, listMedia } from "@sendcoop/db";
+import { getCampaign, getUtmcapConnection, listMedia } from "@sendcoop/db";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -28,6 +28,7 @@ export default async function CampaignDesignPage({
     saveUrl: `/api/w/${slug}/campaigns/${campaign.id}/content`,
     backHref: contentStep,
     backLabel: "Back to the campaign",
+    utmcapSlug: (await getUtmcapConnection(workspace.id)) ? slug : undefined,
   };
 
   if (campaign.editor !== "visual") {

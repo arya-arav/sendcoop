@@ -26,6 +26,8 @@ export type RecordedClick = {
   workspaceId: string;
   campaignId: string;
   campaignName: string;
+  /** The campaign's lists, for UTMCAP's sub3 (only looked up for UTMCAP links). */
+  audience: string | null;
   link: { label: string | null; position: number; networkId: string | null };
   tracking: { addUtm: boolean; utmSource: string };
   subscriber: {
@@ -59,6 +61,7 @@ export async function recordClick(input: {
     workspace_id: string;
     campaign_id: string;
     campaign_name: string;
+    audience: string | null;
     add_utm: boolean | null;
     utm_source: string | null;
     email: string;
@@ -105,6 +108,13 @@ export async function recordClick(input: {
     )
     select l.url, l.label, l.position, l.network_id, m.workspace_id, m.campaign_id,
            c.name as campaign_name, t.add_utm, t.utm_source,
+           case when l.network_id = 'utmcap' then (
+             select string_agg(x.name, ', ' order by x.name) from (
+               select name from lists where id::text in (select jsonb_array_elements_text(c.audience->'lists'))
+               union all
+               select name from segments where id::text in (select jsonb_array_elements_text(c.audience->'segments'))
+             ) x
+           ) end as audience,
            m.email, s.first_name, s.last_name, s.fields,
            v.quick_or_agent or v.burst as is_bot, v.burst
     from m cross join l cross join verdict v
@@ -121,6 +131,7 @@ export async function recordClick(input: {
     workspaceId: row.workspace_id,
     campaignId: row.campaign_id,
     campaignName: row.campaign_name,
+    audience: row.audience,
     link: { label: row.label, position: row.position, networkId: row.network_id },
     // Defaults when the workspace never changed its tracking settings.
     tracking: { addUtm: row.add_utm ?? true, utmSource: row.utm_source ?? "sendcoop" },

@@ -78,9 +78,24 @@ export function CodeEditor({
     );
   }
 
+  /** At the cursor: a link in HTML, the bare address in plain text. */
+  function insertLink(url: string, text: string) {
+    const view = viewRef.current;
+    if (!view) return;
+    const escape = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    const insert = mode === "html" ? `<a href="${escape(url)}">${escape(text)}</a>` : url;
+    const { from, to } = view.state.selection.main;
+    view.dispatch({
+      changes: { from, to, insert },
+      selection: { anchor: from + insert.length },
+    });
+    view.focus();
+  }
+
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3">
-      <EditorHeader target={target} state={state} onSave={save} />
+      <EditorHeader target={target} state={state} onSave={save} onInsertLink={insertLink} />
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
         <div
           ref={host}

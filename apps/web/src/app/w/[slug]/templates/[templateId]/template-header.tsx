@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FormError } from "@/components/form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UtmcapLinkButton } from "./utmcap-link-button";
 import { Label } from "@/components/ui/label";
 
 // The parts every email editor shares (templates and campaign content):
@@ -31,6 +32,8 @@ export type EditorTarget = {
   meta?: { name: string; subject: string };
   /** Shown before Save, e.g. a delete button. */
   actions?: React.ReactNode;
+  /** Set when the workspace has UTMCAP connected: offers "Insert UTMCAP link". */
+  utmcapSlug?: string;
 };
 
 export function useContentSave(target: EditorTarget) {
@@ -95,10 +98,13 @@ export function EditorHeader({
   target,
   state,
   onSave,
+  onInsertLink,
 }: {
   target: EditorTarget;
   state: ReturnType<typeof useContentSave>;
   onSave: () => void;
+  /** Puts a link where the user is editing. */
+  onInsertLink?: (url: string, text: string) => void;
 }) {
   const { name, setName, subject, setSubject, status, error, warnings, markUnsaved } = state;
   return (
@@ -127,6 +133,9 @@ export function EditorHeader({
           {STATUS_TEXT[status]}
         </p>
         <div className="ml-auto flex items-center gap-2">
+          {target.utmcapSlug && onInsertLink && (
+            <UtmcapLinkButton slug={target.utmcapSlug} onInsert={onInsertLink} />
+          )}
           {target.previewHref && (
             <Link
               href={target.previewHref}

@@ -85,6 +85,7 @@ app.get("/c/:token", async (c) => {
     clickId: click.clickId,
     networkId: click.link.networkId,
     campaignName: click.campaignName,
+    audience: click.audience,
     label: click.link.label,
     position: click.link.position,
     ...click.tracking,

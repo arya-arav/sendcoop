@@ -170,6 +170,18 @@ export async function getUtmcapConnection(workspaceId: string): Promise<UtmcapCo
   };
 }
 
+/** The workspace's UTMCAP tracking domains: links to them get sc_cid and sub1-4 (D57). */
+export async function rememberUtmcapDomains(workspaceId: string, domains: string[]) {
+  const config = await getIntegrationConfig(workspaceId, "utmcap");
+  const known = Array.isArray(config.domains) ? config.domains.map(String) : [];
+  const merged = [
+    ...new Set([...known, ...domains.map((d) => d.toLowerCase().replace(/^www\./, ""))]),
+  ];
+  if (merged.length !== known.length) {
+    await setIntegrationConfig(workspaceId, "utmcap", { ...config, domains: merged.slice(0, 50) });
+  }
+}
+
 /** Forgets the key; Sendcoop's source and webhook stay in UTMCAP until the user removes them. */
 export async function clearUtmcapConnection(workspaceId: string) {
   await setIntegrationConfig(workspaceId, "utmcap", {});

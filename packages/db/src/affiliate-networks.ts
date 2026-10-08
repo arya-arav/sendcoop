@@ -111,21 +111,30 @@ export function normalizeDomain(input: string) {
  * Whether a link is an affiliate link: a known network's, or on one of the
  * workspace's own affiliate domains (subdomains included).
  */
-export function classifyLink(href: string, affiliateDomains: string[] = []): LinkKind {
+/** Links to these hosts are UTMCAP campaign links (the workspace's UTMCAP tracking domains). */
+export function classifyLink(
+  href: string,
+  affiliateDomains: string[] = [],
+  utmcapDomains: string[] = [],
+): LinkKind {
   let url: URL;
   try {
     url = new URL(href);
   } catch {
     return { isAffiliate: false, networkId: null };
   }
+  const host = url.hostname.replace(/^www\./, "");
+  if (utmcapDomains.some((d) => d && host === d.replace(/^www\./, "").toLowerCase())) {
+    return { isAffiliate: true, networkId: "utmcap" };
+  }
   const network = AFFILIATE_NETWORKS.find((n) => n.matches(url));
   if (network) return { isAffiliate: true, networkId: network.id };
-  const host = url.hostname.replace(/^www\./, "");
   const custom = affiliateDomains.some((d) => d && (host === d || host.endsWith(`.${d}`)));
   return { isAffiliate: custom, networkId: custom ? "custom" : null };
 }
 
 export function networkName(id: string | null) {
   if (id === "custom") return "Your affiliate domain";
+  if (id === "utmcap") return "UTMCAP";
   return AFFILIATE_NETWORKS.find((n) => n.id === id)?.name ?? null;
 }

@@ -73,3 +73,41 @@ describe("slugForUtm", () => {
     expect(slugForUtm("!!!")).toBe("email");
   });
 });
+
+describe("UTMCAP campaign links (D57)", () => {
+  const options = {
+    clickId: "sc4Fh9KqZ2LmPx7Ty1",
+    networkId: "utmcap",
+    campaignName: "Spring Sale!",
+    label: "Shop now",
+    position: 0,
+    addUtm: true,
+    utmSource: "newsletter",
+    audience: "Keto buyers",
+  };
+
+  it("carry sc_cid and sub1-4, and no UTM tags", () => {
+    const url = new URL(decorateDestination("https://trk.example.com/abc123?lp=2", options));
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      lp: "2",
+      sc_cid: "sc4Fh9KqZ2LmPx7Ty1",
+      sub1: "spring-sale",
+      sub3: "keto-buyers",
+      sub4: "shop-now",
+    });
+  });
+
+  it("name the link by position without a label, and leave out what isn't known", () => {
+    const url = new URL(
+      decorateDestination("https://trk.example.com/abc123", {
+        ...options,
+        label: null,
+        position: 2,
+        audience: null,
+      }),
+    );
+    expect(url.searchParams.get("sub4")).toBe("link-3");
+    expect(url.searchParams.has("sub3")).toBe(false);
+    expect(url.searchParams.has("sub2")).toBe(false);
+  });
+});

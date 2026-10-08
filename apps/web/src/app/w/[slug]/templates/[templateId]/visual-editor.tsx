@@ -162,9 +162,25 @@ export function VisualEditor({
     await state.save({ editor: "visual", design: editor.getProjectData(), mjml: editor.getHtml() });
   }
 
+  /** A button with the link, in the selected column (or the email's last one). */
+  function insertLink(url: string, text: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const escape = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    const selected = editor.getSelected();
+    const column =
+      (selected?.is("mj-column") ? selected : selected?.closest("mj-column")) ??
+      editor.getWrapper()?.find("mj-column").at(-1);
+    if (!column) return;
+    const [added] = column.append(`<mj-button href="${escape(url)}">${escape(text)}</mj-button>`);
+    if (added) editor.select(added);
+    state.markUnsaved();
+  }
+
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3">
-      <EditorHeader target={target} state={state} onSave={save} />
+      <EditorHeader target={target} state={state} onSave={save} onInsertLink={insertLink} />
       <div ref={container} className="min-h-0 flex-1 overflow-hidden rounded-lg border" />
     </div>
   );

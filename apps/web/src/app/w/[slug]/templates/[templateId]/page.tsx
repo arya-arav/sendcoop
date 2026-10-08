@@ -1,4 +1,4 @@
-import { getTemplate, listMedia } from "@sendcoop/db";
+import { getTemplate, getUtmcapConnection, listMedia } from "@sendcoop/db";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -33,6 +33,7 @@ export default async function TemplatePage({
     previewHref: `/w/${slug}/templates/${template.id}/preview`,
     meta: { name: template.name, subject: template.subject },
     actions: <DeleteTemplateButton slug={slug} id={template.id} name={template.name} />,
+    utmcapSlug: (await getUtmcapConnection(workspace.id)) ? slug : undefined,
   };
 
   if (template.editor !== "visual") {

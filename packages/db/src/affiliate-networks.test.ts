@@ -46,3 +46,18 @@ describe("normalizeDomain", () => {
     expect(normalizeDomain("")).toBe("");
   });
 });
+
+describe("classifyLink with UTMCAP domains", () => {
+  it("marks links to the workspace's UTMCAP tracking domains", () => {
+    expect(classifyLink("https://trk.example.com/abc123", [], ["trk.example.com"])).toEqual({
+      isAffiliate: true,
+      networkId: "utmcap",
+    });
+    expect(classifyLink("https://www.trk.example.com/x", [], ["trk.example.com"]).networkId).toBe(
+      "utmcap",
+    );
+    expect(classifyLink("https://other.example.com/x", [], ["trk.example.com"]).networkId).toBe(
+      null,
+    );
+  });
+});

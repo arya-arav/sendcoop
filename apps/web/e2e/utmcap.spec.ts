@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { type FakeUtmcap, startFakeUtmcap } from "@sendcoop/utmcap/fake";
+import type { Page } from "@playwright/test";
+import { closeConnections, sendCampaign } from "./campaigns";
 import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+import { CHROME, waitForTrackedUrls } from "./tracked";
 
 // The UTMCAP integration (D56–D60) against a fake UTMCAP on the port the
 // servers were started with (UTMCAP_API_URL in playwright.config.ts). One
@@ -14,7 +17,22 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => {
   await fake?.close();
+  await closeConnections();
 });
+
+/** A new workspace with UTMCAP connected; returns its slug. */
+async function connected(page: Page, label: string) {
+  const slug = await signUpWithWorkspace(page, {
+    name: "Tracker User",
+    email: uniqueEmail(label),
+    workspace: `UTMCAP ${label} ${Date.now()}`,
+  });
+  await page.goto(`/w/${slug}/integrations`);
+  await page.getByLabel("UTMCAP API key").fill(fake.apiKey);
+  await page.getByRole("button", { name: "Connect" }).click();
+  await expect(page.getByRole("status")).toContainText("is now a traffic source in UTMCAP");
+  return slug;
+}
 
 test("connecting UTMCAP sets up the Sendcoop traffic source and webhook there", async ({
   page,
@@ -71,4 +89,55 @@ test("connecting UTMCAP sets up the Sendcoop traffic source and webhook there", 
   await page.reload();
   await expect(page.getByText(fake.sources[0]!.id)).toBeVisible();
   void slug;
+});
+
+test("a UTMCAP link inserted in the editor reaches UTMCAP with the click id and the email's details", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  const slug = await connected(page, "utmcap-link");
+  const offer = fake.addCampaign("Keto VSL");
+
+  // Insert it in a template from the editor
+  await page.goto(`/w/${slug}/templates/new`);
+  await page.getByRole("button", { name: "Write HTML" }).click();
+  await expect(page.getByRole("status").first()).toHaveText("All changes saved", {
+    timeout: 20_000,
+  });
+  await page.getByRole("button", { name: "Insert UTMCAP link" }).click();
+  await page
+    .getByRole("list", { name: "UTMCAP campaigns" })
+    .getByRole("button", { name: /Keto VSL/ })
+    .click();
+  await expect(page.getByRole("textbox", { name: "HTML code" })).toContainText(
+    `<a href="${offer.url}">Keto VSL</a>`,
+  );
+  await page.getByLabel("Template name").fill("Keto email");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("status").first()).toHaveText("All changes saved");
+  const templateId = page.url().split("/").pop()!;
+
+  // Sent in a campaign, then clicked by a reader
+  const reader = uniqueEmail("utmcap-reader");
+  // A campaign from a template is named after it: sub1 is "keto-email"
+  await sendCampaign(slug, [reader], { templateId });
+  const { links } = await waitForTrackedUrls(reader);
+  await page.waitForTimeout(5500);
+  const hop = await request.get(links[0]!, { headers: { "user-agent": CHROME }, maxRedirects: 0 });
+  const toUtmcap = new URL(hop.headers().location!);
+  expect(`${toUtmcap.origin}${toUtmcap.pathname}`).toBe(offer.url);
+  const scCid = toUtmcap.searchParams.get("sc_cid")!;
+  expect(scCid).toMatch(/^sc\w{16}$/);
+  expect(toUtmcap.searchParams.has("utm_source")).toBe(false);
+  await request.get(toUtmcap.toString(), { maxRedirects: 0 });
+
+  // In UTMCAP's click log: the external id and the sub values
+  const click = fake.clicks.at(-1)!;
+  expect(click).toMatchObject({
+    campaign_id: offer.id,
+    external_id: scCid,
+    subs: { sub1: "keto-email", sub3: expect.stringMatching(/^deals-/), sub4: "keto-vsl" },
+  });
+  expect(fake.sources.find((s) => s.id === click.source_id)?.external_id_param).toBe("sc_cid");
 });

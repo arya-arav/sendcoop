@@ -243,7 +243,9 @@ export async function startFakeUtmcap({
     // A campaign's tracking link: https://{domain}/{alias}?sc_cid=…&sub1=…
     const campaign = fake.campaigns.find((c) => url.pathname === `/${c.alias}`);
     if (campaign) {
-      const source = fake.sources[0] ?? null;
+      // UTMCAP: the campaign's traffic source decides the external id parameter.
+      const source =
+        fake.sources.find((s) => s.id === campaign.source_id) ?? fake.sources.at(-1) ?? null;
       const external = source?.external_id_param
         ? url.searchParams.get(source.external_id_param)
         : null;
@@ -293,8 +295,9 @@ export async function startFakeUtmcap({
         status: "active",
         url: `${origin}/${alias}`,
         domain: new URL(origin).host,
-        source_id: null,
-        source_name: null,
+        // Bought from the newest source, as when the user picks Sendcoop for it.
+        source_id: fake.sources.at(-1)?.id ?? null,
+        source_name: fake.sources.at(-1)?.name ?? null,
         currency: "USD",
         created_at: new Date().toISOString(),
         clicks: 0,

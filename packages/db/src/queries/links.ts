@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { classifyLink, normalizeDomain } from "../affiliate-networks";
 import { getDb } from "../client";
 import { links, trackingSettings } from "../schema";
+import { getIntegrationConfig } from "./integrations";
 
 export async function getAffiliateDomains(workspaceId: string): Promise<string[]> {
   const [row] = await getDb()
@@ -32,7 +33,11 @@ export async function storeCampaignLinks(
   found: { url: string; label: string | null; position: number }[],
 ) {
   if (found.length === 0) return;
-  const domains = await getAffiliateDomains(workspaceId);
+  const [domains, utmcap] = await Promise.all([
+    getAffiliateDomains(workspaceId),
+    getIntegrationConfig(workspaceId, "utmcap"),
+  ]);
+  const utmcapDomains = Array.isArray(utmcap.domains) ? utmcap.domains.map(String) : [];
   await getDb()
     .insert(links)
     .values(
@@ -43,7 +48,7 @@ export async function storeCampaignLinks(
         position: link.position,
         url: link.url.slice(0, 2000),
         label: link.label,
-        ...classifyLink(link.url, domains),
+        ...classifyLink(link.url, domains, utmcapDomains),
       })),
     )
     .onConflictDoNothing();

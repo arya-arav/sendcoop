@@ -1,6 +1,7 @@
 "use server";
 
-import { clearUtmcapConnection } from "@sendcoop/db";
+import { clearUtmcapConnection, getUtmcapConnection, rememberUtmcapDomains } from "@sendcoop/db";
+import { UtmcapClient, UtmcapError } from "@sendcoop/utmcap";
 import { revalidatePath } from "next/cache";
 import { canManage } from "@/lib/permissions";
 import { withinRateLimit } from "@/lib/rate-limit";
@@ -35,4 +36,38 @@ export async function disconnectUtmcapAction(slug: string) {
   await clearUtmcapConnection(workspace.id);
   revalidatePath(`/w/${slug}/integrations`);
   return { ok: true as const };
+}
+
+export type UtmcapCampaignOption = { id: string; name: string; url: string; status: string };
+
+/**
+ * The user's UTMCAP campaigns, for "Insert UTMCAP link" in the editor. Their
+ * tracking domains are remembered, so links to them get sc_cid and sub1–4.
+ */
+export async function listUtmcapCampaignsAction(
+  slug: string,
+): Promise<{ ok: true; campaigns: UtmcapCampaignOption[] } | { ok: false; error: string }> {
+  const { workspace } = await requireMemberWorkspace(slug);
+  const connection = await getUtmcapConnection(workspace.id);
+  if (!connection) return { ok: false, error: "Connect UTMCAP first, in Integrations." };
+  try {
+    const campaigns = await new UtmcapClient({ apiKey: connection.apiKey }).listCampaigns();
+    const domains = campaigns.flatMap((c) => {
+      try {
+        return [new URL(c.url).hostname];
+      } catch {
+        return [];
+      }
+    });
+    await rememberUtmcapDomains(workspace.id, domains);
+    return {
+      ok: true,
+      campaigns: campaigns.map((c) => ({ id: c.id, name: c.name, url: c.url, status: c.status })),
+    };
+  } catch (error) {
+    if (error instanceof UtmcapError) {
+      return { ok: false, error: `UTMCAP couldn't list your campaigns: ${error.message}` };
+    }
+    throw error;
+  }
 }
