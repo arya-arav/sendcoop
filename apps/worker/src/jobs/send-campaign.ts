@@ -5,6 +5,7 @@ import {
   countAudience,
   decideDueAbTests,
   failCampaign,
+  getAccountPlan,
   getCampaign,
   getDkimSigningKey,
   getSendingServer,
@@ -21,28 +22,30 @@ import {
   prepareCampaignMessages,
   queuedMessageBatchPages,
   recordBatchProgress,
-  releaseMessages,
   refreshCampaignProgress,
-  storeCampaignLinks,
+  releaseMessages,
+  sendQuotaProblem,
+  skipUnsendableMessages,
   stalledSendingCampaigns,
   startDueCampaigns,
+  storeCampaignLinks,
   touchCampaignProgress,
-  skipUnsendableMessages,
   unsubscribeUrls,
-  sendQuotaProblem,
+  workspaceOwnerId,
   workspaceQuota,
 } from "@sendcoop/db";
 import {
   buildRawMessage,
   createDriver,
-  extractLinks,
   type DkimKey,
+  extractLinks,
   listUnsubscribeHeaders,
   mergeValuesFor,
   personalize,
   rewriteLinks,
   type ServerConfig,
   serverConfigSchema,
+  withBranding,
   withTrackingPixel,
   withUnsubscribeLink,
 } from "@sendcoop/mailer";
@@ -271,7 +274,13 @@ export async function sendBatch({
           to: message.email,
           replyTo: campaign.replyTo ?? undefined,
           subject: content.subject,
-          ...withPixel(withUnsubscribeLink(content, unsubscribe.page), message.id, trackOpens),
+          ...withPixel(
+            context.branding
+              ? withBranding(withUnsubscribeLink(content, unsubscribe.page), SITE_URL)
+              : withUnsubscribeLink(content, unsubscribe.page),
+            message.id,
+            trackOpens,
+          ),
           headers: {
             ...listUnsubscribeHeaders(unsubscribe.oneClick),
             // Ties bounces and complaints back to this message (D22).
@@ -310,6 +319,8 @@ type Context =
       limits: Limits;
       from: string;
       dkim: DkimKey | undefined;
+      /** Adds "Sent with Sendcoop": the plan doesn't include removing it. */
+      branding: boolean;
     }
   | { error: string };
 
@@ -333,7 +344,11 @@ async function sendContext(
   if (!domain) return { error: "The sending domain was deleted." };
 
   const key = await getDkimSigningKey(workspaceId, domain.domain);
+  // Workspaces without an owner (made in tests) have no plan, and no footer.
+  const owner = await workspaceOwnerId(workspaceId);
+  const branding = owner ? !(await getAccountPlan(owner)).features.removeBranding : false;
   return {
+    branding,
     serverId: server.id,
     config: config.data as ServerConfig,
     limits: server,
@@ -343,6 +358,9 @@ async function sendContext(
       : undefined,
   };
 }
+
+/** Where "Sent with Sendcoop" links to. */
+const SITE_URL = process.env.BETTER_AUTH_URL ?? "https://sendcoop.com";
 
 const NETWORK_CODES = new Set([
   "ECONNREFUSED",

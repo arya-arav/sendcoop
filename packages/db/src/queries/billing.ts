@@ -6,23 +6,34 @@ import { type Plan, plans, subscriptions } from "../schema";
 // Plans and who's on which (D71). Stripe keeps subscriptions in step (D72);
 // quotas are enforced in D73.
 
+/**
+ * Every limit and feature filled in, whatever the stored row has (rows saved
+ * before a limit existed, or written by hand): missing ones are unlimited, on.
+ */
+const complete = (plan: Plan): Plan => ({
+  ...plan,
+  limits: effectiveLimits(plan.limits),
+  features: effectiveFeatures(plan.features),
+});
+
 export async function listPlans({ includeHidden = false } = {}) {
-  return getDb()
+  const rows = await getDb()
     .select()
     .from(plans)
     .where(includeHidden ? sql`true` : and(eq(plans.public, true), eq(plans.archived, false)))
     .orderBy(asc(plans.sortOrder), asc(plans.priceCents));
+  return rows.map(complete);
 }
 
 export async function getPlan(planId: string) {
   if (!/^[0-9a-f-]{36}$/i.test(planId)) return null;
   const [row] = await getDb().select().from(plans).where(eq(plans.id, planId));
-  return row ?? null;
+  return row ? complete(row) : null;
 }
 
 export async function getPlanByKey(key: string) {
   const [row] = await getDb().select().from(plans).where(eq(plans.key, key));
-  return row ?? null;
+  return row ? complete(row) : null;
 }
 
 export type PlanInput = {
@@ -31,6 +42,8 @@ export type PlanInput = {
   description: string;
   priceCents: number;
   currency: string;
+  interval: "month" | "year";
+  trialDays: number;
   stripePriceId: string | null;
   limits: PlanLimits;
   features: PlanFeatures;
@@ -79,7 +92,7 @@ export async function getAccountPlan(userId: string): Promise<AccountPlan> {
     .innerJoin(plans, eq(plans.id, subscriptions.planId))
     .where(eq(subscriptions.userId, userId));
   const live = sub && sub.subscription.status !== "canceled";
-  const plan = live ? sub.plan : (await getPlanByKey("free"))!;
+  const plan = live ? complete(sub.plan) : (await getPlanByKey("free"))!;
   const overrides = sub?.subscription.overrides ?? null;
   return {
     plan,
@@ -151,7 +164,7 @@ export async function isSuperAdmin(userId: string) {
 
 export async function getPlanByStripePrice(priceId: string) {
   const [row] = await getDb().select().from(plans).where(eq(plans.stripePriceId, priceId));
-  return row ?? null;
+  return row ? complete(row) : null;
 }
 
 /** The account a Stripe customer belongs to. */

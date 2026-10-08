@@ -3,8 +3,10 @@
 import {
   createSendingServer,
   deleteSendingServer,
+  featureProblem,
   getDkimSigningKey,
   getSendingServerConfig,
+  limitProblem,
   listSendingDomains,
   updateSendingServer,
 } from "@sendcoop/db";
@@ -73,6 +75,12 @@ export async function saveServerAction(
   if (!name) return { ok: false, error: "Give the server a name." };
   if (serverId && !z.uuid().safeParse(serverId).success) {
     return { ok: false, error: "This server no longer exists." };
+  }
+  if (!serverId) {
+    const blocked =
+      (await featureProblem(workspace.id, "ownSendingServers")) ??
+      (await limitProblem(workspace.id, "sendingServers"));
+    if (blocked) return { ok: false, error: blocked };
   }
 
   // Editing: blank secrets keep the saved ones, so they never have to be shown.

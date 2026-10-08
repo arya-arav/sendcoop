@@ -1,4 +1,11 @@
-import { createImport, findMemberWorkspace, listCustomFields, suggestMapping } from "@sendcoop/db";
+import {
+  createImport,
+  featureProblem,
+  findMemberWorkspace,
+  listCustomFields,
+  suggestMapping,
+  uploadLimitBytes,
+} from "@sendcoop/db";
 import { FileTooLargeError, putStream, readHead, remove } from "@sendcoop/storage";
 import { headers } from "next/headers";
 import { crossSite } from "@/lib/api-auth";
@@ -28,8 +35,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     return error(403, "Only workspace owners and admins can import subscribers.");
   }
 
+  // The plan: whether it imports at all, and how big a file (D73+).
+  const blocked = await featureProblem(membership.workspace.id, "importContacts");
+  if (blocked) return error(403, blocked);
+  const planBytes = await uploadLimitBytes(membership.workspace.id);
+  const maxBytes = Math.min(MAX_IMPORT_BYTES, planBytes ?? MAX_IMPORT_BYTES);
+  const tooLarge = `The file is larger than ${Math.round(maxBytes / 1024 / 1024)} MB${
+    maxBytes < MAX_IMPORT_BYTES ? ", the most your plan allows" : ""
+  }.`;
+
   const declared = Number(request.headers.get("content-length") ?? 0);
-  if (declared > MAX_IMPORT_BYTES) return error(413, "The file is larger than 100 MB.");
+  if (declared > maxBytes) return error(413, tooLarge);
   if (!request.body) return error(400, "Choose a CSV file to upload.");
 
   const fileName = (decodeURIComponent(request.headers.get("x-file-name") ?? "") || "import.csv")
@@ -40,9 +56,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   let fileSize: number;
   try {
-    fileSize = await putStream(fileKey, request.body, { maxBytes: MAX_IMPORT_BYTES });
+    fileSize = await putStream(fileKey, request.body, { maxBytes });
   } catch (cause) {
-    if (cause instanceof FileTooLargeError) return error(413, "The file is larger than 100 MB.");
+    if (cause instanceof FileTooLargeError) return error(413, tooLarge);
     throw cause;
   }
   if (fileSize === 0) {

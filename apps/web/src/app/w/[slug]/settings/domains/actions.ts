@@ -4,6 +4,7 @@ import {
   addSendingDomain,
   deleteSendingDomain,
   getCheckableDomain,
+  limitProblem,
   normalizeSendingDomain,
   systemTxtLookup,
   verifySendingDomain,
@@ -22,6 +23,8 @@ export async function addDomainAction(slug: string, input: string): Promise<Doma
   }
   const normalized = normalizeSendingDomain(String(input ?? "").slice(0, 300));
   if (!normalized.ok) return normalized;
+  const overLimit = await limitProblem(workspace.id, "sendingDomains");
+  if (overLimit) return { ok: false, error: overLimit };
 
   const result = await addSendingDomain(workspace.id, normalized.domain);
   if (!result.ok) return { ok: false, error: `${normalized.domain} is already added.` };

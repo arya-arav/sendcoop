@@ -365,6 +365,20 @@
       "when": 1791483804765,
       "tag": "0051_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791486048205,
+      "tag": "0052_plan_new_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791486083289,
+      "tag": "0053_plan_billing_cycle",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { addMedia } from "@sendcoop/db";
+import { addMedia, uploadLimitBytes } from "@sendcoop/db";
 import { mediaConfigured, putMedia } from "@sendcoop/storage/media";
 import { jsonError, managerWorkspaceForApi } from "@/lib/api-auth";
 import { ImageError, MAX_IMAGE_UPLOAD_BYTES, processImage } from "@/lib/process-image";
@@ -29,6 +29,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }
   if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
     return jsonError(413, "That image is over 10 MB. Use a smaller one.");
+  }
+  const planBytes = await uploadLimitBytes(access.workspace.id);
+  if (planBytes !== null && file.size > planBytes) {
+    return jsonError(
+      413,
+      `That image is over ${Math.round(planBytes / 1024 / 1024)} MB, the most your plan allows.`,
+    );
   }
 
   let image;

@@ -1,6 +1,6 @@
 "use server";
 
-import { createList, deleteList, updateList } from "@sendcoop/db";
+import { createList, deleteList, limitProblem, updateList } from "@sendcoop/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
@@ -53,6 +53,8 @@ export async function createListAction(slug: string, formData: FormData): Promis
 
   const input = parse(formData);
   if (!input.success) return { ok: false, fieldErrors: fieldErrors(input.error) };
+  const overLimit = await limitProblem(workspace.id, "lists");
+  if (overLimit) return { ok: false, error: overLimit };
 
   const result = await createList(workspace.id, input.data);
   if (!result.ok) return { ok: false, fieldErrors: { name: DUPLICATE } };

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getSql } from "../client";
+import { effectiveFeatures, effectiveLimits } from "../plans";
 import {
   getAccountPlan,
   getPlanByKey,
@@ -50,17 +51,24 @@ describe("plans", () => {
       name: "Custom",
       description: "",
       priceCents: 9900,
+      interval: "month" as const,
+      trialDays: 0,
       currency: "USD",
       stripePriceId: null,
-      limits: { subscribers: 5000, sendsPerMonth: 50000, workspaces: 2, teamMembers: 3 },
-      features: {
+      limits: effectiveLimits({
+        subscribers: 5000,
+        sendsPerMonth: 50000,
+        workspaces: 2,
+        teamMembers: 3,
+      }),
+      features: effectiveFeatures({
         automations: true,
         abTests: false,
         aiAssist: false,
         utmcap: true,
         api: false,
         removeBranding: false,
-      },
+      }),
       public: false,
       sortOrder: 99,
       archived: false,

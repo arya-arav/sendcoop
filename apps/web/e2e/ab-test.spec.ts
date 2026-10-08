@@ -9,7 +9,7 @@ import {
   getSql,
   updateDraftCampaign,
 } from "@sendcoop/db";
-import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+import { onPlan, signUpWithWorkspace, uniqueEmail } from "./helpers";
 
 test("an A/B test sends two versions, then the winner to everyone else", async ({ page }) => {
   test.setTimeout(120_000);
@@ -18,6 +18,7 @@ test("an A/B test sends two versions, then the winner to everyone else", async (
     email: uniqueEmail("ab"),
     workspace: `AB ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
 
   // A ready draft to 4 people (set up directly; the builder has its own tests)
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;

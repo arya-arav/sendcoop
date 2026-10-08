@@ -32,8 +32,8 @@ test("a super-admin adds a plan, and customers see it on their billing page", as
   await page.getByRole("link", { name: "New plan" }).click();
   await page.getByLabel("Name").fill("Agency");
   await page.getByLabel("Key").fill(KEY);
-  await page.getByLabel("Price a month").fill("299");
-  await page.getByLabel("Subscribers").fill("");
+  await page.getByLabel("Price", { exact: true }).fill("299");
+  await page.getByLabel("Subscribers: unlimited").check();
   await page.getByLabel("API and webhooks").check();
   await page.getByLabel("Order").fill("50");
   await page.getByRole("button", { name: "Save plan" }).click();

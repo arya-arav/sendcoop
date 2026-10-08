@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { type FakeUtmcap, startFakeUtmcap } from "@sendcoop/utmcap/fake";
 import type { Page } from "@playwright/test";
 import { closeConnections, sendCampaign } from "./campaigns";
-import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+import { onPlan, signUpWithWorkspace, uniqueEmail } from "./helpers";
 import { CHROME, waitForTrackedUrls } from "./tracked";
 
 // The UTMCAP integration (D56–D60) against a fake UTMCAP on the port the
@@ -27,6 +27,7 @@ async function connected(page: Page, label: string) {
     email: uniqueEmail(label),
     workspace: `UTMCAP ${label} ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
   await page.goto(`/w/${slug}/integrations`);
   await page.getByLabel("UTMCAP API key").fill(fake.apiKey);
   await page.getByRole("button", { name: "Connect" }).click();
@@ -42,6 +43,7 @@ test("connecting UTMCAP sets up the Sendcoop traffic source and webhook there", 
     email: uniqueEmail("utmcap"),
     workspace: `UTMCAP ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
   await page.locator("[data-sidebar=sidebar]").getByRole("link", { name: "Integrations" }).click();
   await expect(page.getByRole("heading", { name: "Integrations", level: 1 })).toBeVisible();
 

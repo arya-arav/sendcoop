@@ -59,7 +59,12 @@ export async function choosePlanAction(slug: string, planId: string): Promise<Re
     customer,
     client_reference_id: user.id,
     line_items: [{ price: plan.stripePriceId, quantity: 1 }],
-    subscription_data: { metadata: { sendcoop_user_id: user.id } },
+    subscription_data: {
+      metadata: { sendcoop_user_id: user.id },
+      // The plan's free trial, for an account that has never paid.
+      ...(plan.trialDays > 0 &&
+        !account.stripeSubscriptionId && { trial_period_days: plan.trialDays }),
+    },
     success_url: `${back}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: back,
   });

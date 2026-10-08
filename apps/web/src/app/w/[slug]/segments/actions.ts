@@ -3,6 +3,7 @@
 import {
   createSegment,
   deleteSegment,
+  limitProblem,
   previewSegment,
   segmentRulesProblem,
   segmentRulesSchema,
@@ -37,6 +38,10 @@ export async function saveSegmentAction(
   if (!rules.success) return { ok: false, error: "The rules are invalid. Reload and try again." };
   if (segmentId && !z.uuid().safeParse(segmentId).success) {
     return { ok: false, error: "This segment no longer exists." };
+  }
+  if (!segmentId) {
+    const overLimit = await limitProblem(workspace.id, "segments");
+    if (overLimit) return { ok: false, error: overLimit };
   }
 
   const problem = segmentRulesProblem(rules.data, await segmentContext(workspace.id));

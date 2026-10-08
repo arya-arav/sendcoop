@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatMoney } from "@/lib/money";
+import { CopyPlanButton } from "./copy-plan-button";
 
 export const metadata: Metadata = { title: "Plans" };
 
@@ -39,6 +40,9 @@ export default async function PlansPage() {
             <TableHead className="text-right">Emails a month</TableHead>
             <TableHead className="text-right">Workspaces</TableHead>
             <TableHead>Stripe</TableHead>
+            <TableHead>
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -64,7 +68,14 @@ export default async function PlansPage() {
                 )}
               </TableCell>
               <TableCell className="text-right tabular-nums">
-                {p.priceCents === 0 ? "Free" : `${formatMoney(p.priceCents / 100, p.currency)}/mo`}
+                {p.priceCents === 0
+                  ? "Free"
+                  : `${formatMoney(p.priceCents / 100, p.currency)}/${p.interval === "year" ? "yr" : "mo"}`}
+                {p.trialDays > 0 && (
+                  <span className="block text-xs text-muted-foreground">
+                    {p.trialDays}-day trial
+                  </span>
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatLimit(p.limits.subscribers)}
@@ -77,6 +88,9 @@ export default async function PlansPage() {
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 {p.stripePriceId ?? "—"}
+              </TableCell>
+              <TableCell className="text-right">
+                <CopyPlanButton planId={p.id} name={p.name} />
               </TableCell>
             </TableRow>
           ))}

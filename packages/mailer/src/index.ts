@@ -9,6 +9,7 @@ export * from "./links";
 export * from "./personalize";
 export * from "./preheader";
 export * from "./sns";
+export * from "./branding";
 export * from "./unsubscribe";
 
 // Builds outgoing messages (DKIM-signed with the sending domain's key) and

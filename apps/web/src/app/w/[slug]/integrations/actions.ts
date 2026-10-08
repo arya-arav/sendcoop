@@ -1,6 +1,11 @@
 "use server";
 
-import { clearUtmcapConnection, getUtmcapConnection, rememberUtmcapDomains } from "@sendcoop/db";
+import {
+  clearUtmcapConnection,
+  featureProblem,
+  getUtmcapConnection,
+  rememberUtmcapDomains,
+} from "@sendcoop/db";
 import { UtmcapClient, UtmcapError } from "@sendcoop/utmcap";
 import { revalidatePath } from "next/cache";
 import { canManage } from "@/lib/permissions";
@@ -14,6 +19,8 @@ export async function connectUtmcapAction(slug: string, apiKey: string) {
   if (!canManage(role)) {
     return { ok: false as const, error: "Only workspace owners and admins can connect UTMCAP." };
   }
+  const blocked = await featureProblem(workspace.id, "utmcap");
+  if (blocked) return { ok: false as const, error: blocked };
   const key = apiKey.trim();
   if (!/^utmk_[\w-]{8,200}$/.test(key)) {
     return {

@@ -23,8 +23,12 @@ export const plans = pgTable("plans", {
   key: text().notNull().unique(),
   name: text().notNull(),
   description: text().notNull().default(""),
-  /** Per month, in cents; 0 is free. */
+  /** Per billing period, in cents; 0 is free. */
   priceCents: integer().notNull().default(0),
+  /** How often it bills (the Stripe price must match). */
+  interval: text().$type<"month" | "year">().notNull().default("month"),
+  /** Free days before the first charge, on Checkout (0: none). */
+  trialDays: integer().notNull().default(0),
   currency: text().notNull().default("USD"),
   /** The Stripe price this plan subscribes to (D72); null for free plans. */
   stripePriceId: text(),

@@ -87,3 +87,17 @@ export async function emailCount(to: string): Promise<number> {
   ).then((r) => r.json());
   return search.messages_count ?? 0;
 }
+
+/**
+ * Puts the owner of a workspace on a plan (by key), for tests of features
+ * the free plan doesn't include.
+ */
+export async function onPlan(slug: string, planKey: string) {
+  const { getSql } = await import("@sendcoop/db");
+  await getSql()`
+    insert into subscriptions (user_id, plan_id, status)
+    select m.user_id, p.id, 'active'
+    from memberships m join workspaces w on w.id = m.workspace_id, plans p
+    where w.slug = ${slug} and m.role like '%owner%' and p.key = ${planKey}
+    on conflict (user_id) do update set plan_id = excluded.plan_id, status = 'active'`;
+}

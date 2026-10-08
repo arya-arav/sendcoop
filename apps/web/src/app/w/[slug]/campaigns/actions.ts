@@ -2,10 +2,11 @@
 
 import {
   applyTemplateToDraft,
-  cancelCampaign,
   type CampaignDraftChanges,
+  cancelCampaign,
   countAudience,
   createDraftCampaign,
+  featureProblem,
   getCampaign,
   getTemplate,
   getVariantB,
@@ -304,6 +305,10 @@ export async function saveAbTestAction(
     return { ok: false as const, error: "This campaign isn't a draft." };
   }
   const a = parsed.data;
+  if (a.enabled) {
+    const blocked = await featureProblem(workspace.id, "abTests");
+    if (blocked) return { ok: false as const, error: blocked };
+  }
   if (!a.enabled) {
     await setAbTest(workspace.id, campaign.id, null);
     revalidatePath(`/w/${slug}/campaigns/${campaign.id}/content`);

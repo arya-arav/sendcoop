@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { getSql } from "@sendcoop/db";
 import { type FakeAnthropic, startFakeAnthropic } from "./fake-anthropic";
-import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+import { onPlan, signUpWithWorkspace, uniqueEmail } from "./helpers";
 
 // AI assist (D70) against a fake Claude API on the port the servers were
 // started with (ANTHROPIC_BASE_URL in playwright.config.ts). One file, in
@@ -25,6 +25,7 @@ test("a draft written with AI goes into the email, and its subject can be used",
     email: uniqueEmail("ai-email"),
     workspace: `AI email ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
   await page.goto(`/w/${slug}/templates/new`);
   await page.getByRole("button", { name: "Write HTML" }).click();
   await expect(page.getByRole("status").first()).toHaveText("All changes saved", {
@@ -81,6 +82,7 @@ test("an automation is drafted from a goal, its emails written", async ({ page }
     email: uniqueEmail("ai-flow"),
     workspace: `AI flow ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
   await page.goto(`/w/${slug}/automations`);
   await page.getByLabel("Goal").fill("Turn new webinar sign-ups into buyers of my course");
   await page.getByRole("button", { name: "Draft the flow" }).click();

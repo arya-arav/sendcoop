@@ -6,7 +6,7 @@ import {
   createSubscriber,
   getSql,
 } from "@sendcoop/db";
-import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+import { onPlan, signUpWithWorkspace, uniqueEmail } from "./helpers";
 import { CHROME, waitForTrackedUrls } from "./tracked";
 
 const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8027";
@@ -21,6 +21,7 @@ test("a live automation emails someone who joins its list, and shows what the em
     email: uniqueEmail("automation-run"),
     workspace: `Welcome flow ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
   // Somewhere to send from (domain and server), and the list it listens to

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../client";
 import type { PlanLimits } from "../plans";
 import { WARMUP_STEPS, warmupLimit } from "../abuse";
+import { effectiveLimits, type PlanFeatures } from "../plans";
 import { getAccountPlan, workspaceOwnerId } from "./billing";
 
 // Quotas (D73): what an account has used of its plan's limits, across every
@@ -114,12 +115,7 @@ async function sendsInLastDay(userId: string) {
   return row?.n ?? 0;
 }
 
-const UNLIMITED: PlanLimits = {
-  subscribers: null,
-  sendsPerMonth: null,
-  workspaces: null,
-  teamMembers: null,
-};
+const UNLIMITED: PlanLimits = effectiveLimits({});
 
 export async function workspaceQuota(workspaceId: string): Promise<Quota> {
   const owner = await workspaceOwnerId(workspaceId);
@@ -168,4 +164,72 @@ export function subscriberQuotaProblem(quota: Quota, count = 1) {
     `subscribers, and you have ${quota.usage.subscribers.toLocaleString("en")}. ` +
     `Upgrade your plan to add more.`
   );
+}
+
+/** Plan limits that count things the account has made (the plans editor). */
+export type CountedLimit =
+  "lists" | "automations" | "forms" | "segments" | "sendingDomains" | "sendingServers";
+
+const COUNTED: Record<CountedLimit, { table: string; where?: string; noun: [string, string] }> = {
+  lists: { table: "lists", noun: ["list", "lists"] },
+  automations: {
+    table: "automations",
+    where: "status = 'active'",
+    noun: ["live automation", "live automations"],
+  },
+  forms: { table: "signup_forms", noun: ["signup form", "signup forms"] },
+  segments: { table: "segments", noun: ["segment", "segments"] },
+  sendingDomains: { table: "sending_domains", noun: ["sending domain", "sending domains"] },
+  sendingServers: { table: "sending_servers", noun: ["sending server", "sending servers"] },
+};
+
+/**
+ * Why the account behind a workspace can't have `adding` more of something,
+ * or null when it can (or the workspace has no owner, as in tests).
+ */
+export async function limitProblem(workspaceId: string, key: CountedLimit, adding = 1) {
+  const owner = await workspaceOwnerId(workspaceId);
+  if (!owner) return null;
+  const plan = await getAccountPlan(owner);
+  const limit = plan.limits[key];
+  if (limit === null) return null;
+  const { table, where, noun } = COUNTED[key];
+  const [row] = await getDb().execute<{ n: number }>(sql`
+    select count(*)::int as n from ${sql.raw(table)}
+    where workspace_id in (${ownedWorkspaces(owner)}) ${where ? sql.raw(`and ${where}`) : sql``}`);
+  const used = row?.n ?? 0;
+  if (used + adding <= limit) return null;
+  return (
+    `Your ${plan.plan.name} plan allows ${limit.toLocaleString("en")} ${noun[limit === 1 ? 0 : 1]}, ` +
+    `and you have ${used.toLocaleString("en")}. Upgrade your plan in Settings > Billing for more.`
+  );
+}
+
+const FEATURE_NAMES: Record<keyof PlanFeatures, string> = {
+  automations: "Automations",
+  abTests: "A/B tests",
+  aiAssist: "AI assist",
+  utmcap: "The UTMCAP integration",
+  api: "The API and webhooks",
+  removeBranding: "Removing the Sendcoop footer",
+  importContacts: "Importing contacts",
+  exportContacts: "Exporting contacts",
+  ownSendingServers: "Connecting your own sending servers",
+};
+
+/** Why the workspace's plan doesn't allow a feature, or null when it does. */
+export async function featureProblem(workspaceId: string, feature: keyof PlanFeatures) {
+  const owner = await workspaceOwnerId(workspaceId);
+  if (!owner) return null;
+  const plan = await getAccountPlan(owner);
+  if (plan.features[feature]) return null;
+  return `${FEATURE_NAMES[feature]} isn't part of the ${plan.plan.name} plan. Upgrade in Settings > Billing.`;
+}
+
+/** The largest file the workspace's plan lets it upload, in bytes (null: no plan limit). */
+export async function uploadLimitBytes(workspaceId: string) {
+  const owner = await workspaceOwnerId(workspaceId);
+  if (!owner) return null;
+  const mb = (await getAccountPlan(owner)).limits.uploadMb;
+  return mb === null ? null : mb * 1024 * 1024;
 }

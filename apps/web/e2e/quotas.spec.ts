@@ -102,3 +102,30 @@ test("a campaign over the plan's monthly emails is blocked, with a clear message
   await expect(page.getByLabel("Usage")).toContainText("2 of 2");
   await expect(page.getByLabel("Usage")).toContainText("3 of 500");
 });
+
+test("a plan's list limit stops a second list, saying why", async ({ page }) => {
+  const email = uniqueEmail("list-limit");
+  const slug = await signUpWithWorkspace(page, {
+    name: "List Limit",
+    email,
+    workspace: `List limit ${Date.now()}`,
+  });
+  await getSql()`
+    insert into subscriptions (user_id, plan_id, status, overrides)
+    select u.id, p.id, 'active', ${JSON.stringify({ limits: { lists: 1 } })}::text::jsonb
+    from users u, plans p where u.email = ${email} and p.key = 'free'`;
+
+  await page.goto(`/w/${slug}/lists`);
+  await page.getByRole("button", { name: "Create your first list" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("Buyers");
+  await dialog.getByRole("button", { name: "Create list" }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole("button", { name: "New list" }).click();
+  await dialog.getByLabel("Name").fill("Leads");
+  await dialog.getByRole("button", { name: "Create list" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Your Free plan allows 1 list, and you have 1.",
+  );
+});

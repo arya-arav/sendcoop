@@ -7,7 +7,7 @@ import {
   createSubscriber,
   getSql,
 } from "@sendcoop/db";
-import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+import { onPlan, signUpWithWorkspace, uniqueEmail } from "./helpers";
 import { waitForTrackedUrls } from "./tracked";
 
 test("a purchase stops the sales sequence", async ({ page, request }) => {
@@ -17,6 +17,7 @@ test("a purchase stops the sales sequence", async ({ page, request }) => {
     email: uniqueEmail("sales-sequence"),
     workspace: `Sales sequence ${Date.now()}`,
   });
+  await onPlan(slug, "growth"); // automations, A/B tests, AI, UTMCAP
   const [ws] = await getSql()<{ id: string }[]>`select id from workspaces where slug = ${slug}`;
   const workspaceId = ws!.id;
   const domain = await addSendingDomain(workspaceId, `mail.${slug}.test`);

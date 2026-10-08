@@ -1,7 +1,9 @@
 import {
   automationProblem,
+  featureProblem,
   getAutomation,
   getCampaign,
+  limitProblem,
   listCampaignLinks,
   queuedMessageBatches,
   segmentRulesProblem,
@@ -20,6 +22,10 @@ export async function activateAutomation(workspaceId: string, automationId: stri
   if (!automation) return { ok: false as const, error: "This automation doesn't exist anymore." };
   const problem = automationProblem(automation.trigger, automation.graph, { activating: true });
   if (problem) return { ok: false as const, error: problem };
+  const blocked =
+    (await featureProblem(workspaceId, "automations")) ??
+    (automation.status === "active" ? null : await limitProblem(workspaceId, "automations"));
+  if (blocked) return { ok: false as const, error: blocked };
 
   // Field conditions are checked like segments: fields, operators and values.
   const context = await segmentContext(workspaceId);

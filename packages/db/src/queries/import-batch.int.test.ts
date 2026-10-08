@@ -126,5 +126,5 @@ describe("importSubscriberBatch", () => {
       .from(subscribers)
       .where(inArray(subscribers.email, ["bulk0@example.com", "bulk4999@example.com"]));
     expect(sample).toHaveLength(2);
-  });
+  }, 30_000); // Bulk: CI runs it beside every other test file.
 });

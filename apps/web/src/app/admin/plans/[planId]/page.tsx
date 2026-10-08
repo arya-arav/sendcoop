@@ -10,7 +10,7 @@ export default async function PlanPage({ params }: { params: Promise<{ planId: s
   const plan = planId === "new" ? null : await getPlan(planId);
   if (planId !== "new" && !plan) notFound();
   return (
-    <div className="grid max-w-2xl gap-4">
+    <div className="grid gap-4">
       <h1 className="text-[22px] font-semibold">{plan ? plan.name : "New plan"}</h1>
       <PlanForm
         planId={plan?.id ?? null}
@@ -22,6 +22,8 @@ export default async function PlanPage({ params }: { params: Promise<{ planId: s
                 description: plan.description,
                 priceCents: plan.priceCents,
                 currency: plan.currency,
+                interval: plan.interval,
+                trialDays: plan.trialDays,
                 stripePriceId: plan.stripePriceId ?? "",
                 limits: plan.limits,
                 features: plan.features,

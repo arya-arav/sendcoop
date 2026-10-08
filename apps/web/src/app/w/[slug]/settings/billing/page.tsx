@@ -64,8 +64,15 @@ function UsageMeter({ label, used, limit }: { label: string; used: number; limit
   );
 }
 
-const price = (cents: number, currency: string) =>
-  cents === 0 ? "Free" : `${formatMoney(cents / 100, currency)} a month`;
+const price = (plan: {
+  priceCents: number;
+  currency: string;
+  interval: string;
+  trialDays: number;
+}) =>
+  plan.priceCents === 0
+    ? "Free"
+    : `${formatMoney(plan.priceCents / 100, plan.currency)} a ${plan.interval === "year" ? "year" : "month"}${plan.trialDays > 0 ? `, ${plan.trialDays}-day free trial` : ""}`;
 
 /** Back from Checkout: applies the new subscription now, rather than waiting for the webhook. */
 async function syncCheckout(sessionId: string, customerId: string | null) {
@@ -129,7 +136,7 @@ export default async function BillingPage({
             {current.status === "past_due" && <Badge variant="destructive">Payment failed</Badge>}
           </CardTitle>
           <CardDescription>
-            {price(current.plan.priceCents, current.plan.currency)}
+            {price(current.plan)}
             {current.currentPeriodEnd && paying
               ? current.cancelAtPeriodEnd
                 ? ` · ends ${day(current.currentPeriodEnd)}`
@@ -172,7 +179,7 @@ export default async function BillingPage({
             {plans.map((p) => (
               <TableHead key={p.id} className="text-center">
                 <span className="block font-semibold text-foreground">{p.name}</span>
-                <span className="block text-xs">{price(p.priceCents, p.currency)}</span>
+                <span className="block text-xs">{price(p)}</span>
                 <span className="mt-2 flex min-h-8 items-center justify-center">
                   {p.id === current.plan.id ? (
                     <Badge variant="secondary">Your plan</Badge>

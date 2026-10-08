@@ -12,6 +12,7 @@ import {
 import {
   ChevronLeft,
   ChevronRight,
+  FileDown,
   FileUp,
   ShieldBan,
   SlidersHorizontal,
@@ -139,6 +140,15 @@ export default async function ContactsPage({
             <Button variant="outline" render={<Link href={`/w/${slug}/contacts/import`} />}>
               <FileUp />
               Import
+            </Button>
+          )}
+          {editable && total > 0 && (
+            <Button
+              variant="outline"
+              render={<a href={`/api/w/${slug}/contacts/export`} download />}
+            >
+              <FileDown />
+              Export
             </Button>
           )}
           {editable && total > 0 && (

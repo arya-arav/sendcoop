@@ -6,6 +6,7 @@ import {
   type AutomationTrigger,
   createAutomationFrom,
   ensureAutomationEmail,
+  featureProblem,
   listSendingDomains,
   listSendingServers,
   setAutomationEmailContent,
@@ -25,6 +26,8 @@ async function allowed(slug: string) {
   if (!canManage(role)) return { error: "Only workspace owners and admins can use AI assist." };
   if (!aiAvailable())
     return { error: "AI assist isn't set up on this server (ANTHROPIC_API_KEY)." };
+  const blocked = await featureProblem(workspace.id, "aiAssist");
+  if (blocked) return { error: blocked };
   if (!(await withinRateLimit(`ai:${workspace.id}`, 60, 3600))) {
     return { error: "That's a lot of AI drafts for one hour. Try again a little later." };
   }

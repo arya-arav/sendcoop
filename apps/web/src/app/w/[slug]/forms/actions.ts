@@ -1,6 +1,13 @@
 "use server";
 
-import { createForm, deleteForm, listCustomFields, listLists, updateForm } from "@sendcoop/db";
+import {
+  createForm,
+  deleteForm,
+  limitProblem,
+  listCustomFields,
+  listLists,
+  updateForm,
+} from "@sendcoop/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
@@ -46,6 +53,10 @@ export async function saveFormAction(
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]!.message };
   if (formId && !z.uuid().safeParse(formId).success) {
     return { ok: false, error: "This form no longer exists." };
+  }
+  if (!formId) {
+    const overLimit = await limitProblem(workspace.id, "forms");
+    if (overLimit) return { ok: false, error: overLimit };
   }
 
   const [customFields, lists] = await Promise.all([
