@@ -7,6 +7,7 @@ export * from "./bot-detection";
 export * from "./custom-fields";
 export * from "./destination";
 export * from "./postback-params";
+export * from "./automation-templates";
 export * from "./automations";
 export * from "./conversion-api";
 export * from "./fx-rates";

@@ -1,4 +1,4 @@
-import { listAutomations } from "@sendcoop/db";
+import { AUTOMATION_TEMPLATES, listAutomations } from "@sendcoop/db";
 import { Workflow } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import {
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { NewAutomationButton } from "./new-automation-button";
+import { TemplateGallery } from "./template-gallery";
 
 export const metadata: Metadata = { title: "Automations" };
 
@@ -89,6 +90,18 @@ export default async function AutomationsPage({ params }: { params: Promise<{ sl
             ))}
           </TableBody>
         </Table>
+      )}
+      {editable && (
+        <TemplateGallery
+          slug={slug}
+          templates={AUTOMATION_TEMPLATES.map(({ id, name, description, audience, setup }) => ({
+            id,
+            name,
+            description,
+            audience,
+            setup,
+          }))}
+        />
       )}
     </div>
   );

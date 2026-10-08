@@ -1,15 +1,20 @@
 "use server";
 
 import {
+  AUTOMATION_TEMPLATES,
   type AutomationGraph,
   type AutomationTrigger,
   createAutomation,
+  createAutomationFrom,
   deleteAutomation,
   ensureAutomationEmail,
   listSendingDomains,
   listSendingServers,
   saveAutomation,
+  setAutomationEmailContent,
+  templateGraph,
 } from "@sendcoop/db";
+import { htmlToText } from "@sendcoop/mailer";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -108,4 +113,41 @@ export async function pauseAutomationAction(slug: string, automationId: string) 
   const result = await pauseAutomation(workspace.id, automationId);
   revalidatePath(`/w/${slug}/automations`, "layout");
   return result;
+}
+
+/** Installs a ready-made flow as a draft, its emails written (D69). */
+export async function installAutomationTemplateAction(slug: string, templateId: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) return { ok: false as const, error: NOT_ALLOWED };
+  const template = AUTOMATION_TEMPLATES.find((t) => t.id === templateId);
+  if (!template) return { ok: false as const, error: "That flow doesn't exist." };
+  const { graph, emails } = templateGraph(template);
+  const automation = await createAutomationFrom(workspace.id, {
+    name: template.name,
+    trigger: template.trigger,
+    graph,
+    exitOnConversion: template.exitOnConversion,
+  });
+  const [domains, servers] = await Promise.all([
+    listSendingDomains(workspace.id),
+    listSendingServers(workspace.id),
+  ]);
+  const domain = domains.find((d) => d.status === "verified") ?? domains[0] ?? null;
+  for (const [nodeId, email] of Object.entries(emails)) {
+    const campaignId = await ensureAutomationEmail(workspace.id, automation.id, nodeId, {
+      fromName: workspace.name,
+      fromLocal: "hello",
+      sendingDomainId: domain?.id ?? null,
+      sendingServerId: servers[0]?.id ?? null,
+    });
+    if (campaignId) {
+      await setAutomationEmailContent(workspace.id, campaignId, {
+        subject: email.subject,
+        html: email.html,
+        text: htmlToText(email.html),
+      });
+    }
+  }
+  revalidatePath(`/w/${slug}/automations`);
+  redirect(`/w/${slug}/automations/${automation.id}`);
 }

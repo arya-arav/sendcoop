@@ -297,3 +297,38 @@ export async function automationReport(
   }
   return { runs: runs!, revenue: Math.round(revenue * 100) / 100, conversions, steps };
 }
+
+/** A new draft automation with a given trigger and steps (ready-made flows, D69). */
+export async function createAutomationFrom(
+  workspaceId: string,
+  input: {
+    name: string;
+    trigger: AutomationTrigger;
+    graph: AutomationGraph;
+    exitOnConversion: boolean;
+  },
+) {
+  const [row] = await getDb()
+    .insert(automations)
+    .values({ workspaceId, ...input })
+    .returning();
+  return row!;
+}
+
+/** Sets an automation email's content (its campaign), e.g. from a ready-made flow. */
+export async function setAutomationEmailContent(
+  workspaceId: string,
+  campaignId: string,
+  content: { subject: string; html: string; text: string },
+) {
+  await getDb()
+    .update(campaigns)
+    .set({ ...content, editor: "html", updatedAt: new Date() })
+    .where(
+      and(
+        eq(campaigns.workspaceId, workspaceId),
+        eq(campaigns.id, campaignId),
+        eq(campaigns.kind, "automation"),
+      ),
+    );
+}
