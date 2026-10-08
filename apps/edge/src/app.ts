@@ -22,6 +22,7 @@ import {
   recordConversion,
   recordLead,
   recordUtmcapConversion,
+  storeUtmcapEvent,
   recordHoneypot,
   recordOpen,
   refundConversion,
@@ -32,7 +33,9 @@ import {
   webhookSigningSecret,
 } from "@sendcoop/db";
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
+import { enqueueUtmcapEvent } from "@sendcoop/queue";
 import { pingRedis } from "@sendcoop/redis";
+import { verifyUtmcapSignature } from "@sendcoop/utmcap";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { PIXEL_JS } from "./pixel";
@@ -368,6 +371,45 @@ app.on(["GET", "POST"], "/pb/utmcap", async (c) => {
     },
   });
   return c.text(`ok ${result}`);
+});
+
+/**
+ * UTMCAP's conversion webhooks (D59): signed with the endpoint's secret,
+ * kept once per event id (UTMCAP retries with the same id), answered at
+ * once (UTMCAP waits ten seconds at most) and applied by the worker.
+ */
+app.post("/wh/utmcap/:key", async (c) => {
+  const integration = await findIntegrationBySecret("utmcap", c.req.param("key"));
+  if (!integration) return c.text("unknown webhook url", 404);
+  const secret = webhookSigningSecret(integration.config);
+  const body = await c.req.text();
+  const verdict = secret
+    ? verifyUtmcapSignature(secret, body, c.req.header("utmcap-signature"))
+    : "invalid";
+  if (verdict !== "ok") return c.text(`signature ${verdict}`, 401);
+  let event: { id?: unknown; type?: unknown };
+  try {
+    event = JSON.parse(body);
+  } catch {
+    return c.text("invalid json", 400);
+  }
+  if (typeof event.id !== "string" || typeof event.type !== "string") {
+    return c.text("not an event", 400);
+  }
+  // Only conversions matter here; the rest (ping, broken links) is acknowledged.
+  if (!event.type.startsWith("conversion.")) return c.text("ok ignored");
+  const fresh = await storeUtmcapEvent(integration.workspaceId, {
+    id: event.id.slice(0, 100),
+    type: event.type,
+    payload: event as Record<string, unknown>,
+  });
+  if (fresh) {
+    await enqueueUtmcapEvent({
+      workspaceId: integration.workspaceId,
+      eventId: event.id.slice(0, 100),
+    });
+  }
+  return c.text(fresh ? "ok queued" : "ok duplicate");
 });
 
 /** The website pixel (see pixel.ts). */

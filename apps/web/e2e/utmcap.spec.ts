@@ -199,3 +199,40 @@ test("a conversion in UTMCAP comes back by postback and shows on the Sendcoop ca
   // The same postback again counts once
   expect(await (await request.get(postback!)).text()).toBe("ok duplicate");
 });
+
+test("a chargeback in UTMCAP removes the revenue in Sendcoop", async ({ page, request }) => {
+  test.setTimeout(90_000);
+  const slug = await connected(page, "utmcap-chargeback");
+  const offer = fake.addCampaign("Supplement trial");
+  const { campaignId, ucid } = await clickThrough(page, request, slug, offer.url, "Trial push");
+  const revenue = page
+    .getByRole("region", { name: "Results" })
+    .locator("[data-slot=card]")
+    .filter({ has: page.getByText("Revenue", { exact: true }) });
+
+  // Approved: the postback and the conversion.created webhook (counted once).
+  // Every workspace connected to this UTMCAP account gets the webhook; each
+  // takes only its own source's conversions.
+  const sale = await fake.convert(ucid, { conversionId: "TRIAL-9", payout: 120 });
+  expect(sale.webhooks.every((status) => status === 200)).toBe(true);
+  await page.goto(`/w/${slug}/campaigns/${campaignId}`);
+  await expect(revenue).toContainText("$120.00");
+
+  // Charged back in UTMCAP: conversion.updated, applied by the worker
+  const chargeback = await fake.convert(ucid, {
+    conversionId: "TRIAL-9",
+    payout: 120,
+    status: "chargeback",
+  });
+  expect(chargeback.postback).toBeNull();
+  expect(chargeback.webhooks.every((status) => status === 200)).toBe(true);
+  await expect
+    .poll(
+      async () => {
+        await page.reload();
+        return revenue.textContent();
+      },
+      { timeout: 15_000 },
+    )
+    .toContain("$0.00");
+});

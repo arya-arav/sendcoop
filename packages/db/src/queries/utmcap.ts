@@ -126,3 +126,39 @@ export async function recordUtmcapConversion(
   });
   return { result: created.result, id: created.id };
 }
+
+/** Keeps a webhook event; false when it was already received (a retry: same event id). */
+export async function storeUtmcapEvent(
+  workspaceId: string,
+  event: { id: string; type: string; payload: Record<string, unknown> },
+) {
+  const inserted = await getDb().execute<{ event_id: string }>(sql`
+    insert into utmcap_events (workspace_id, event_id, type, payload)
+    values (${workspaceId}, ${event.id}, ${event.type}, ${JSON.stringify(event.payload)}::jsonb)
+    on conflict do nothing
+    returning event_id`);
+  return inserted.length > 0;
+}
+
+export async function getUtmcapEvent(workspaceId: string, eventId: string) {
+  const [row] = await getDb().execute<{
+    type: string;
+    payload: Record<string, unknown>;
+    processed_at: string | null;
+  }>(sql`
+    select type, payload, processed_at from utmcap_events
+    where workspace_id = ${workspaceId} and event_id = ${eventId}`);
+  return row ?? null;
+}
+
+export async function finishUtmcapEvent(
+  workspaceId: string,
+  eventId: string,
+  error: string | null,
+) {
+  await getDb().execute(sql`
+    update utmcap_events
+    set processed_at = case when ${error}::text is null then now() else processed_at end,
+        error = ${error}
+    where workspace_id = ${workspaceId} and event_id = ${eventId}`);
+}

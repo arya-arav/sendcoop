@@ -18,6 +18,7 @@
     "@sendcoop/queue": "workspace:*",
     "@sendcoop/redis": "workspace:*",
     "@sendcoop/storage": "workspace:*",
+    "@sendcoop/utmcap": "workspace:*",
     "bullmq": "^6.3.11",
     "csv-parse": "^7.0.3",
     "drizzle-orm": "^0.45.3",

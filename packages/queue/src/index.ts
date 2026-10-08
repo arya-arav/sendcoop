@@ -11,6 +11,8 @@ export const QUEUES = {
   campaigns: "campaign-prepare",
   /** One job per batch of up to 100 messages. */
   sends: "campaign-sends",
+  /** UTMCAP webhook events, applied after the edge has answered UTMCAP. */
+  utmcapEvents: "utmcap-events",
 } as const;
 
 /** Recurring jobs on the maintenance queue, by name. */
@@ -27,6 +29,7 @@ export const MAINTENANCE_JOBS = {
 export type ImportJob = { importId: string; workspaceId: string };
 export type CampaignJob = { campaignId: string; workspaceId: string };
 export type SendBatchJob = { campaignId: string; workspaceId: string; messageIds: string[] };
+export type UtmcapEventJob = { workspaceId: string; eventId: string };
 
 /** A fresh connection: BullMQ workers need their own (blocking commands). */
 export function queueConnection(): ConnectionOptions {
@@ -61,6 +64,19 @@ export async function enqueueImport(job: ImportJob) {
   await queue<ImportJob>(QUEUES.imports).add("import", job, {
     jobId: job.importId,
     attempts: 1,
+    ...keep,
+  });
+}
+
+/**
+ * Queues a UTMCAP webhook event (job id = event id: once). Retried with
+ * backoff, since it may need UTMCAP's API, which can be busy.
+ */
+export async function enqueueUtmcapEvent(job: UtmcapEventJob) {
+  await queue<UtmcapEventJob>(QUEUES.utmcapEvents).add("apply", job, {
+    jobId: `${job.workspaceId}_${job.eventId}`,
+    attempts: 6,
+    backoff: { type: "exponential", delay: 30_000 },
     ...keep,
   });
 }

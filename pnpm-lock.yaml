@@ -41,9 +41,18 @@ importers:
       '@sendcoop/mailer':
         specifier: workspace:*
         version: link:../../packages/mailer
+      '@sendcoop/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       '@sendcoop/redis':
         specifier: workspace:*
         version: link:../../packages/redis
+      '@sendcoop/utmcap':
+        specifier: workspace:*
+        version: link:../../packages/utmcap
+      bullmq:
+        specifier: ^6.3.11
+        version: 6.3.11(ioredis@6.0.0)
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(kysely@0.29.6)(postgres@3.4.9)
@@ -214,6 +223,9 @@ importers:
       '@sendcoop/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@sendcoop/utmcap':
+        specifier: workspace:*
+        version: link:../../packages/utmcap
       bullmq:
         specifier: ^6.3.11
         version: 6.3.11(ioredis@6.0.0)

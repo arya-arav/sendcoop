@@ -13,12 +13,14 @@ import {
   queueConnection,
   scheduleMaintenanceJobs,
   type SendBatchJob,
+  type UtmcapEventJob,
 } from "@sendcoop/queue";
 import { pingRedis } from "@sendcoop/redis";
 import { Worker } from "bullmq";
 import { createServer } from "node:http";
 import { refreshFxRates } from "./jobs/fx-rates";
 import { processImport } from "./jobs/import-subscribers";
+import { applyUtmcapEvent } from "./jobs/utmcap-events";
 import {
   decideAbTests,
   prepareCampaign,
@@ -56,6 +58,11 @@ const workers = [
   new Worker<SendBatchJob>(QUEUES.sends, processSendBatch, {
     connection: queueConnection(),
     concurrency: Number(process.env.SEND_CONCURRENCY ?? 5),
+  }),
+  // UTMCAP conversion webhooks, kept by the edge.
+  new Worker<UtmcapEventJob>(QUEUES.utmcapEvents, (job) => applyUtmcapEvent(job.data), {
+    connection: queueConnection(),
+    concurrency: 4,
   }),
   // Recurring housekeeping, registered by scheduleMaintenanceJobs below.
   new Worker(
