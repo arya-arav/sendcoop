@@ -4,11 +4,13 @@ import {
   getCampaign,
   listCampaignLinks,
   queuedMessageBatches,
+  segmentRulesProblem,
   setAutomationStatus,
   storeCampaignLinks,
 } from "@sendcoop/db";
 import { extractLinks } from "@sendcoop/mailer";
 import { enqueueSendBatches } from "@sendcoop/queue";
+import { segmentContext } from "@/lib/segment-context";
 
 // Going live and pausing (D63). Not a "use server" file: it trusts the
 // workspace id it's given.
@@ -18,6 +20,14 @@ export async function activateAutomation(workspaceId: string, automationId: stri
   if (!automation) return { ok: false as const, error: "This automation doesn't exist anymore." };
   const problem = automationProblem(automation.trigger, automation.graph, { activating: true });
   if (problem) return { ok: false as const, error: problem };
+
+  // Field conditions are checked like segments: fields, operators and values.
+  const context = await segmentContext(workspaceId);
+  for (const node of automation.graph.nodes) {
+    if (node.type !== "condition" || node.data.kind !== "rules") continue;
+    const issue = segmentRulesProblem(node.data.rules, context);
+    if (issue) return { ok: false as const, error: `A condition: ${issue}` };
+  }
 
   const emails = automation.graph.nodes.flatMap((n) => (n.type === "email" ? [n] : []));
   for (const node of emails) {

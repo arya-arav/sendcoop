@@ -11,6 +11,7 @@ import {
   type NodeType,
   type WaitStep,
 } from "@sendcoop/db/automations";
+import { operatorsFor, type SegmentFieldInfo } from "@sendcoop/db/segments";
 import {
   addEdge,
   applyEdgeChanges,
@@ -63,6 +64,8 @@ export type BuilderContext = {
   campaigns: Option[];
   /** Custom fields: date ones for date triggers, all for "update field". */
   fields: { key: string; label: string; type: string }[];
+  /** What a field condition can test: built-ins, conversion fields, custom fields. */
+  conditionFields: SegmentFieldInfo[];
 };
 
 /** Node data on the canvas: the step's own data, plus its summary line. */
@@ -123,6 +126,12 @@ function describe(node: AutomationNode, nodes: AutomationNode[], c: BuilderConte
         return d.event === "converted"
           ? "Converted since it began?"
           : `${d.event === "opened" ? "Opened" : "Clicked"} ${what}?`;
+      }
+      const rule = d.rules.conditions[0];
+      if (rule?.type === "field") {
+        const field = c.conditionFields.find((f) => f.key === rule.field);
+        const op = field ? operatorsFor(field).find((o) => o.value === rule.op) : null;
+        return `${field?.label ?? rule.field} ${op?.label ?? rule.op}${op?.needsValue ? ` ${rule.value ?? ""}` : ""}?`;
       }
       return "Matches the rules?";
     }
@@ -950,7 +959,23 @@ function ConditionForm({
           onChange={(e) => {
             const v = e.target.value;
             if (v === "segment") onChange({ kind: "segment", segmentId: "" });
-            else
+            else if (v === "rules") {
+              const field = context.conditionFields[0]!;
+              onChange({
+                kind: "rules",
+                rules: {
+                  match: "all",
+                  conditions: [
+                    {
+                      type: "field",
+                      field: field.key,
+                      op: operatorsFor(field)[0]!.value,
+                      value: "",
+                    },
+                  ],
+                },
+              });
+            } else
               onChange({
                 kind: "activity",
                 event: v as "opened" | "clicked" | "converted",
@@ -962,6 +987,7 @@ function ConditionForm({
           <option value="clicked">Clicked in an email</option>
           <option value="converted">Bought or converted</option>
           <option value="segment">Is in a segment</option>
+          <option value="rules">A field&apos;s value</option>
         </NativeSelect>
       </Field>
       {step.kind === "activity" && step.event !== "converted" && (
@@ -985,6 +1011,15 @@ function ConditionForm({
             onChange={(segmentId) => onChange({ kind: "segment", segmentId })}
           />
         </Field>
+      )}
+      {step.kind === "rules" && step.rules.conditions[0]?.type === "field" && (
+        <FieldRule
+          rule={step.rules.conditions[0]}
+          fields={context.conditionFields}
+          onChange={(rule) =>
+            onChange({ kind: "rules", rules: { match: "all", conditions: [rule] } })
+          }
+        />
       )}
       <p className="text-xs text-muted-foreground">Yes and No each lead to their own step.</p>
     </>
@@ -1108,6 +1143,90 @@ function ActionForm({
           />
         </Field>
       )}
+    </>
+  );
+}
+
+type FieldCondition = { type: "field"; field: string; op: string; value?: string };
+
+/** One field test, as in segments: the field, how to compare, and the value. */
+function FieldRule({
+  rule,
+  fields,
+  onChange,
+}: {
+  rule: FieldCondition;
+  fields: SegmentFieldInfo[];
+  onChange: (rule: FieldCondition) => void;
+}) {
+  const field = fields.find((f) => f.key === rule.field) ?? fields[0]!;
+  const operators = operatorsFor(field);
+  const op = operators.find((o) => o.value === rule.op) ?? operators[0]!;
+  const days = op.value === "in_last_days" || op.value === "more_than_days_ago";
+  return (
+    <>
+      <Field label="Field">
+        <NativeSelect
+          id="condition-field"
+          value={field.key}
+          onChange={(e) => {
+            const next = fields.find((f) => f.key === e.target.value)!;
+            onChange({
+              type: "field",
+              field: next.key,
+              op: operatorsFor(next)[0]!.value,
+              value: next.kind === "enum" ? (next.options?.[0]?.value ?? "") : "",
+            });
+          }}
+        >
+          {fields.map((f) => (
+            <option key={f.key} value={f.key}>
+              {f.label}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="Comparison">
+        <NativeSelect
+          id="condition-op"
+          value={op.value}
+          onChange={(e) => onChange({ ...rule, op: e.target.value })}
+        >
+          {operators.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+      {op.needsValue &&
+        (field.kind === "enum" ? (
+          <Field label="Value">
+            <NativeSelect
+              id="condition-value"
+              value={rule.value ?? ""}
+              onChange={(e) => onChange({ ...rule, value: e.target.value })}
+            >
+              {field.options?.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        ) : (
+          <Field label={days ? "Days" : "Value"}>
+            <Input
+              id="condition-value"
+              type={
+                days || field.kind === "number" ? "number" : field.kind === "date" ? "date" : "text"
+              }
+              step={field.kind === "number" ? "any" : undefined}
+              value={rule.value ?? ""}
+              onChange={(e) => onChange({ ...rule, value: e.target.value })}
+            />
+          </Field>
+        ))}
     </>
   );
 }

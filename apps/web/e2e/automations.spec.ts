@@ -95,3 +95,34 @@ test("an automation is built from a trigger, email, wait and condition, saved an
     page.getByRole("table", { name: "Automations" }).getByRole("row", { name: /Welcome series/ }),
   ).toContainText("Draft");
 });
+
+test("a condition on a field's value is set, saved and reloaded", async ({ page }) => {
+  const slug = await signUpWithWorkspace(page, {
+    name: "Condition Setter",
+    email: uniqueEmail("automation-condition"),
+    workspace: `Conditions ${Date.now()}`,
+  });
+  await page.goto(`/w/${slug}/automations`);
+  await page.getByRole("button", { name: "New automation" }).click();
+  await expect(page).toHaveURL(/\/automations\/[0-9a-f-]{36}$/);
+  const steps = page.getByRole("navigation", { name: "Steps" });
+  const panel = page.getByRole("region", { name: "Selected step" });
+
+  await steps.getByRole("button", { name: /^Email 1:/ }).click();
+  await page.getByRole("button", { name: "Add condition step" }).click();
+  await panel.getByLabel("Check").selectOption("rules");
+  await panel.getByLabel("Field").selectOption({ label: "Lifetime value" });
+  await panel.getByLabel("Comparison").selectOption("gt");
+  await panel.getByLabel("Value").fill("100");
+  await expect(steps.getByRole("button", { name: /^Condition:/ })).toHaveText(
+    "Condition: Lifetime value > 100?",
+  );
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved.");
+
+  await page.reload();
+  await steps.getByRole("button", { name: /^Condition:/ }).click();
+  await expect(panel.getByLabel("Check")).toHaveValue("rules");
+  await expect(panel.getByLabel("Field")).toHaveValue("lifetime_value");
+  await expect(panel.getByLabel("Value")).toHaveValue("100");
+});

@@ -5,6 +5,7 @@ import {
   listLists,
   listSegments,
   listTags,
+  segmentFields,
 } from "@sendcoop/db";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -49,6 +50,7 @@ export default async function AutomationPage({
         segments: options(segments),
         campaigns: options(campaigns.filter((c) => c.status !== "draft")),
         fields: fields.map((f) => ({ key: f.key, label: f.label, type: f.type })),
+        conditionFields: segmentFields(fields),
       }}
     />
   );
