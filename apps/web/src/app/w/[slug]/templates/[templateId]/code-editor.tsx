@@ -78,6 +78,15 @@ export function CodeEditor({
     );
   }
 
+  /** Text at the cursor (an AI draft). */
+  function insertText(insert: string) {
+    const view = viewRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection.main;
+    view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length } });
+    view.focus();
+  }
+
   /** At the cursor: a link in HTML, the bare address in plain text. */
   function insertLink(url: string, text: string) {
     const view = viewRef.current;
@@ -95,7 +104,15 @@ export function CodeEditor({
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3">
-      <EditorHeader target={target} state={state} onSave={save} onInsertLink={insertLink} />
+      <EditorHeader
+        target={target}
+        state={state}
+        onSave={save}
+        onInsertLink={insertLink}
+        onInsertDraft={(draft) => insertText(mode === "html" ? draft.html : draft.text)}
+        getContent={() => viewRef.current?.state.doc.toString() ?? ""}
+        draftFormat={mode}
+      />
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
         <div
           ref={host}

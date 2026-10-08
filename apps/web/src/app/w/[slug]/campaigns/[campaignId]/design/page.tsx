@@ -2,6 +2,7 @@ import { getCampaign, getUtmcapConnection, listMedia } from "@sendcoop/db";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
+import { aiAvailable } from "@/lib/ai";
 import { appUrl } from "@/lib/app-url";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
@@ -34,6 +35,7 @@ export default async function CampaignDesignPage({
     backHref: automation ?? contentStep,
     backLabel: automation ? "Back to the automation" : "Back to the campaign",
     utmcapSlug: (await getUtmcapConnection(workspace.id)) ? slug : undefined,
+    aiSlug: aiAvailable() ? slug : undefined,
   };
 
   if (campaign.editor !== "visual") {

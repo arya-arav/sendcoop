@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { FormError } from "@/components/form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { type AiDraft, AiWriteButton, SubjectSuggestions } from "./ai-assist";
 import { UtmcapLinkButton } from "./utmcap-link-button";
 import { Label } from "@/components/ui/label";
 
@@ -34,6 +35,8 @@ export type EditorTarget = {
   actions?: React.ReactNode;
   /** Set when the workspace has UTMCAP connected: offers "Insert UTMCAP link". */
   utmcapSlug?: string;
+  /** Set when AI assist is available: offers "Write with AI" and subject suggestions. */
+  aiSlug?: string;
 };
 
 export function useContentSave(target: EditorTarget) {
@@ -99,12 +102,20 @@ export function EditorHeader({
   state,
   onSave,
   onInsertLink,
+  onInsertDraft,
+  getContent,
+  draftFormat = "html",
 }: {
   target: EditorTarget;
   state: ReturnType<typeof useContentSave>;
   onSave: () => void;
   /** Puts a link where the user is editing. */
   onInsertLink?: (url: string, text: string) => void;
+  /** Puts an AI draft where the user is editing. */
+  onInsertDraft?: (draft: AiDraft) => void;
+  /** The email as written now, for subject suggestions. */
+  getContent?: () => string;
+  draftFormat?: "html" | "text";
 }) {
   const { name, setName, subject, setSubject, status, error, warnings, markUnsaved } = state;
   return (
@@ -133,6 +144,21 @@ export function EditorHeader({
           {STATUS_TEXT[status]}
         </p>
         <div className="ml-auto flex items-center gap-2">
+          {target.aiSlug && onInsertDraft && (
+            <AiWriteButton
+              slug={target.aiSlug}
+              format={draftFormat}
+              onInsert={onInsertDraft}
+              onUseSubject={
+                target.meta
+                  ? (subject) => {
+                      setSubject(subject);
+                      markUnsaved();
+                    }
+                  : undefined
+              }
+            />
+          )}
           {target.utmcapSlug && onInsertLink && (
             <UtmcapLinkButton slug={target.utmcapSlug} onInsert={onInsertLink} />
           )}
@@ -168,6 +194,16 @@ export function EditorHeader({
             }}
           />
         </div>
+      )}
+      {target.meta && target.aiSlug && getContent && (
+        <SubjectSuggestions
+          slug={target.aiSlug}
+          getContent={getContent}
+          onPick={(subject) => {
+            setSubject(subject);
+            markUnsaved();
+          }}
+        />
       )}
       <FormError message={error} />
       {warnings.length > 0 && (

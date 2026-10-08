@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { aiAvailable } from "@/lib/ai";
+import { AiFlowForm } from "./ai-flow-form";
 import { NewAutomationButton } from "./new-automation-button";
 import { TemplateGallery } from "./template-gallery";
 
@@ -91,6 +93,7 @@ export default async function AutomationsPage({ params }: { params: Promise<{ sl
           </TableBody>
         </Table>
       )}
+      {editable && aiAvailable() && <AiFlowForm slug={slug} />}
       {editable && (
         <TemplateGallery
           slug={slug}
