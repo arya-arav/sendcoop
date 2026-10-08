@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { workspaces } from "./auth";
 import { createdAt, id, updatedAt } from "./columns";
 import { subscribers } from "./contacts";
@@ -48,6 +49,9 @@ export const EMPTY_AUDIENCE: CampaignAudience = {
   excludeSegments: [],
 };
 
+/** broadcast: sent once to an audience. automation: an automation's email step (D61). */
+export const campaignKind = pgEnum("campaign_kind", ["broadcast", "automation"]);
+
 export const campaignStatus = pgEnum("campaign_status", [
   "draft",
   "scheduled", // waits for scheduledAt
@@ -68,6 +72,9 @@ export const campaigns = pgTable(
     workspaceId: uuid()
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    kind: campaignKind().notNull().default("broadcast"),
+    /** For automation emails: the automation (its graph names this campaign). */
+    automationId: uuid(),
     name: text().notNull(),
     subject: text().notNull(),
     fromName: text().notNull(),
@@ -135,6 +142,8 @@ export const messages = pgTable(
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
     subscriberId: uuid().references(() => subscribers.id, { onDelete: "set null" }),
+    /** Automation emails: the run that sent it (a subscriber can go through a flow again). */
+    automationRunId: uuid(),
     /** Copied at queue time, so the record survives the subscriber being deleted. */
     email: text().notNull(),
     status: messageStatus().notNull().default("queued"),
@@ -162,7 +171,13 @@ export const messages = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex("messages_campaign_subscriber_unique").on(t.campaignId, t.subscriberId),
+    // A broadcast reaches each subscriber once; an automation email, once per run.
+    uniqueIndex("messages_campaign_subscriber_unique")
+      .on(t.campaignId, t.subscriberId)
+      .where(sql`${t.automationRunId} is null`),
+    uniqueIndex("messages_run_campaign_unique")
+      .on(t.automationRunId, t.campaignId)
+      .where(sql`${t.automationRunId} is not null`),
     index().on(t.campaignId, t.status),
     index().on(t.subscriberId),
     // Provider feedback (bounces, complaints) names messages by their id.

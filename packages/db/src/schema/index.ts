@@ -9,3 +9,4 @@ export * from "./templates";
 export * from "./media";
 export * from "./tracking";
 export * from "./conversions";
+export * from "./automations";

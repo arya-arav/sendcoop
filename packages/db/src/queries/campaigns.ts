@@ -117,20 +117,23 @@ export async function createDraftCampaign(workspaceId: string, fromName: string)
 
 /** For the campaigns list: no content. */
 export async function listCampaigns(workspaceId: string) {
-  return getDb()
-    .select({
-      id: campaigns.id,
-      name: campaigns.name,
-      status: campaigns.status,
-      recipientCount: campaigns.recipientCount,
-      sentCount: campaigns.sentCount,
-      createdAt: campaigns.createdAt,
-      startedAt: campaigns.startedAt,
-      scheduledAt: campaigns.scheduledAt,
-    })
-    .from(campaigns)
-    .where(eq(campaigns.workspaceId, workspaceId))
-    .orderBy(desc(campaigns.createdAt));
+  return (
+    getDb()
+      .select({
+        id: campaigns.id,
+        name: campaigns.name,
+        status: campaigns.status,
+        recipientCount: campaigns.recipientCount,
+        sentCount: campaigns.sentCount,
+        createdAt: campaigns.createdAt,
+        startedAt: campaigns.startedAt,
+        scheduledAt: campaigns.scheduledAt,
+      })
+      .from(campaigns)
+      // Automation emails live in their automation, not in the campaign list.
+      .where(and(eq(campaigns.workspaceId, workspaceId), eq(campaigns.kind, "broadcast")))
+      .orderBy(desc(campaigns.createdAt))
+  );
 }
 
 /** Changes a draft. False if the campaign doesn't exist or is no longer a draft. */
@@ -234,7 +237,7 @@ export async function prepareCampaignMessages(campaign: Campaign): Promise<numbe
     select ${campaign.workspaceId}, ${campaign.id}, ${subscribers.id}, ${subscribers.email}, ${sendAfter}
     from ${subscribers}
     where ${audience}
-    on conflict (campaign_id, subscriber_id) do nothing`);
+    on conflict (campaign_id, subscriber_id) where automation_run_id is null do nothing`);
 
   const [counted] = await db
     .select({ n: count() })

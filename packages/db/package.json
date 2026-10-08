@@ -9,7 +9,8 @@
     "./imports": "./src/imports.ts",
     "./segments": "./src/segments.ts",
     "./affiliate-networks": "./src/affiliate-networks.ts",
-    "./postback-templates": "./src/postback-templates.ts"
+    "./postback-templates": "./src/postback-templates.ts",
+    "./automations": "./src/automations.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
