@@ -59,8 +59,15 @@ export const subscriptions = pgTable("subscriptions", {
   currentPeriodEnd: timestamp({ withTimezone: true }),
   /** Canceled, but paid up until currentPeriodEnd. */
   cancelAtPeriodEnd: boolean().notNull().default(false),
-  /** Set by a super-admin (D75): limits and features that beat the plan's. */
-  overrides: jsonb().$type<{ limits?: Partial<PlanLimits>; features?: Partial<PlanFeatures> }>(),
+  /**
+   * Set by a super-admin (D75): limits and features that beat the plan's, and
+   * trusted (D76): no new-account warm-up.
+   */
+  overrides: jsonb().$type<{
+    limits?: Partial<PlanLimits>;
+    features?: Partial<PlanFeatures>;
+    trusted?: boolean;
+  }>(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

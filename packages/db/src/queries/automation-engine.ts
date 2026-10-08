@@ -9,7 +9,7 @@ import {
 import { getDb } from "../client";
 import { automationRuns, automations, subscribers } from "../schema";
 import type { SegmentRules } from "../segments";
-import { workspaceQuota } from "./quotas";
+import { sendQuotaProblem, workspaceQuota } from "./quotas";
 import { getSegment } from "./segments";
 import { subscriberConditions } from "./subscribers";
 
@@ -174,10 +174,11 @@ export async function advanceAutomationRun(runId: string, now = new Date()): Pro
 
       case "email": {
         const next = nextNodeId(graph, node.id);
-        // Out of emails this month: the step is skipped and the run goes on (D73).
+        // Out of emails (this month's, or a new account's today), or suspended:
+        // the step is skipped and the run goes on (D73, D76).
         if (
           !(await stepLog(run.id, node.id)) &&
-          (await workspaceQuota(run.workspace_id)).room.sendsPerMonth < 1
+          sendQuotaProblem(await workspaceQuota(run.workspace_id), 1) !== null
         ) {
           await logStep(run, node, "skipped", {
             reason: "Your plan's emails for this month ran out.",

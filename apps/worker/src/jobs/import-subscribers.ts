@@ -1,6 +1,7 @@
 import {
   claimImport,
   finishImport,
+  getSql,
   type ImportCounters,
   type ImportRow,
   importSubscriberBatch,
@@ -17,6 +18,9 @@ import { parse } from "csv-parse";
 import { PassThrough, Transform } from "node:stream";
 
 export const IMPORT_BATCH_SIZE = 1000;
+
+/** New subscribers after which an import refreshes the table statistics. */
+const ANALYZE_AFTER = 10_000;
 
 /**
  * Imports one uploaded CSV. Streams the file (so memory stays flat whatever
@@ -125,6 +129,12 @@ export async function processImport(
       `[worker] import ${importId}: ${counters.processedRows} rows in ${seconds.toFixed(1)}s ` +
         `(${Math.round(counters.processedRows / seconds)}/s), peak memory ${Math.round(peakRss / 1024 / 1024)} MB (heap ${Math.round(peakHeap / 1024 / 1024)} MB)`,
     );
+    // A big import can leave the planner's statistics far behind (it would
+    // still think the list is empty, and count audiences very slowly).
+    if (counters.createdCount >= ANALYZE_AFTER) {
+      await getSql()`analyze subscribers`;
+      await getSql()`analyze list_memberships`;
+    }
     await finishImport(importId, {
       ...counters,
       status: "completed",

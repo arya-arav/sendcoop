@@ -1,6 +1,8 @@
 import {
+  enforceAccountHealth,
   getSql,
   pingDatabase,
+  recentlySendingAccounts,
   type ServiceName,
   systemTxtLookup,
   verifyDueDomains,
@@ -112,6 +114,12 @@ const workers = [
           console.log(
             `[${service}] FX rates for ${result.day}: ${result.stored} currencies, ${result.converted} conversions converted`,
           );
+        }
+      }
+      if (job.name === MAINTENANCE_JOBS.accountHealth.name) {
+        for (const userId of await recentlySendingAccounts()) {
+          const reason = await enforceAccountHealth(userId);
+          if (reason) console.log(`[${service}] account ${userId} suspended: ${reason}`);
         }
       }
       if (job.name === MAINTENANCE_JOBS.verifyDomains.name) {

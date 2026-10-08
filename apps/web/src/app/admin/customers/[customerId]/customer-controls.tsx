@@ -49,6 +49,7 @@ export function CustomerControls({
   planId,
   plans,
   overrides,
+  trusted: initiallyTrusted,
   banned,
   isAdmin,
 }: {
@@ -56,12 +57,14 @@ export function CustomerControls({
   planId: string | null;
   plans: { id: string; name: string; archived: boolean }[];
   overrides: Record<string, string>;
+  trusted: boolean;
   banned: boolean;
   isAdmin: boolean;
 }) {
   const [plan, setPlan] = useState(planId ?? "");
   const [limits, setLimits] = useState<Record<string, string>>(overrides);
   const [reason, setReason] = useState("");
+  const [trusted, setTrusted] = useState(initiallyTrusted);
   const planAction = useAction();
   const overrideAction = useAction();
   const accessAction = useAction();
@@ -111,7 +114,9 @@ export function CustomerControls({
             className="grid gap-3"
             onSubmit={(e) => {
               e.preventDefault();
-              overrideAction.run(() => saveOverridesAction(customerId, limits));
+              overrideAction.run(() =>
+                saveOverridesAction(customerId, { ...limits, trusted: String(trusted) }),
+              );
             }}
           >
             <div className="grid gap-3 sm:grid-cols-2">
@@ -127,6 +132,15 @@ export function CustomerControls({
                 </div>
               ))}
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={trusted}
+                onChange={(e) => setTrusted(e.target.checked)}
+              />
+              Trusted: no new-account warm-up
+            </label>
             <Button
               type="submit"
               variant="outline"

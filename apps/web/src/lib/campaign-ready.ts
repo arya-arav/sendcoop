@@ -1,6 +1,8 @@
 import {
+  audienceQuality,
   type Campaign,
   countAudience,
+  LIST_QUALITY,
   listSendingDomains,
   listSendingServers,
   sendQuotaProblem,
@@ -14,12 +16,22 @@ import {
 export type ReadinessItem = { id: string; label: string; ok: boolean; fix: string; step: string };
 
 export async function campaignReadiness(workspaceId: string, campaign: Campaign) {
-  const [recipients, domains, servers, quota] = await Promise.all([
+  const [recipients, domains, servers, quota, quality] = await Promise.all([
     countAudience(workspaceId, campaign.audience),
     listSendingDomains(workspaceId),
     listSendingServers(workspaceId),
     workspaceQuota(workspaceId),
+    audienceQuality(workspaceId, campaign.audience),
   ]);
+  // Lists full of shared and throwaway addresses were bought or scraped (D76).
+  const riskyShare =
+    quality.total >= LIST_QUALITY.minRecipients
+      ? (quality.role + quality.disposable) / quality.total
+      : 0;
+  const qualityProblem =
+    riskyShare >= LIST_QUALITY.maxRiskyShare
+      ? `${Math.round(riskyShare * 100)}% of recipients are shared or throwaway addresses (${quality.role.toLocaleString("en")} like info@ or sales@, ${quality.disposable.toLocaleString("en")} disposable). Lists like this are usually bought or scraped, and they complain and bounce. Remove them from the audience to send.`
+      : null;
   const overSubscribers =
     !quota.suspended &&
     quota.limits.subscribers !== null &&
@@ -57,6 +69,13 @@ export async function campaignReadiness(workspaceId: string, campaign: Campaign)
         servers.some((s) => s.id === campaign.sendingServerId),
       fix: "Choose a sending domain and server.",
       step: "content",
+    },
+    {
+      id: "quality",
+      label: "List quality",
+      ok: qualityProblem === null,
+      fix: qualityProblem ?? "",
+      step: "recipients",
     },
     {
       id: "quota",

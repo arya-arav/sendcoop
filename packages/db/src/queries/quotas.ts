@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "../client";
 import type { PlanLimits } from "../plans";
+import { WARMUP_STEPS, warmupLimit } from "../abuse";
 import { getAccountPlan, workspaceOwnerId } from "./billing";
 
 // Quotas (D73): what an account has used of its plan's limits, across every
@@ -45,6 +46,8 @@ export type Quota = {
   usage: Usage;
   /** How many more of each the account may have; Infinity when unlimited. */
   room: Record<keyof Usage, number>;
+  /** A new account's daily cap (D76), until it's two weeks old or trusted. */
+  warmup: { perDay: number; sentToday: number; room: number; risesAt: Date } | null;
 };
 
 const room = (limit: number | null, used: number) =>
@@ -54,9 +57,19 @@ export async function accountQuota(userId: string): Promise<Quota> {
   const [plan, usage, [owner]] = await Promise.all([
     getAccountPlan(userId),
     accountUsage(userId),
-    getDb().execute<{ banned: boolean }>(sql`select banned from users where id = ${userId}`),
+    getDb().execute<{ banned: boolean; created_at: Date; trusted: boolean | null }>(sql`
+      select u.banned, u.created_at, (s.overrides ->> 'trusted')::boolean as trusted
+      from users u left join subscriptions s on s.user_id = u.id
+      where u.id = ${userId}`),
   ]);
   const suspended = Boolean(owner?.banned);
+  const step = owner && !owner.trusted ? warmupLimit(new Date(owner.created_at)) : null;
+  const warmup = step
+    ? await (async () => {
+        const sentToday = await sendsInLastDay(userId);
+        return { ...step, sentToday, room: Math.max(0, step.perDay - sentToday) };
+      })()
+    : null;
   if (suspended) {
     return {
       ownerId: userId,
@@ -65,6 +78,7 @@ export async function accountQuota(userId: string): Promise<Quota> {
       limits: plan.limits,
       usage,
       room: { subscribers: 0, sendsPerMonth: 0, workspaces: 0 },
+      warmup,
     };
   }
   return {
@@ -78,7 +92,18 @@ export async function accountQuota(userId: string): Promise<Quota> {
       sendsPerMonth: room(plan.limits.sendsPerMonth, usage.sendsPerMonth),
       workspaces: room(plan.limits.workspaces, usage.workspaces),
     },
+    warmup,
   };
+}
+
+/** Emails queued in the last 24 hours, for the warm-up's daily cap. */
+async function sendsInLastDay(userId: string) {
+  const [row] = await getDb().execute<{ n: number }>(sql`
+    select count(*)::int as n from messages
+    where workspace_id in (${ownedWorkspaces(userId)})
+      and created_at >= now() - interval '1 day'
+      and status in ('queued', 'sent', 'held')`);
+  return row?.n ?? 0;
 }
 
 const UNLIMITED: PlanLimits = {
@@ -98,6 +123,7 @@ export async function workspaceQuota(workspaceId: string): Promise<Quota> {
     limits: UNLIMITED,
     usage: { subscribers: 0, sendsPerMonth: 0, workspaces: 0 },
     room: { subscribers: Infinity, sendsPerMonth: Infinity, workspaces: Infinity },
+    warmup: null,
   };
 }
 
@@ -106,7 +132,16 @@ const SUSPENDED = "This account is suspended, so nothing can be sent or added.";
 /** Why `count` more emails can't go out this month, or null when they can. */
 export function sendQuotaProblem(quota: Quota, count: number) {
   if (quota.suspended) return SUSPENDED;
-  if (count <= quota.room.sendsPerMonth) return null;
+  const warmup = quota.warmup;
+  if (count <= quota.room.sendsPerMonth) {
+    if (!warmup || count <= warmup.room) return null;
+    const rises = warmup.risesAt.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+    return (
+      `New accounts send up to ${WARMUP_STEPS[0].perDay.toLocaleString("en")} emails a day at first, rising over two weeks. ` +
+      `Yours can send ${warmup.room.toLocaleString("en")} more today (of ${warmup.perDay.toLocaleString("en")}); ` +
+      `this would send ${count.toLocaleString("en")}. The limit rises on ${rises}; send to part of the list now, or contact us to go faster.`
+    );
+  }
   const limit = quota.limits.sendsPerMonth!;
   const resets = nextMonthStart().toLocaleDateString("en-GB", { day: "numeric", month: "long" });
   return (

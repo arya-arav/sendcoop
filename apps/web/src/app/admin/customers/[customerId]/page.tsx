@@ -107,6 +107,7 @@ export default async function CustomerPage({
         overrides={Object.fromEntries(
           Object.entries(overrides).map(([k, v]) => [k, v === null ? "unlimited" : String(v)]),
         )}
+        trusted={customer.overrides?.trusted ?? false}
         banned={customer.banned}
         isAdmin={customer.role === "admin"}
       />

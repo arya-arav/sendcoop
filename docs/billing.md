@@ -48,3 +48,19 @@ A plan's limits apply to the account, across every workspace it owns:
 
 Usage is shown under Settings > Billing. Super-admins can raise one
 account's limits with overrides on its subscription.
+
+## Abuse protection
+
+- **New accounts warm up.** For their first two weeks, accounts send at most
+  1,000 emails a day, then 5,000 (from day 1), 20,000 (day 3) and 50,000
+  (day 7), counted over the last 24 hours. After day 14 only the plan's
+  limits apply. A super-admin can mark an account trusted (Admin > Customers)
+  to skip this.
+- **List quality.** A campaign to 50 or more people can't be sent when 30% or
+  more of them are shared mailboxes (info@, sales@, …) or throwaway inboxes
+  (mailinator.com, …): such lists are usually bought or scraped.
+- **Automatic suspension.** Every 10 minutes, accounts that sent at least 500
+  emails in the last 7 days are checked: 0.5% or more marked as spam, or 8%
+  or more hard bounces, suspends the account (its sessions end and its
+  sending campaigns pause). One campaign already pauses itself earlier, at
+  0.3% complaints or 5% bounces. A super-admin can lift a suspension.

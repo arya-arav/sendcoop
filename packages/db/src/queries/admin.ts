@@ -90,7 +90,11 @@ export async function getCustomer(userId: string) {
     join workspaces w on w.id = m.workspace_id
     where m.user_id = ${userId} order by m.created_at`);
   const [sub] = await db.execute<{
-    overrides: { limits?: Partial<PlanLimits>; features?: Partial<PlanFeatures> } | null;
+    overrides: {
+      limits?: Partial<PlanLimits>;
+      features?: Partial<PlanFeatures>;
+      trusted?: boolean;
+    } | null;
   }>(sql`select overrides from subscriptions where user_id = ${userId}`);
   return {
     id: user.id,
@@ -108,7 +112,11 @@ export async function getCustomer(userId: string) {
 /** Limits that beat the plan's for one account; null clears them. */
 export async function setAccountOverrides(
   userId: string,
-  overrides: { limits?: Partial<PlanLimits>; features?: Partial<PlanFeatures> } | null,
+  overrides: {
+    limits?: Partial<PlanLimits>;
+    features?: Partial<PlanFeatures>;
+    trusted?: boolean;
+  } | null,
 ) {
   const free = (await getPlanByKey("free"))!;
   await getDb()

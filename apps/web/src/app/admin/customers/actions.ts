@@ -58,7 +58,13 @@ export async function saveOverridesAction(
     else if (/^\d{1,9}$/.test(value)) limits[key] = Number(value);
     else return { ok: false, error: `${LIMIT_LABELS[key]}: a number, "unlimited" or blank.` };
   }
-  await setAccountOverrides(customerId, Object.keys(limits).length > 0 ? { limits } : null);
+  const trusted = input.trusted === "true";
+  await setAccountOverrides(
+    customerId,
+    Object.keys(limits).length > 0 || trusted
+      ? { ...(Object.keys(limits).length > 0 && { limits }), ...(trusted && { trusted }) }
+      : null,
+  );
   revalidatePath(`/admin/customers/${customerId}`);
   return { ok: true, message: "Overrides saved." };
 }

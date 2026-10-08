@@ -20,6 +20,8 @@ export const QUEUES = {
 /** Recurring jobs on the maintenance queue, by name. */
 export const MAINTENANCE_JOBS = {
   verifyDomains: { name: "verify-domains", everyMs: 10 * 60_000 },
+  /** Suspends accounts whose last week drew too many complaints or bounces (D76). */
+  accountHealth: { name: "account-health", everyMs: 10 * 60_000 },
   /** Starts scheduled campaigns whose time has come. */
   startScheduled: { name: "start-scheduled", everyMs: 15_000 },
   /** Ends A/B tests whose time is up and sends the winner to the rest. */
