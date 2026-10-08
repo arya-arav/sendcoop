@@ -28,7 +28,7 @@ const sections = [
     title: "Billing",
     description: "Your plan, usage and invoices.",
     icon: ReceiptText,
-    path: null,
+    path: "/settings/billing",
   },
   {
     title: "API keys",

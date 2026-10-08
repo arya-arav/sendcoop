@@ -9,6 +9,8 @@ export const users = pgTable("users", {
   email: text().notNull().unique(),
   emailVerified: boolean().notNull().default(false),
   image: text(),
+  /** Runs Sendcoop: plans, customers, suspensions (D71, D75). Set in the database only. */
+  isSuperAdmin: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

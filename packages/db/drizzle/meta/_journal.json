@@ -281,6 +281,13 @@
       "when": 1791464839354,
       "tag": "0039_webhook_secret",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791466941701,
+      "tag": "0040_plans",
+      "breakpoints": true
     }
   ]
 }

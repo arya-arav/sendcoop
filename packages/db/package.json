@@ -11,7 +11,8 @@
     "./affiliate-networks": "./src/affiliate-networks.ts",
     "./postback-templates": "./src/postback-templates.ts",
     "./automations": "./src/automations.ts",
-    "./automation-templates": "./src/automation-templates.ts"
+    "./automation-templates": "./src/automation-templates.ts",
+    "./plans": "./src/plans.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
