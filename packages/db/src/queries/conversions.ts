@@ -71,3 +71,33 @@ export async function recordConversion(
   }
   return { result: "duplicate", id: null };
 }
+
+export type RecentConversion = {
+  id: string;
+  /** Epoch ms. */
+  at: number;
+  source: ConversionInput["source"];
+  network: string | null;
+  value: number;
+  currency: string;
+  status: ConversionStatus;
+  txid: string | null;
+  campaignId: string | null;
+  campaignName: string | null;
+  /** Sent with the test button in settings. */
+  test: boolean;
+};
+
+/** The latest conversions to arrive, newest first: for checking a setup works. */
+export async function listRecentConversions(workspaceId: string, limit = 10) {
+  return getDb().execute<RecentConversion>(sql`
+    select v.id, (extract(epoch from v.created_at) * 1000)::float8 as at, v.source,
+           v.network_id as network, v.value::float8 as value, v.currency, v.status,
+           v.external_txid as txid, v.campaign_id as "campaignId", c.name as "campaignName",
+           coalesce(v.payload->>'test' = '1', false) as test
+    from conversions v
+    left join campaigns c on c.id = v.campaign_id
+    where v.workspace_id = ${workspaceId}
+    order by v.id desc
+    limit ${limit}`);
+}

@@ -4,6 +4,7 @@ import {
   getIntegrationConfig,
   getIntegrationSecret,
   getUtmSettings,
+  listRecentConversions,
   POSTBACK_TEMPLATES,
   postbackUrl as networkPostbackUrl,
 } from "@sendcoop/db";
@@ -16,6 +17,7 @@ import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { AffiliateDomainsForm } from "./affiliate-domains-form";
 import { PostbackCard } from "./postback-card";
+import { RecentConversions } from "./recent-conversions";
 import { UtmForm } from "./utm-form";
 
 export const metadata: Metadata = { title: "Tracking settings" };
@@ -24,12 +26,13 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
   const editable = canManage(role);
-  const [domains, utm, postbackKey, postbackConfig] = await Promise.all([
+  const [domains, utm, postbackKey, postbackConfig, recent] = await Promise.all([
     getAffiliateDomains(workspace.id),
     getUtmSettings(workspace.id),
     // Members don't see the key: it lets anyone report sales.
     editable ? getIntegrationSecret(workspace.id, "postback") : null,
     getIntegrationConfig(workspace.id, "postback"),
+    listRecentConversions(workspace.id),
   ]);
   const tracking = (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
   const postbackUrl = postbackKey
@@ -94,6 +97,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
           Array.isArray(postbackConfig.allowedIps) ? postbackConfig.allowedIps.map(String) : []
         }
       />
+      <RecentConversions slug={slug} editable={editable} conversions={recent} />
     </div>
   );
 }
