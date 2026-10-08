@@ -2,6 +2,7 @@
 
 import type { SubscriberStatus } from "@sendcoop/db/custom-fields";
 import { ListMinus, ListPlus, MoveRight, SearchX, Tag, Tags, Trash2, UserX, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FormError } from "@/components/form";
@@ -292,7 +293,12 @@ export function SubscriberTable({
                       </TableCell>
                     )}
                     <TableCell className={editable ? "font-medium" : "pl-4 font-medium"}>
-                      {s.email}
+                      <Link
+                        href={`/w/${slug}/contacts/${s.id}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {s.email}
+                      </Link>
                     </TableCell>
                     <TableCell className={s.name ? undefined : "text-muted-foreground"}>
                       {s.name || "—"}

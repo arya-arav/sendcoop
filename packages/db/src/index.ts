@@ -44,6 +44,7 @@ export * from "./queries/revenue";
 export * from "./queries/segments";
 export * from "./queries/sending-domains";
 export * from "./queries/sending-servers";
+export * from "./queries/subscriber-profile";
 export * from "./queries/subscribers";
 export * from "./queries/suppressions";
 export * from "./queries/tags";
