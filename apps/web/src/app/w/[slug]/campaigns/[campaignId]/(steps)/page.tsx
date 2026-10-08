@@ -1,4 +1,4 @@
-import { abResults, getCampaign, getVariantB, listCampaignLinks, networkName } from "@sendcoop/db";
+import { abResults, campaignReport, getCampaign, getVariantB, networkName } from "@sendcoop/db";
 import { CalendarClock } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +76,44 @@ export default async function CampaignPage({
   }
 
   const ab = campaign.abTest ? await abResults(campaign.id) : null;
-  const links = await listCampaignLinks(workspace.id, campaign.id);
+  const { report, links } = (await campaignReport(workspace.id, campaign.id))!;
+  const n = (value: number) => value.toLocaleString("en");
+  const count = (value: number, one: string, many: string) =>
+    `${n(value)} ${value === 1 ? one : many}`;
+  const pct = (value: number) =>
+    `${(value * 100).toLocaleString("en", { maximumFractionDigits: 1 })}%`;
+  const metrics = [
+    {
+      label: "Delivered",
+      value: n(report.delivered),
+      detail: `of ${n(report.sent)} sent · ${n(report.hardBounces + report.softBounces)} bounced`,
+    },
+    {
+      label: "Opened",
+      value: pct(report.openRate),
+      detail: `${count(report.uniqueOpens, "person", "people")} · ${count(report.machineOpens, "machine open", "machine opens")} not counted`,
+    },
+    {
+      label: "Clicked",
+      value: pct(report.clickRate),
+      detail: `${count(report.uniqueClicks, "person", "people")}, ${count(report.clicks, "click", "clicks")} · ${count(report.botClicks, "bot click", "bot clicks")} not counted`,
+    },
+    {
+      label: "Click-to-open",
+      value: pct(report.clickToOpenRate),
+      detail: "Of the people who opened",
+    },
+    {
+      label: "Unsubscribed",
+      value: n(report.unsubscribes),
+      detail: `${n(report.complaints)} marked as spam`,
+    },
+    {
+      label: "Revenue",
+      value: report.revenue.toLocaleString("en", { style: "currency", currency: "USD" }),
+      detail: "From tracked conversions",
+    },
+  ];
   const variantB = campaign.abTest ? await getVariantB(campaign.id) : null;
   const money = (n: number) => n.toLocaleString("en", { style: "currency", currency: "USD" });
 
@@ -130,6 +167,21 @@ export default async function CampaignPage({
           )}
         </CardContent>
       </Card>
+      {campaign.status !== "queued" && (
+        <section aria-label="Results" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {metrics.map((m) => (
+            <Card key={m.label} size="sm">
+              <CardHeader>
+                <CardDescription>{m.label}</CardDescription>
+                <CardTitle className="text-2xl tabular-nums">
+                  <p>{m.value}</p>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground">{m.detail}</CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
       {campaign.abTest && ab && (
         <Card>
           <CardHeader>
@@ -186,7 +238,8 @@ export default async function CampaignPage({
               <h2>Links</h2>
             </CardTitle>
             <CardDescription>
-              Every link in the email, in order. Clicks per link arrive with click tracking.
+              Every link in the email, in order, with clicks by people. Clicks by scanners and other
+              machines are counted separately.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -197,6 +250,9 @@ export default async function CampaignPage({
                   {campaign.abTest && <TableHead>Version</TableHead>}
                   <TableHead>Link</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Clicks</TableHead>
+                  <TableHead className="text-right">People</TableHead>
+                  <TableHead className="text-right">Bots</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -218,6 +274,13 @@ export default async function CampaignPage({
                       ) : (
                         <span className="text-muted-foreground">Link</span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{n(link.clicks)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {n(link.uniqueClicks)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground tabular-nums">
+                      {n(link.botClicks)}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -28,6 +28,7 @@ export * from "./queries/imports";
 export * from "./queries/links";
 export * from "./queries/lists";
 export * from "./queries/media";
+export * from "./queries/reports";
 export * from "./queries/segments";
 export * from "./queries/sending-domains";
 export * from "./queries/sending-servers";
