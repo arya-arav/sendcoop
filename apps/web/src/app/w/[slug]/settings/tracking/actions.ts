@@ -1,6 +1,11 @@
 "use server";
 
-import { setAffiliateDomains, setUtmSettings } from "@sendcoop/db";
+import {
+  rotateIntegrationSecret,
+  setAffiliateDomains,
+  setIntegrationConfig,
+  setUtmSettings,
+} from "@sendcoop/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
@@ -38,4 +43,36 @@ export async function saveUtmSettingsAction(slug: string, input: z.input<typeof 
   await setUtmSettings(workspace.id, parsed.data);
   revalidatePath(`/w/${slug}/settings/tracking`);
   return { ok: true as const };
+}
+
+export async function rotatePostbackKeyAction(slug: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  await rotateIntegrationSecret(workspace.id, "postback");
+  revalidatePath(`/w/${slug}/settings/tracking`);
+  return { ok: true as const };
+}
+
+/** One IP or IPv4 range (CIDR) per line; empty allows any. */
+export async function savePostbackIpsAction(slug: string, text: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  const entries = [
+    ...new Set(
+      text
+        .split(/[\s,]+/)
+        .map((e) => e.trim())
+        .filter(Boolean),
+    ),
+  ];
+  const valid = /^(\d{1,3}\.){3}\d{1,3}(\/([0-9]|[12][0-9]|3[0-2]))?$|^[0-9a-f:]+$/i;
+  const bad = entries.find((e) => !valid.test(e));
+  if (bad) return { ok: false as const, error: `“${bad}” isn't an IP address or range.` };
+  await setIntegrationConfig(workspace.id, "postback", { allowedIps: entries.slice(0, 50) });
+  revalidatePath(`/w/${slug}/settings/tracking`);
+  return { ok: true as const, ips: entries.slice(0, 50) };
 }

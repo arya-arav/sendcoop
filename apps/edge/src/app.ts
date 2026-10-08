@@ -1,11 +1,15 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import {
   decorateDestination,
+  findIntegrationBySecret,
+  ipAllowed,
+  parsePostback,
   pingDatabase,
   readClickToken,
   readHoneypotToken,
   readOpenToken,
   recordClick,
+  recordConversion,
   recordHoneypot,
   recordOpen,
   type ServiceName,
@@ -96,4 +100,47 @@ app.get("/h/:token", async (c) => {
   const messageId = readHoneypotToken(c.req.param("token"));
   if (messageId) await recordHoneypot(messageId);
   return c.body(null, 204);
+});
+
+/** All parameters of a request: the query string, plus a form or JSON body. */
+async function requestParams(c: Context) {
+  const params: Record<string, string> = { ...c.req.query() };
+  if (c.req.method === "POST") {
+    const type = c.req.header("content-type") ?? "";
+    try {
+      const body = type.includes("application/json")
+        ? ((await c.req.json()) as Record<string, unknown>)
+        : await c.req.parseBody();
+      for (const [key, value] of Object.entries(body)) {
+        if (typeof value === "string" || typeof value === "number") params[key] = String(value);
+      }
+    } catch {
+      // An unreadable body: the query string is all there is.
+    }
+  }
+  return params;
+}
+
+/**
+ * Server-to-server conversion postbacks from affiliate networks:
+ * /pb?key=<postback key>&cid={subid}&payout={payout}&txid={transaction id}
+ * (GET or POST). Answers in plain text, as networks expect.
+ */
+app.on(["GET", "POST"], "/pb", async (c) => {
+  const params = await requestParams(c);
+  const { key = "", ...rest } = params;
+  const integration = await findIntegrationBySecret("postback", key);
+  if (!integration) return c.text("unknown postback key", 401);
+  const allowed = integration.config.allowedIps;
+  if (Array.isArray(allowed) && !ipAllowed(clientIp(c), allowed.map(String))) {
+    return c.text("ip not allowed", 403);
+  }
+
+  const parsed = parsePostback(rest);
+  const { result } = await recordConversion(integration.workspaceId, {
+    ...parsed,
+    source: "postback",
+    payload: rest,
+  });
+  return c.text(`ok ${result}`);
 });

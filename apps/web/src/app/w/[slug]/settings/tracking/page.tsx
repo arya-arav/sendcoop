@@ -1,4 +1,10 @@
-import { AFFILIATE_NETWORKS, getAffiliateDomains, getUtmSettings } from "@sendcoop/db";
+import {
+  AFFILIATE_NETWORKS,
+  getAffiliateDomains,
+  getIntegrationConfig,
+  getIntegrationSecret,
+  getUtmSettings,
+} from "@sendcoop/db";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -7,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { AffiliateDomainsForm } from "./affiliate-domains-form";
+import { PostbackCard } from "./postback-card";
 import { UtmForm } from "./utm-form";
 
 export const metadata: Metadata = { title: "Tracking settings" };
@@ -14,10 +21,18 @@ export const metadata: Metadata = { title: "Tracking settings" };
 export default async function TrackingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
-  const [domains, utm] = await Promise.all([
+  const editable = canManage(role);
+  const [domains, utm, postbackKey, postbackConfig] = await Promise.all([
     getAffiliateDomains(workspace.id),
     getUtmSettings(workspace.id),
+    // Members don't see the key: it lets anyone report sales.
+    editable ? getIntegrationSecret(workspace.id, "postback") : null,
+    getIntegrationConfig(workspace.id, "postback"),
   ]);
+  const tracking = (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
+  const postbackUrl = postbackKey
+    ? `${tracking}/pb?key=${postbackKey}&cid={subid}&payout={payout}&txid={txid}`
+    : "Only workspace owners and admins can see the postback URL.";
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -56,6 +71,14 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
 
       <AffiliateDomainsForm slug={slug} editable={canManage(role)} initial={domains} />
       <UtmForm slug={slug} editable={canManage(role)} initial={utm} />
+      <PostbackCard
+        slug={slug}
+        editable={editable}
+        postbackUrl={postbackUrl}
+        allowedIps={
+          Array.isArray(postbackConfig.allowedIps) ? postbackConfig.allowedIps.map(String) : []
+        }
+      />
     </div>
   );
 }
