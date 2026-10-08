@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { requireMemberWorkspace } from "@/lib/workspace";
-import { STATUS_LABELS } from "../status";
+import { STATUS_LABELS } from "../../status";
 import { CampaignSteps } from "./steps";
 
 export default async function CampaignLayout({

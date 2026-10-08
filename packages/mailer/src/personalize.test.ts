@@ -114,3 +114,31 @@ describe("personalize", () => {
     expect(out.text).toBe("Hi Ana\nLeave: {{unsubscribe_url}}");
   });
 });
+
+describe("preheaders", () => {
+  it("go hidden right after <body>, personalized and escaped", () => {
+    const out = personalize(
+      {
+        subject: "Hi",
+        html: "<html><body><p>Body</p></body></html>",
+        text: "Body",
+        preheader: "{{first_name | Friend}}, 40% off <today>",
+      },
+      values,
+      "seed",
+    );
+    expect(out.html).toMatch(
+      /^<html><body><div style="display:none;[^"]*mso-hide:all">Ana, 40% off &#60;today&#62;(&zwnj;&nbsp;)+<\/div><p>Body<\/p>/,
+    );
+    expect(out.text).toBe("Body");
+  });
+
+  it("are left out of plain-text emails and when empty", () => {
+    expect(
+      personalize({ subject: "", html: "", text: "x", preheader: "Hi" }, values, "s").html,
+    ).toBe("");
+    expect(personalize({ subject: "", html: "<p>x</p>", text: "x" }, values, "s").html).toBe(
+      "<p>x</p>",
+    );
+  });
+});

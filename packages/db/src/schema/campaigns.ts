@@ -13,6 +13,7 @@ import { workspaces } from "./auth";
 import { createdAt, id, updatedAt } from "./columns";
 import { subscribers } from "./contacts";
 import { sendingDomains, sendingServers } from "./sending";
+import { templateEditor } from "./templates";
 
 /**
  * Who a campaign goes to: everyone subscribed, or anyone in the chosen lists
@@ -60,6 +61,12 @@ export const campaigns = pgTable(
     /** The part before @; the domain comes from sendingDomainId. */
     fromLocal: text().notNull(),
     replyTo: text(),
+    /** Shown after the subject in most inbox lists. */
+    preheader: text().notNull().default(""),
+    // Content, edited like a template's (and copied from one): see templates.
+    editor: templateEditor().notNull().default("html"),
+    design: jsonb().$type<Record<string, unknown>>(),
+    mjml: text(),
     html: text().notNull(),
     text: text().notNull(),
     sendingDomainId: uuid().references(() => sendingDomains.id, { onDelete: "set null" }),

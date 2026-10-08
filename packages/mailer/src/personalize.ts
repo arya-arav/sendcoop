@@ -1,3 +1,5 @@
+import { withPreheader } from "./preheader";
+
 // Per-recipient content: merge tags like {{first_name}} or
 // {{first_name | there}} (with a fallback), and spintax like
 // {Hi|Hello|Hey} (one option picked per recipient, nesting allowed).
@@ -108,18 +110,24 @@ export function mergeValuesFor(subscriber: Subscriber): MergeValues {
  * seed (the message id) always gives the same spintax choices.
  */
 export function personalize(
-  content: { subject: string; html: string; text: string },
+  content: { subject: string; html: string; text: string; preheader?: string },
   values: MergeValues,
   seed: string,
 ) {
   const keep = ["unsubscribe_url"];
+  const preheader = renderContent(content.preheader ?? "", values, {
+    random: seededRandom(`${seed}:preheader`),
+  });
   return {
     subject: renderContent(content.subject, values, { random: seededRandom(`${seed}:subject`) }),
-    html: renderContent(content.html, values, {
-      html: true,
-      keep,
-      random: seededRandom(`${seed}:html`),
-    }),
+    html: withPreheader(
+      renderContent(content.html, values, {
+        html: true,
+        keep,
+        random: seededRandom(`${seed}:html`),
+      }),
+      preheader,
+    ),
     text: renderContent(content.text, values, { keep, random: seededRandom(`${seed}:text`) }),
   };
 }

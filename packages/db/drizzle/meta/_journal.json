@@ -162,6 +162,13 @@
       "when": 1791419014993,
       "tag": "0022_campaign_drop_list_segment",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791419462232,
+      "tag": "0023_campaign_content",
+      "breakpoints": true
     }
   ]
 }

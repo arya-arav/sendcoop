@@ -6,6 +6,7 @@ import { z } from "zod";
 
 export * from "./html-to-text";
 export * from "./personalize";
+export * from "./preheader";
 export * from "./sns";
 export * from "./unsubscribe";
 

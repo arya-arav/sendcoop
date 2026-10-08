@@ -5,6 +5,7 @@ import { z } from "zod";
 import { appUrl } from "@/lib/app-url";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
+import { DeleteTemplateButton } from "../template-actions";
 import { CodeEditor } from "./code-editor";
 import { VisualEditor } from "./visual-editor";
 
@@ -24,13 +25,20 @@ export default async function TemplatePage({
   // Members can look but not edit.
   if (!canManage(role)) redirect(`/w/${slug}/templates/${template.id}/preview`);
 
+  // Where the editor saves, and its header: name, subject, preview and delete.
+  const target = {
+    saveUrl: `/api/w/${slug}/templates/${template.id}`,
+    backHref: `/w/${slug}/templates`,
+    backLabel: "Back to templates",
+    previewHref: `/w/${slug}/templates/${template.id}/preview`,
+    meta: { name: template.name, subject: template.subject },
+    actions: <DeleteTemplateButton slug={slug} id={template.id} name={template.name} />,
+  };
+
   if (template.editor !== "visual") {
     return (
       <CodeEditor
-        slug={slug}
-        templateId={template.id}
-        initialName={template.name}
-        initialSubject={template.subject}
+        target={target}
         mode={template.editor}
         initialContent={template.editor === "html" ? template.html : template.text}
       />
@@ -40,9 +48,7 @@ export default async function TemplatePage({
   return (
     <VisualEditor
       slug={slug}
-      templateId={template.id}
-      initialName={template.name}
-      initialSubject={template.subject}
+      target={target}
       design={template.design}
       mjml={template.mjml}
       assets={`${appUrl()}/email`}

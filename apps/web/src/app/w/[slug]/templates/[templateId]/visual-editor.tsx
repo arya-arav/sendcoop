@@ -4,7 +4,7 @@ import "grapesjs/dist/css/grapes.min.css";
 import type { Editor } from "grapesjs";
 import { useEffect, useRef } from "react";
 import { emailBlocks } from "@/lib/email-blocks";
-import { TemplateHeader, useTemplateSave } from "./template-header";
+import { EditorHeader, type EditorTarget, useContentSave } from "./template-header";
 
 const icon = (body: string) =>
   `<svg viewBox="0 0 24 24" width="36" height="36" style="fill:none" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -28,18 +28,15 @@ const BLOCK_ICONS: Record<string, string> = {
  */
 export function VisualEditor({
   slug,
-  templateId,
-  initialName,
-  initialSubject,
+  target,
   design,
   mjml,
   assets,
   images,
 }: {
   slug: string;
-  templateId: string;
-  initialName: string;
-  initialSubject: string;
+  /** Where it saves, and what the header shows. */
+  target: EditorTarget;
   design: Record<string, unknown> | null;
   mjml: string | null;
   /** Absolute URL of the placeholder images used by blocks. */
@@ -49,11 +46,7 @@ export function VisualEditor({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
-  const state = useTemplateSave(slug, templateId, {
-    name: initialName,
-    subject: initialSubject,
-    status: "loading",
-  });
+  const state = useContentSave(target);
   const { setStatus, setError, markUnsaved } = state;
 
   useEffect(() => {
@@ -171,7 +164,7 @@ export function VisualEditor({
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3">
-      <TemplateHeader slug={slug} templateId={templateId} state={state} onSave={save} />
+      <EditorHeader target={target} state={state} onSave={save} />
       <div ref={container} className="min-h-0 flex-1 overflow-hidden rounded-lg border" />
     </div>
   );

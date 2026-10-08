@@ -28,7 +28,13 @@ export type CampaignInput = Pick<
   | "audience"
 >;
 
-export async function createCampaign(workspaceId: string, input: CampaignInput) {
+/** Content fields beyond the required ones (they have defaults). */
+type ContentExtras = Partial<Pick<Campaign, "preheader" | "editor" | "design" | "mjml">>;
+
+/** What can change while a campaign is a draft. */
+export type CampaignDraftChanges = Partial<CampaignInput> & ContentExtras;
+
+export async function createCampaign(workspaceId: string, input: CampaignInput & ContentExtras) {
   const [row] = await getDb()
     .insert(campaigns)
     .values({ workspaceId, ...input })
@@ -59,8 +65,37 @@ export async function createCampaignFromTemplate(
     ...settings,
     name: name || template.name,
     subject: subject || template.subject || template.name,
+    // The template's editor and design come along, so it's edited the same way.
+    editor: template.editor,
+    design: template.design,
+    mjml: template.mjml,
     html: template.html,
     text: template.text,
+  });
+}
+
+/**
+ * Puts a template's content into a draft, replacing what was there, and its
+ * subject when the draft has none yet. False if either isn't found.
+ */
+export async function applyTemplateToDraft(
+  workspaceId: string,
+  campaignId: string,
+  templateId: string,
+) {
+  const [template] = await getDb()
+    .select()
+    .from(templates)
+    .where(and(eq(templates.workspaceId, workspaceId), eq(templates.id, templateId)));
+  const campaign = await getCampaign(workspaceId, campaignId);
+  if (!template || !campaign) return false;
+  return updateDraftCampaign(workspaceId, campaignId, {
+    editor: template.editor,
+    design: template.design,
+    mjml: template.mjml,
+    html: template.html,
+    text: template.text,
+    ...(campaign.subject ? {} : { subject: template.subject }),
   });
 }
 
@@ -101,7 +136,7 @@ export async function listCampaigns(workspaceId: string) {
 export async function updateDraftCampaign(
   workspaceId: string,
   campaignId: string,
-  changes: Partial<CampaignInput>,
+  changes: CampaignDraftChanges,
 ) {
   const rows = await getDb()
     .update(campaigns)

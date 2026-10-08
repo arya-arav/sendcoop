@@ -7,10 +7,10 @@ import { FormError } from "@/components/form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DeleteTemplateButton } from "../template-actions";
 
-// The parts every template editor shares: name, subject line, save state,
-// saving, and what the server says about the saved email.
+// The parts every email editor shares (templates and campaign content):
+// save state, saving, what the server says about the saved email, and for
+// templates the name and subject line.
 
 export type SaveStatus = "loading" | "saved" | "unsaved" | "saving";
 
@@ -21,14 +21,22 @@ const STATUS_TEXT: Record<SaveStatus, string> = {
   saving: "Saving…",
 };
 
-export function useTemplateSave(
-  slug: string,
-  templateId: string,
-  initial: { name: string; subject: string; status: SaveStatus },
-) {
-  const [name, setName] = useState(initial.name);
-  const [subject, setSubject] = useState(initial.subject);
-  const [status, setStatus] = useState<SaveStatus>(initial.status);
+/** Where an editor saves to, and what its header shows. */
+export type EditorTarget = {
+  saveUrl: string;
+  backHref: string;
+  backLabel: string;
+  previewHref?: string;
+  /** Templates have a name and subject line in the editor; campaigns set them elsewhere. */
+  meta?: { name: string; subject: string };
+  /** Shown before Save, e.g. a delete button. */
+  actions?: React.ReactNode;
+};
+
+export function useContentSave(target: EditorTarget) {
+  const [name, setName] = useState(target.meta?.name ?? "");
+  const [subject, setSubject] = useState(target.meta?.subject ?? "");
+  const [status, setStatus] = useState<SaveStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -45,15 +53,15 @@ export function useTemplateSave(
     return () => window.removeEventListener("beforeunload", warn);
   }, [status]);
 
-  /** Saves the name and subject with the editor's content. */
+  /** Saves the editor's content (and the name and subject, for templates). */
   async function save(content: Record<string, unknown>) {
     setError(null);
     setWarnings([]);
     setStatus("saving");
-    const response = await fetch(`/api/w/${slug}/templates/${templateId}`, {
+    const response = await fetch(target.saveUrl, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, subject, ...content }),
+      body: JSON.stringify({ ...(target.meta ? { name, subject } : {}), ...content }),
     }).catch(() => null);
     const data = (await response?.json().catch(() => null)) as {
       error?: string;
@@ -64,7 +72,7 @@ export function useTemplateSave(
       setWarnings(data?.warnings ?? []);
       return;
     }
-    setError(data?.error ?? "The template couldn't be saved. Check your connection and try again.");
+    setError(data?.error ?? "Your changes couldn't be saved. Check your connection and try again.");
     setStatus("unsaved");
   }
 
@@ -83,15 +91,13 @@ export function useTemplateSave(
   };
 }
 
-export function TemplateHeader({
-  slug,
-  templateId,
+export function EditorHeader({
+  target,
   state,
   onSave,
 }: {
-  slug: string;
-  templateId: string;
-  state: ReturnType<typeof useTemplateSave>;
+  target: EditorTarget;
+  state: ReturnType<typeof useContentSave>;
   onSave: () => void;
 }) {
   const { name, setName, subject, setSubject, status, error, warnings, markUnsaved } = state;
@@ -99,55 +105,61 @@ export function TemplateHeader({
     <>
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href={`/w/${slug}/templates`}
-          aria-label="Back to templates"
+          href={target.backHref}
+          aria-label={target.backLabel}
           className={buttonVariants({ variant: "ghost", size: "icon" })}
         >
           <ArrowLeft />
         </Link>
-        <Input
-          aria-label="Template name"
-          value={name}
-          maxLength={100}
-          onChange={(e) => {
-            setName(e.target.value);
-            markUnsaved();
-          }}
-          className="max-w-sm font-medium"
-        />
+        {target.meta && (
+          <Input
+            aria-label="Template name"
+            value={name}
+            maxLength={100}
+            onChange={(e) => {
+              setName(e.target.value);
+              markUnsaved();
+            }}
+            className="max-w-sm font-medium"
+          />
+        )}
         <p role="status" className="text-sm text-muted-foreground">
           {STATUS_TEXT[status]}
         </p>
         <div className="ml-auto flex items-center gap-2">
-          <Link
-            href={`/w/${slug}/templates/${templateId}/preview`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <Eye />
-            Preview
-          </Link>
-          <DeleteTemplateButton slug={slug} id={templateId} name={name} />
+          {target.previewHref && (
+            <Link
+              href={target.previewHref}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <Eye />
+              Preview
+            </Link>
+          )}
+          {target.actions}
           <Button onClick={onSave} disabled={status === "loading" || status === "saving"}>
             <Save />
             Save
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <Label htmlFor="template-subject" className="shrink-0 text-muted-foreground">
-          Subject line
-        </Label>
-        <Input
-          id="template-subject"
-          value={subject}
-          maxLength={200}
-          placeholder="Suggested subject for campaigns. Merge tags and spintax work here too."
-          onChange={(e) => {
-            setSubject(e.target.value);
-            markUnsaved();
-          }}
-        />
-      </div>
+      {target.meta && (
+        <div className="flex items-center gap-3">
+          <Label htmlFor="template-subject" className="shrink-0 text-muted-foreground">
+            Subject line
+          </Label>
+          <Input
+            id="template-subject"
+            value={subject}
+            maxLength={200}
+            placeholder="Suggested subject for campaigns. Merge tags and spintax work here too."
+            onChange={(e) => {
+              setSubject(e.target.value);
+              markUnsaved();
+            }}
+          />
+        </div>
+      )}
       <FormError message={error} />
       {warnings.length > 0 && (
         <div

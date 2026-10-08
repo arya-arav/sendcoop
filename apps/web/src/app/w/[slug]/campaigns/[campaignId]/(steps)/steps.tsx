@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 // The builder's steps. Steps not built yet are listed but not linked.
 const STEPS = [
   { path: "recipients", label: "Recipients", ready: true },
-  { path: "content", label: "Content", ready: false },
+  { path: "content", label: "Content", ready: true },
   { path: "schedule", label: "Schedule", ready: false },
 ];
 

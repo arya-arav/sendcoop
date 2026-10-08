@@ -2,7 +2,7 @@
 
 import type { EditorView } from "@codemirror/view";
 import { useEffect, useRef, useState } from "react";
-import { TemplateHeader, useTemplateSave } from "./template-header";
+import { EditorHeader, type EditorTarget, useContentSave } from "./template-header";
 
 /**
  * Code modes: write the email's HTML yourself (the text version is made
@@ -10,28 +10,19 @@ import { TemplateHeader, useTemplateSave } from "./template-header";
  * preview sits next to the code.
  */
 export function CodeEditor({
-  slug,
-  templateId,
-  initialName,
-  initialSubject,
+  target,
   mode,
   initialContent,
 }: {
-  slug: string;
-  templateId: string;
-  initialName: string;
-  initialSubject: string;
+  /** Where it saves, and what the header shows. */
+  target: EditorTarget;
   mode: "html" | "text";
   initialContent: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const [preview, setPreview] = useState(initialContent);
-  const state = useTemplateSave(slug, templateId, {
-    name: initialName,
-    subject: initialSubject,
-    status: "loading",
-  });
+  const state = useContentSave(target);
   const { setStatus, markUnsaved } = state;
 
   useEffect(() => {
@@ -89,7 +80,7 @@ export function CodeEditor({
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[560px] flex-col gap-3">
-      <TemplateHeader slug={slug} templateId={templateId} state={state} onSave={save} />
+      <EditorHeader target={target} state={state} onSave={save} />
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
         <div
           ref={host}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { countRecipientsAction, saveRecipientsAction } from "../../actions";
+import { countRecipientsAction, saveRecipientsAction } from "../../../actions";
 
 type Option = { id: string; name: string; count?: number };
 type ListKey = "lists" | "segments" | "excludeLists" | "excludeSegments";
