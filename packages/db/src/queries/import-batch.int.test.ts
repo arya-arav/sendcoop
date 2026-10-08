@@ -55,7 +55,7 @@ describe("importSubscriberBatch", () => {
       ],
       { listIds: [list], updateExisting: false },
     );
-    expect(result).toEqual({ created: 1, updated: 0, unchanged: 1 });
+    expect(result).toEqual({ created: 1, updated: 0, unchanged: 1, overLimit: [] });
 
     const created = await subscriberByEmail("new1@example.com");
     expect(created).toMatchObject({
@@ -78,7 +78,7 @@ describe("importSubscriberBatch", () => {
       ],
       { listIds: [], updateExisting: true },
     );
-    expect(result).toEqual({ created: 0, updated: 1, unchanged: 1 });
+    expect(result).toEqual({ created: 0, updated: 1, unchanged: 1, overLimit: [] });
 
     expect(await subscriberByEmail("old@example.com")).toMatchObject({
       firstName: "Olivia",

@@ -2,6 +2,7 @@ import {
   assignAbVariants,
   claimCampaign,
   clickUrl,
+  countAudience,
   decideDueAbTests,
   failCampaign,
   getCampaign,
@@ -24,6 +25,8 @@ import {
   startDueCampaigns,
   skipUnsendableMessages,
   unsubscribeUrls,
+  sendQuotaProblem,
+  workspaceQuota,
 } from "@sendcoop/db";
 import {
   buildRawMessage,
@@ -69,6 +72,19 @@ export async function prepareCampaign(
   if ("error" in context) {
     await failCampaign(workspaceId, campaignId, context.error);
     return;
+  }
+
+  // Scheduled campaigns are checked again here: the plan's monthly emails
+  // may have run out since they were scheduled (D73).
+  if (!resume) {
+    const problem = sendQuotaProblem(
+      await workspaceQuota(workspaceId),
+      await countAudience(workspaceId, campaign.audience),
+    );
+    if (problem) {
+      await failCampaign(workspaceId, campaignId, problem);
+      return;
+    }
   }
 
   await prepareCampaignMessages(campaign);

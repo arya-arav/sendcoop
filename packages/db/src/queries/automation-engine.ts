@@ -9,6 +9,7 @@ import {
 import { getDb } from "../client";
 import { automationRuns, automations, subscribers } from "../schema";
 import type { SegmentRules } from "../segments";
+import { workspaceQuota } from "./quotas";
 import { getSegment } from "./segments";
 import { subscriberConditions } from "./subscribers";
 
@@ -172,8 +173,19 @@ export async function advanceAutomationRun(runId: string, now = new Date()): Pro
         return finish(run.id, "completed", null);
 
       case "email": {
-        const fresh = await logStep(run, node, "done", { campaignId: node.data.campaignId });
         const next = nextNodeId(graph, node.id);
+        // Out of emails this month: the step is skipped and the run goes on (D73).
+        if (
+          !(await stepLog(run.id, node.id)) &&
+          (await workspaceQuota(run.workspace_id)).room.sendsPerMonth < 1
+        ) {
+          await logStep(run, node, "skipped", {
+            reason: "Your plan's emails for this month ran out.",
+          });
+          await moveTo(run.id, next);
+          continue;
+        }
+        const fresh = await logStep(run, node, "done", { campaignId: node.data.campaignId });
         if (!fresh || !node.data.campaignId) {
           await moveTo(run.id, next);
           continue;

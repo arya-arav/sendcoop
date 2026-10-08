@@ -1,0 +1,1 @@
+CREATE INDEX "messages_workspace_id_created_at_index" ON "messages" USING btree ("workspace_id","created_at");

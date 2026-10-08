@@ -43,7 +43,12 @@ export default async function SchedulePage({
                 )}
                 <span>{item.label}</span>
                 {!item.ok && (
-                  <Link href={`${base}/${item.step}`} className="text-muted-foreground underline">
+                  <Link
+                    href={
+                      item.step.startsWith("/") ? `/w/${slug}${item.step}` : `${base}/${item.step}`
+                    }
+                    className="text-muted-foreground underline"
+                  >
                     {item.fix}
                   </Link>
                 )}

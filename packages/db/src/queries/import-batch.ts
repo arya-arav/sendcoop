@@ -15,6 +15,8 @@ export type BatchResult = {
   updated: number;
   /** Existing subscribers left as they were. */
   unchanged: number;
+  /** New people left out: the plan's subscriber limit was reached (D73). */
+  overLimit: string[];
 };
 
 /**
@@ -30,9 +32,32 @@ export type BatchResult = {
 export async function importSubscriberBatch(
   workspaceId: string,
   rows: ImportRow[],
-  { listIds, updateExisting }: { listIds: string[]; updateExisting: boolean },
+  {
+    listIds,
+    updateExisting,
+    maxNew = Infinity,
+  }: { listIds: string[]; updateExisting: boolean; maxNew?: number },
 ): Promise<BatchResult> {
-  if (rows.length === 0) return { created: 0, updated: 0, unchanged: 0 };
+  if (rows.length === 0) return { created: 0, updated: 0, unchanged: 0, overLimit: [] };
+
+  // Over the plan's limit, only the first maxNew new people are added.
+  let overLimit: string[] = [];
+  if (Number.isFinite(maxNew)) {
+    const known = new Set(
+      (
+        await getSql()<{ email: string }[]>`
+          select email from subscribers
+          where workspace_id = ${workspaceId} and email = any(${rows.map((r) => r.email)}::text[])`
+      ).map((r) => r.email),
+    );
+    const fresh = rows.filter((r) => !known.has(r.email));
+    if (fresh.length > maxNew) {
+      overLimit = fresh.slice(Math.max(0, maxNew)).map((r) => r.email);
+      const left = new Set(overLimit);
+      rows = rows.filter((r) => !left.has(r.email));
+      if (rows.length === 0) return { created: 0, updated: 0, unchanged: 0, overLimit };
+    }
+  }
 
   const emails = rows.map((r) => r.email);
   const firstNames = rows.map((r) => r.firstName);
@@ -90,6 +115,7 @@ export async function importSubscriberBatch(
       created: inserted.length,
       updated,
       unchanged: existing.length - updated,
+      overLimit,
     };
   });
 }

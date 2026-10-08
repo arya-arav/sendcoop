@@ -1,6 +1,12 @@
 "use server";
 
-import { createSubscriber, listCustomFields, parseFieldValues } from "@sendcoop/db";
+import {
+  createSubscriber,
+  listCustomFields,
+  parseFieldValues,
+  subscriberQuotaProblem,
+  workspaceQuota,
+} from "@sendcoop/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManage } from "@/lib/permissions";
@@ -66,6 +72,8 @@ export async function addSubscriberAction(
   }
 
   const { listIds, ...subscriber } = input.data;
+  const overLimit = subscriberQuotaProblem(await workspaceQuota(workspace.id));
+  if (overLimit) return { ok: false, error: overLimit };
   const result = await createSubscriber(
     workspace.id,
     { ...subscriber, source: "manual", fields: fields.values },

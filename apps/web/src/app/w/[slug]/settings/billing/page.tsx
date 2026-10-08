@@ -4,6 +4,8 @@ import {
   getWorkspacePlan,
   LIMIT_LABELS,
   listPlans,
+  nextMonthStart,
+  workspaceQuota,
   type PlanFeatures,
   type PlanLimits,
 } from "@sendcoop/db";
@@ -26,6 +28,40 @@ import { requireMemberWorkspace } from "@/lib/workspace";
 import { ChoosePlanButton, ManageBillingButton } from "./billing-buttons";
 
 export const metadata: Metadata = { title: "Billing" };
+
+/** Used of a limit, as a bar; amber from 80%, red when reached. */
+function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  const share = limit === null ? 0 : limit === 0 ? 1 : Math.min(1, used / limit);
+  return (
+    <div className="grid gap-1 text-sm">
+      <div className="flex justify-between gap-2">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="tabular-nums">
+          {used.toLocaleString("en")} of {formatLimit(limit)}
+        </span>
+      </div>
+      <div
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={limit ?? used}
+        aria-valuenow={used}
+        className="h-1.5 overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className={
+            share >= 1
+              ? "h-full bg-destructive"
+              : share >= 0.8
+                ? "h-full bg-amber-500"
+                : "h-full bg-primary"
+          }
+          style={{ width: `${Math.max(share * 100, used > 0 ? 2 : 0)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 const price = (cents: number, currency: string) =>
   cents === 0 ? "Free" : `${formatMoney(cents / 100, currency)} a month`;
@@ -56,7 +92,11 @@ export default async function BillingPage({
     const before = await getWorkspacePlan(workspace.id);
     if (before.ownerId === user.id) await syncCheckout(session_id, before.stripeCustomerId);
   }
-  const [current, plans] = await Promise.all([getWorkspacePlan(workspace.id), listPlans()]);
+  const [current, plans, quota] = await Promise.all([
+    getWorkspacePlan(workspace.id),
+    listPlans(),
+    workspaceQuota(workspace.id),
+  ]);
   const isOwner = current.ownerId === user.id;
   const billing = Boolean(getStripe());
   const paying = Boolean(current.stripeSubscriptionId);
@@ -95,14 +135,20 @@ export default async function BillingPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            {(Object.keys(LIMIT_LABELS) as (keyof PlanLimits)[]).map((key) => (
-              <div key={key} className="flex justify-between gap-4 border-b py-1">
-                <dt className="text-muted-foreground">{LIMIT_LABELS[key]}</dt>
-                <dd className="tabular-nums">{formatLimit(current.limits[key])}</dd>
-              </div>
+          <div className="grid gap-4 sm:grid-cols-3" aria-label="Usage">
+            {(["subscribers", "sendsPerMonth", "workspaces"] as const).map((key) => (
+              <UsageMeter
+                key={key}
+                label={key === "sendsPerMonth" ? "Emails this month" : LIMIT_LABELS[key]}
+                used={quota.usage[key]}
+                limit={current.limits[key]}
+              />
             ))}
-          </dl>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Emails start again on {day(nextMonthStart())}. Team members per workspace:{" "}
+            {formatLimit(current.limits.teamMembers)}.
+          </p>
           {isOwner && billing && current.stripeCustomerId && (
             <div className="mt-4">
               <ManageBillingButton slug={slug} />

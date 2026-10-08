@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { getSql } from "@sendcoop/db";
+import { closeConnections } from "./campaigns";
 import { signUpWithWorkspace, uniqueEmail } from "./helpers";
+
+test.afterAll(closeConnections);
 
 test("sidebar shows navigation to every section", async ({ page }) => {
   await signUpWithWorkspace(page, {
@@ -14,16 +18,27 @@ test("sidebar shows navigation to every section", async ({ page }) => {
   }
 });
 
-test("switcher creates a second workspace and moves between them", async ({ page }) => {
+test("switcher creates a second workspace (on a plan that allows it) and moves between them", async ({
+  page,
+}) => {
+  const email = uniqueEmail("switch");
   const first = await signUpWithWorkspace(page, {
     name: "Switch User",
-    email: uniqueEmail("switch"),
+    email,
     workspace: `First ${Date.now()}`,
   });
 
   await page.getByRole("button", { name: "Switch workspace" }).click();
   await page.getByRole("menuitem", { name: "Create workspace" }).click();
   await expect(page).toHaveURL(/\/workspaces\/new/);
+  await page.getByLabel("Workspace name").fill(`Second ${Date.now()}`);
+  await page.getByRole("button", { name: "Create workspace" }).click();
+  // The free plan has one workspace.
+  await expect(page.getByText(/Your Free plan allows 1 workspace\./)).toBeVisible();
+
+  await getSql()`
+    insert into subscriptions (user_id, plan_id, status)
+    select u.id, p.id, 'active' from users u, plans p where u.email = ${email} and p.key = 'starter'`;
   await page.getByLabel("Workspace name").fill(`Second ${Date.now()}`);
   await page.getByRole("button", { name: "Create workspace" }).click();
   await expect(page).toHaveURL(/\/w\/second-/);

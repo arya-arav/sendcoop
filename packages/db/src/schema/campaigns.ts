@@ -182,6 +182,8 @@ export const messages = pgTable(
     index().on(t.subscriberId),
     // Provider feedback (bounces, complaints) names messages by their id.
     index().on(t.providerMessageId),
+    // Usage: emails an account sent this month (D73).
+    index().on(t.workspaceId, t.createdAt),
   ],
 );
 

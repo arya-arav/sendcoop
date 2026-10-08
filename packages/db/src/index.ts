@@ -30,6 +30,7 @@ export * from "./queries/automation-engine";
 export * from "./queries/automation-triggers";
 export * from "./queries/automations";
 export * from "./queries/billing";
+export * from "./queries/quotas";
 export * from "./queries/audience";
 export * from "./queries/bulk";
 export * from "./queries/clicks";

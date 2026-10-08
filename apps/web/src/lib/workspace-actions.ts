@@ -1,9 +1,10 @@
 "use server";
 
-import { isWorkspaceSlugTaken } from "@sendcoop/db";
+import { accountQuota, isWorkspaceSlugTaken } from "@sendcoop/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/session";
 import { slugCandidate, slugify } from "@/lib/slug";
 
 export type CreateWorkspaceState = { error: string | null };
@@ -15,6 +16,14 @@ export async function createWorkspace(
   const name = String(formData.get("name") ?? "").trim();
   if (name.length < 2 || name.length > 60) {
     return { error: "Use between 2 and 60 characters." };
+  }
+
+  const { user } = await requireSession();
+  const quota = await accountQuota(user.id);
+  if (quota.room.workspaces < 1) {
+    return {
+      error: `Your ${quota.planName} plan allows ${quota.limits.workspaces} ${quota.limits.workspaces === 1 ? "workspace" : "workspaces"}. Upgrade your plan to add another.`,
+    };
   }
 
   const slug = await availableSlug(name);

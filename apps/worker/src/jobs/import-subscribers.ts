@@ -9,6 +9,7 @@ import {
   mappingProblem,
   mapRow,
   updateImportProgress,
+  workspaceQuota,
 } from "@sendcoop/db";
 import type { ImportJob } from "@sendcoop/queue";
 import { getStream, putStream, remove } from "@sendcoop/storage";
@@ -63,12 +64,19 @@ export async function processImport(
 
     const seen = new Map<string, number>(); // email -> row number, to catch duplicates
     let batch: ImportRow[] = [];
+    // New people beyond the plan's subscriber limit are skipped (D73).
+    let room = (await workspaceQuota(workspaceId)).room.subscribers;
 
     const flush = async () => {
       const result = await importSubscriberBatch(workspaceId, batch, {
         listIds,
         updateExisting: upload.updateExisting,
+        maxNew: room,
       });
+      room -= result.created;
+      for (const email of result.overLimit) {
+        skip(seen.get(email) ?? 0, email, "Over your plan's subscriber limit.");
+      }
       counters.createdCount += result.created;
       counters.updatedCount += result.updated;
       counters.skippedCount += result.unchanged;

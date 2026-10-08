@@ -1,4 +1,5 @@
 import {
+  accountQuota,
   accounts,
   getDb,
   invitations,
@@ -66,6 +67,9 @@ export const auth = betterAuth({
   plugins: [
     // Better Auth "organizations" are Sendcoop workspaces.
     organization({
+      // The plan limits how many workspaces an account owns (D73).
+      allowUserToCreateOrganization: async (user) =>
+        (await accountQuota(user.id)).room.workspaces > 0,
       schema: {
         organization: { modelName: "workspaces" },
         member: { modelName: "memberships", fields: { organizationId: "workspaceId" } },
