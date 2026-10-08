@@ -26,7 +26,15 @@ export type RunAdvance =
   /** The step queued an email: the worker sends it, then carries on. */
   | { state: "email"; campaignId: string; messageId: string; workspaceId: string; next: true }
   /** A webhook action: the worker calls it (D67), then carries on. */
-  | { state: "webhook"; url: string; body: Record<string, unknown>; next: true };
+  | {
+      state: "webhook";
+      url: string;
+      body: Record<string, unknown>;
+      workspaceId: string;
+      runId: string;
+      nodeId: string;
+      next: true;
+    };
 
 /**
  * Starts a run for a subscriber, unless one is live already or this trigger
@@ -227,11 +235,10 @@ export async function advanceAutomationRun(runId: string, now = new Date()): Pro
           return {
             state: "webhook",
             url: node.data.url,
-            body: {
-              runId: run.id,
-              automationId: run.automation_id,
-              subscriberId: run.subscriber_id,
-            },
+            body: await webhookBody(run, node.id),
+            workspaceId: run.workspace_id,
+            runId: run.id,
+            nodeId: node.id,
             next: true,
           };
         }
@@ -343,4 +350,54 @@ export async function dueAutomationRuns(limit = 500, now = new Date()) {
 export async function getAutomationRun(runId: string) {
   const [row] = await getDb().select().from(automationRuns).where(eq(automationRuns.id, runId));
   return row ?? null;
+}
+
+/** What an automation's webhook step sends: who, from which automation and step. */
+async function webhookBody(
+  run: {
+    id: string;
+    automation_id: string;
+    subscriber_id: string;
+    context: Record<string, unknown>;
+  },
+  nodeId: string,
+) {
+  const [row] = await getDb().execute<{
+    automation_name: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+    status: string;
+    fields: Record<string, unknown>;
+  }>(sql`
+    select a.name as automation_name, s.email, s.first_name, s.last_name, s.status, s.fields
+    from automations a, subscribers s
+    where a.id = ${run.automation_id} and s.id = ${run.subscriber_id}`);
+  return {
+    event: "automation.webhook",
+    automation: { id: run.automation_id, name: row?.automation_name ?? null, step: nodeId },
+    run: { id: run.id, trigger: run.context },
+    subscriber: {
+      id: run.subscriber_id,
+      email: row?.email ?? null,
+      first_name: row?.first_name ?? null,
+      last_name: row?.last_name ?? null,
+      status: row?.status ?? null,
+      fields: row?.fields ?? {},
+    },
+    sent_at: new Date().toISOString(),
+  };
+}
+
+/** Records what a webhook step's call came to (the worker makes the call). */
+export async function recordWebhookOutcome(
+  runId: string,
+  nodeId: string,
+  outcome: { ok: boolean; status: number | null; error: string | null; attempts: number },
+) {
+  await getDb().execute(sql`
+    update automation_step_logs
+    set status = ${outcome.ok ? "done" : "failed"}::automation_step_status,
+        detail = detail || ${JSON.stringify(outcome)}::jsonb
+    where run_id = ${runId} and node_id = ${nodeId}`);
 }

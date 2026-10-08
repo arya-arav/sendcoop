@@ -15,6 +15,7 @@ const PREFIX: Record<IntegrationKind, string> = {
   woocommerce: "wc",
   utmcap: "ut",
   leads: "ld",
+  webhooks: "whs",
 };
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";

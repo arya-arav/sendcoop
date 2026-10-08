@@ -139,6 +139,7 @@ export const integrationKind = pgEnum("integration_kind", [
   "woocommerce",
   "utmcap",
   "leads", // lead form webhook
+  "webhooks", // signs outgoing webhooks (automation actions, D67; events, D78)
 ]);
 
 /**

@@ -1143,6 +1143,19 @@ function ActionForm({
           />
         </Field>
       )}
+      {step.type === "webhook" && (
+        <p className="text-xs text-muted-foreground">
+          Sends the subscriber as JSON, signed.{" "}
+          <a
+            href="https://github.com/arya-arav/sendcoop/blob/main/docs/webhooks.md"
+            className="underline underline-offset-4"
+            target="_blank"
+            rel="noreferrer"
+          >
+            What arrives
+          </a>
+        </p>
+      )}
     </>
   );
 }

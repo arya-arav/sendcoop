@@ -1,12 +1,15 @@
 import {
   advanceAutomationRun,
   dueAutomationRuns,
+  getIntegrationSecret,
   processAutomationEvents,
+  recordWebhookOutcome,
   pruneAutomationEvents,
   startClickedNoConversionRuns,
   startDateTriggeredRuns,
 } from "@sendcoop/db";
 import { enqueueAutomationRun, enqueueSendBatches } from "@sendcoop/queue";
+import { deliverWebhook } from "../webhooks";
 
 /**
  * Moves a run along (D63): every step that can go now, an email handed to
@@ -18,7 +21,12 @@ export async function processAutomationRun(
   {
     now = () => new Date(),
     send = enqueueSendBatches,
-  }: { now?: () => Date; send?: typeof enqueueSendBatches } = {},
+    deliver = deliverWebhook,
+  }: {
+    now?: () => Date;
+    send?: typeof enqueueSendBatches;
+    deliver?: typeof deliverWebhook;
+  } = {},
 ) {
   const sent: string[] = [];
   for (let i = 0; i < 50; i++) {
@@ -35,7 +43,10 @@ export async function processAutomationRun(
       continue;
     }
     if (step.state === "webhook") {
-      // Calling webhooks arrives with the other actions (D67).
+      // Called right here; a failure is logged on the step and the run goes on.
+      const secret = await getIntegrationSecret(step.workspaceId, "webhooks");
+      const outcome = await deliver(step.url, step.body, secret);
+      await recordWebhookOutcome(step.runId, step.nodeId, outcome);
       continue;
     }
     if (step.state === "waiting") {

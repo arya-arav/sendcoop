@@ -1,7 +1,8 @@
-import { getUtmcapConnection } from "@sendcoop/db";
+import { getIntegrationSecret, getUtmcapConnection } from "@sendcoop/db";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyField } from "@/components/copy-field";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { canManage } from "@/lib/permissions";
 import { requireMemberWorkspace } from "@/lib/workspace";
 import { UtmcapCard } from "./utmcap-card";
@@ -11,7 +12,11 @@ export const metadata: Metadata = { title: "Integrations" };
 export default async function IntegrationsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { workspace, role } = await requireMemberWorkspace(slug);
-  const connection = await getUtmcapConnection(workspace.id);
+  const editable = canManage(role);
+  const [connection, webhookSecret] = await Promise.all([
+    getUtmcapConnection(workspace.id),
+    editable ? getIntegrationSecret(workspace.id, "webhooks") : null,
+  ]);
   const others = [
     {
       name: "Affiliate networks",
@@ -32,7 +37,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
       </div>
       <UtmcapCard
         slug={slug}
-        editable={canManage(role)}
+        editable={editable}
         connection={
           connection && {
             sourceName: connection.sourceName,
@@ -41,6 +46,29 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
           }
         }
       />
+      {webhookSecret && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Webhooks from Sendcoop</h2>
+            </CardTitle>
+            <CardDescription>
+              Automation steps that call your server sign each request with this secret.{" "}
+              <a
+                href="https://github.com/arya-arav/sendcoop/blob/main/docs/webhooks.md"
+                className="underline underline-offset-4"
+                target="_blank"
+                rel="noreferrer"
+              >
+                How to check it
+              </a>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CopyField label="Webhook signing secret" value={webhookSecret} />
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         {others.map((o) => (
           <Link key={o.name} href={`/w/${slug}/settings/tracking`} className="rounded-xl">
