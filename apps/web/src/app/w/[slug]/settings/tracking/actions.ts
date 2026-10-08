@@ -5,6 +5,7 @@ import {
   rotateIntegrationSecret,
   setAffiliateDomains,
   setIntegrationConfig,
+  setWebhookSigningSecret,
   setUtmSettings,
 } from "@sendcoop/db";
 import { randomBytes } from "node:crypto";
@@ -125,6 +126,25 @@ export async function rotateApiSecretAction(slug: string) {
     return { ok: false as const, error: "Only workspace owners and admins can change this." };
   }
   await rotateIntegrationSecret(workspace.id, "api");
+  revalidatePath(`/w/${slug}/settings/tracking`);
+  return { ok: true as const };
+}
+
+/** The secret Shopify signs its webhooks with, from the Shopify admin's webhooks page. */
+export async function saveShopifySecretAction(slug: string, secret: string) {
+  const { workspace, role } = await requireMemberWorkspace(slug);
+  if (!canManage(role)) {
+    return { ok: false as const, error: "Only workspace owners and admins can change this." };
+  }
+  const value = secret.trim();
+  if (!/^[\w-]{16,200}$/.test(value)) {
+    return {
+      ok: false as const,
+      error:
+        "Paste the signing secret from Shopify's webhooks page (a long string of letters and numbers).",
+    };
+  }
+  await setWebhookSigningSecret(workspace.id, "shopify", value);
   revalidatePath(`/w/${slug}/settings/tracking`);
   return { ok: true as const };
 }

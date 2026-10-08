@@ -7,6 +7,8 @@
 // email. Sales are reported with sc('conversion', {...}); calls made before
 // the script loads wait in window.sc.q (see the snippet in settings).
 //
+// On Shopify it also puts the click id in the cart (see shopify.ts).
+//
 // Plain ES5, no dependencies: it runs on any site, in any browser.
 
 export const PIXEL_JS = `(function () {
@@ -53,6 +55,27 @@ export const PIXEL_JS = `(function () {
     var cid = readCookie();
     return cid && VALID.test(cid) ? cid : null;
   }
+
+  // On Shopify, the click id rides along in the cart, so it reaches the
+  // order (as a note attribute) and the order webhook. Once per visit.
+  function tagShopifyCart() {
+    var cid = clickId();
+    if (!cid || !window.Shopify || !window.fetch) return;
+    try {
+      if (sessionStorage.getItem("sc_cart") === cid) return;
+    } catch (e) {}
+    var root = (window.Shopify.routes && window.Shopify.routes.root) || "/";
+    fetch(root + "cart/update.js", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attributes: { sc_cid: cid } })
+    }).then(function (response) {
+      try {
+        if (response.ok) sessionStorage.setItem("sc_cart", cid);
+      } catch (e) {}
+    }, function () {});
+  }
+  tagShopifyCart();
 
   function send(event, data) {
     data = data || {};

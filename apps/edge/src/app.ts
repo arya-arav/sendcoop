@@ -6,6 +6,8 @@ import {
   parseApiConversion,
   parsePixelEvent,
   parsePostback,
+  parseShopifyOrder,
+  parseShopifyRefund,
   pingDatabase,
   readClickToken,
   readHoneypotToken,
@@ -15,8 +17,11 @@ import {
   recordConversion,
   recordHoneypot,
   recordOpen,
+  refundConversion,
   type ServiceName,
   verifyConversionSignature,
+  verifyShopifyHmac,
+  webhookSigningSecret,
 } from "@sendcoop/db";
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
 import { pingRedis } from "@sendcoop/redis";
@@ -27,8 +32,8 @@ import { PIXEL_JS } from "./pixel";
 const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
-// postbacks (D42), the website pixel (D46), the conversion API (D47). Kept
-// small and fast: a click is one database round trip.
+// postbacks (D42), the website pixel (D46), the conversion API (D47), Shopify
+// (D48). Kept small and fast: a click is one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -211,6 +216,52 @@ app.post("/v1/conversions", async (c) => {
     { result: recorded.result, id: recorded.id, attributed_by: recorded.method ?? null },
     recorded.result === "created" ? 201 : 200,
   );
+});
+
+/**
+ * Shopify order webhooks (see shopify.ts). The URL's key says which
+ * workspace; Shopify's signature, with the secret from its admin, proves
+ * the body is Shopify's.
+ */
+app.post("/wh/shopify/:key", async (c) => {
+  const integration = await findIntegrationBySecret("shopify", c.req.param("key"));
+  if (!integration) return c.text("unknown webhook url", 404);
+  const secret = webhookSigningSecret(integration.config);
+  if (!secret) return c.text("add the webhook signing secret in Sendcoop first", 401);
+  const body = await c.req.text();
+  if (!verifyShopifyHmac(secret, body, c.req.header("x-shopify-hmac-sha256"))) {
+    return c.text("invalid signature", 401);
+  }
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return c.text("invalid json", 400);
+  }
+
+  const topic = c.req.header("x-shopify-topic");
+  if (topic === "orders/create" || topic === "orders/paid") {
+    const order = parseShopifyOrder(payload);
+    if (!order) return c.text("not an order", 422);
+    const { result } = await recordConversion(integration.workspaceId, {
+      ...order,
+      source: "shopify",
+      event: "sale",
+      network: null,
+      payload: {
+        order: (payload as { name?: unknown }).name ?? null,
+        shop: c.req.header("x-shopify-shop-domain") ?? null,
+      },
+    });
+    return c.text(`ok ${result}`);
+  }
+  if (topic === "refunds/create") {
+    const refund = parseShopifyRefund(payload);
+    if (!refund) return c.text("not a refund", 422);
+    return c.text(`ok ${await refundConversion(integration.workspaceId, refund)}`);
+  }
+  // Other topics: accepted, so Shopify doesn't retry them, and ignored.
+  return c.text("ok ignored");
 });
 
 /** The website pixel (see pixel.ts). */

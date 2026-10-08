@@ -103,3 +103,23 @@ export async function readIntegrationSecret(workspaceId: string, kind: Integrati
     .where(and(eq(integrations.workspaceId, workspaceId), eq(integrations.kind, kind)));
   return row ? decryptSecret(row.secret) : null;
 }
+
+/**
+ * A secret a platform signs its webhooks with (Shopify, WooCommerce): theirs,
+ * pasted in by the user, stored encrypted in the integration's settings.
+ */
+export async function setWebhookSigningSecret(
+  workspaceId: string,
+  kind: IntegrationKind,
+  secret: string | null,
+) {
+  const config = await getIntegrationConfig(workspaceId, kind);
+  await setIntegrationConfig(workspaceId, kind, {
+    ...config,
+    signingSecret: secret ? encryptSecret(secret) : null,
+  });
+}
+
+export function webhookSigningSecret(config: Record<string, unknown>) {
+  return typeof config.signingSecret === "string" ? decryptSecret(config.signingSecret) : null;
+}

@@ -101,3 +101,41 @@ export async function listRecentConversions(workspaceId: string, limit = 10) {
     order by v.id desc
     limit ${limit}`);
 }
+
+/**
+ * Takes a refund off a recorded sale (Shopify, WooCommerce): what's left is
+ * its value, and nothing left reverses it. Each refund counts once, however
+ * often it's delivered.
+ */
+export async function refundConversion(
+  workspaceId: string,
+  input: { txid: string; refundId: string; amount: number },
+): Promise<"refunded" | "reversed" | "duplicate" | "unknown"> {
+  const [row] = await getDb().execute<{
+    id: string;
+    message_id: string | null;
+    status: ConversionStatus;
+    applied: boolean;
+  }>(sql`
+    with target as (
+      select id, value, payload from conversions
+      where workspace_id = ${workspaceId} and external_txid = ${input.txid}
+    ), updated as (
+      update conversions c set
+        value = greatest(c.value - ${input.amount}, 0),
+        status = case when c.value - ${input.amount} <= 0.005 then 'reversed'::conversion_status
+                      else c.status end,
+        payload = jsonb_set(coalesce(c.payload, '{}'::jsonb), '{refunds}',
+                            coalesce(c.payload->'refunds', '[]'::jsonb) || to_jsonb(${input.refundId}::text)),
+        updated_at = now()
+      from target t
+      where c.id = t.id and not coalesce(t.payload->'refunds', '[]'::jsonb) ? ${input.refundId}
+      returning c.id, c.message_id, c.status
+    )
+    select t.id, u.message_id, u.status, u.id is not null as applied
+    from target t left join updated u on u.id = t.id`);
+  if (!row) return "unknown";
+  if (!row.applied) return "duplicate";
+  if (row.message_id) await refreshMessageRevenue(row.message_id);
+  return row.status === "reversed" ? "reversed" : "refunded";
+}
