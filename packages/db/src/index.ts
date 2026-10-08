@@ -26,6 +26,7 @@ export * from "./queries/health";
 export * from "./queries/import-batch";
 export * from "./queries/imports";
 export * from "./queries/links";
+export * from "./queries/integrations";
 export * from "./queries/lists";
 export * from "./queries/media";
 export * from "./queries/reports";
