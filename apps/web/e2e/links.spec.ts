@@ -17,7 +17,7 @@ test("a campaign's links are recorded, with affiliate links marked", async ({ pa
   // The workspace's own affiliate domain
   await page.goto(`/w/${slug}/settings`);
   await page.getByRole("link", { name: /Tracking/ }).click();
-  await expect(page.getByText("ClickBank")).toBeVisible();
+  await expect(page.locator("[data-slot=badge]", { hasText: "ClickBank" })).toBeVisible();
   await page
     .getByLabel("Affiliate domains")
     .fill("https://www.MyPartner.com/offers\nmypartner.com");

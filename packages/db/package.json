@@ -8,7 +8,8 @@
     "./custom-fields": "./src/custom-fields.ts",
     "./imports": "./src/imports.ts",
     "./segments": "./src/segments.ts",
-    "./affiliate-networks": "./src/affiliate-networks.ts"
+    "./affiliate-networks": "./src/affiliate-networks.ts",
+    "./postback-templates": "./src/postback-templates.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

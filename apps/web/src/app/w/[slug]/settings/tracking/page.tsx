@@ -4,6 +4,8 @@ import {
   getIntegrationConfig,
   getIntegrationSecret,
   getUtmSettings,
+  POSTBACK_TEMPLATES,
+  postbackUrl as networkPostbackUrl,
 } from "@sendcoop/db";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -33,6 +35,16 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
   const postbackUrl = postbackKey
     ? `${tracking}/pb?key=${postbackKey}&cid={subid}&payout={payout}&txid={txid}`
     : "Only workspace owners and admins can see the postback URL.";
+  const networks = postbackKey
+    ? POSTBACK_TEMPLATES.map((t) => ({
+        id: t.id,
+        name: t.name,
+        url: t.macros
+          ? networkPostbackUrl(tracking, postbackKey, { id: t.id, macros: t.macros })
+          : null,
+        instructions: t.instructions,
+      }))
+    : [];
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -75,6 +87,9 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
         slug={slug}
         editable={editable}
         postbackUrl={postbackUrl}
+        networks={networks}
+        trackingUrl={tracking}
+        postbackKey={postbackKey}
         allowedIps={
           Array.isArray(postbackConfig.allowedIps) ? postbackConfig.allowedIps.map(String) : []
         }

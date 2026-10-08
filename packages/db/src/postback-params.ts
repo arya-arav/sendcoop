@@ -18,7 +18,7 @@ const first = (params: Record<string, string>, names: string[]) => {
   for (const name of names) {
     const value = params[name]?.trim();
     // Unfilled network macros ("{subid}", "[TXID]", "#payout#") mean "not given".
-    if (value && !/^[{[#%].*[}\]#%]$/.test(value)) return value;
+    if (value && !/^[{[#%].*[}\]#%]$/.test(value) && !/^!!!.*!!!$/.test(value)) return value;
   }
   return null;
 };
@@ -34,10 +34,14 @@ export function parseAmount(raw: string | null): number | null {
 }
 
 const STATUS_WORDS: [RegExp, PostbackStatus][] = [
-  [/^(refund(ed)?|chargeback|charged_?back|revers(ed|al)|cancel(l?ed)?|void(ed)?)$/i, "reversed"],
+  // ClickBank's event types: RFND (refund), CGBK (chargeback), INSF (bounced payment).
+  [
+    /^(refund(ed)?|chargeback|charged_?back|revers(ed|al)|cancel(l?ed)?|void(ed)?|rfnd|cgbk|insf)$/i,
+    "reversed",
+  ],
   [/^(reject(ed)?|declined?|denied|deny|invalid|fraud)$/i, "rejected"],
   [/^(pending|hold|on_?hold|waiting|0)$/i, "pending"],
-  [/^(approved?|confirmed?|success|sale|paid|complete(d)?|1)$/i, "approved"],
+  [/^(approved?|confirmed?|success|sale|paid|complete(d)?|bill|upsell|rebill|1)$/i, "approved"],
 ];
 
 export function parseStatus(raw: string | null): PostbackStatus {

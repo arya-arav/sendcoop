@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { rotatePostbackKeyAction, savePostbackIpsAction } from "./actions";
+import { type NetworkPostback, NetworkPostbacks } from "./network-postbacks";
 
 /** Where affiliate networks report sales: the postback URL and its key. */
 export function PostbackCard({
@@ -25,11 +26,18 @@ export function PostbackCard({
   editable,
   postbackUrl,
   allowedIps,
+  networks,
+  trackingUrl,
+  postbackKey,
 }: {
   slug: string;
   editable: boolean;
   postbackUrl: string;
   allowedIps: string[];
+  networks: NetworkPostback[];
+  trackingUrl: string;
+  /** null for members, who don't see the key. */
+  postbackKey: string | null;
 }) {
   const [ips, setIps] = useState(allowedIps.join("\n"));
   const [message, setMessage] = useState<string | null>(null);
@@ -68,6 +76,17 @@ export function PostbackCard({
           Replace {"{subid}"}, {"{payout}"} and {"{txid}"} with your network&apos;s macros. Also
           understood: status (approved, pending, rejected, refund), currency and event (sale, lead).
         </p>
+
+        {postbackKey && (
+          <div className="grid gap-3 border-t pt-5">
+            <h3 className="text-sm font-medium">Ready-made for your network</h3>
+            <NetworkPostbacks
+              networks={networks}
+              trackingUrl={trackingUrl}
+              postbackKey={postbackKey}
+            />
+          </div>
+        )}
 
         {editable && (
           <>

@@ -45,14 +45,21 @@ test("an affiliate network's postback records a sale once, from the URL in setti
   const clickId = new URL(redirect.headers().location!).searchParams.get("tid")!;
   expect(clickId).toMatch(/^sc\w{16}$/);
 
-  // The postback URL from settings, with the network's macros filled in
+  // ClickBank's ready-made postback URL from settings, filled in as ClickBank would
   await page.goto(`/w/${slug}/settings/tracking`);
-  const template = await page.getByLabel("Postback URL").inputValue();
-  expect(template).toMatch(/^http:\/\/localhost:3001\/pb\?key=pk_\w{32}&cid=\{subid\}/);
+  const generic = await page.getByLabel("Postback URL", { exact: true }).inputValue();
+  expect(generic).toMatch(/^http:\/\/localhost:3001\/pb\?key=pk_\w{32}&cid=\{subid\}/);
+  await page.getByLabel("Network", { exact: true }).selectOption({ label: "ClickBank" });
+  const template = await page.getByLabel("ClickBank postback URL").inputValue();
+  expect(template).toBe(
+    generic.split("&")[0] +
+      "&cid={tid}&payout={affiliate_earnings}&txid={receipt_id}&status={event_type}&network=clickbank",
+  );
   const fired = template
-    .replace("{subid}", clickId)
-    .replace("{payout}", "47.00")
-    .replace("{txid}", "CB-RECEIPT-1");
+    .replace("{tid}", clickId)
+    .replace("{affiliate_earnings}", "47.00")
+    .replace("{receipt_id}", "CB-RECEIPT-1")
+    .replace("{event_type}", "SALE");
   expect(await (await request.get(fired)).text()).toBe("ok created");
   expect(await (await request.get(fired)).text()).toBe("ok duplicate");
 
@@ -74,6 +81,6 @@ test("an affiliate network's postback records a sale once, from the URL in setti
   // A new key: the old URL stops working
   await page.getByRole("button", { name: "New key" }).click();
   await page.getByRole("button", { name: "Make a new key" }).click();
-  await expect(page.getByLabel("Postback URL")).not.toHaveValue(template);
+  await expect(page.getByLabel("Postback URL", { exact: true })).not.toHaveValue(generic);
   expect((await request.get(fired.replace("CB-RECEIPT-1", "CB-RECEIPT-2"))).status()).toBe(401);
 });

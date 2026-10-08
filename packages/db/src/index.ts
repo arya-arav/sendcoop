@@ -7,6 +7,7 @@ export * from "./bot-detection";
 export * from "./custom-fields";
 export * from "./destination";
 export * from "./postback-params";
+export * from "./postback-templates";
 export * from "./domain-verification";
 export * from "./imports";
 export * from "./secrets";
