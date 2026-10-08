@@ -8,12 +8,15 @@ import {
   getDkimSigningKey,
   getSendingServer,
   getSendingServerConfig,
+  getUtmSettings,
   getVariantB,
+  honeypotUrl,
   listCampaignLinks,
   listSendingDomains,
   loadMessageBatch,
   markMessageFailed,
   markMessageSent,
+  openPixelUrl,
   prepareCampaignMessages,
   queuedMessageBatchesTimed,
   refreshCampaignProgress,
@@ -33,6 +36,7 @@ import {
   rewriteLinks,
   type ServerConfig,
   serverConfigSchema,
+  withTrackingPixel,
   withUnsubscribeLink,
 } from "@sendcoop/mailer";
 import {
@@ -124,6 +128,18 @@ export async function startScheduledCampaigns() {
   return due.length;
 }
 
+/** The open pixel (when the workspace tracks opens) and the bot-catching hidden link. */
+function withPixel(body: { html: string; text: string }, messageId: string, trackOpens: boolean) {
+  return {
+    ...body,
+    html: withTrackingPixel(
+      body.html,
+      trackOpens ? openPixelUrl(messageId) : null,
+      honeypotUrl(messageId),
+    ),
+  };
+}
+
 /** Waits this long for a per-second slot; longer waits postpone the batch. */
 const MAX_INLINE_WAIT_MS = 2000;
 
@@ -151,6 +167,7 @@ export async function sendBatch({
   const batch = await loadMessageBatch(workspaceId, campaignId, messageIds);
   // Variant B's subject and content, for A/B test recipients who get it.
   const variantB = batch.some((m) => m.variant === "b") ? await getVariantB(campaignId) : null;
+  const { trackOpens } = await getUtmSettings(workspaceId);
   // Link ids by version and position, for each recipient's tracked links.
   const linkIds = { a: [] as string[], b: [] as string[] };
   for (const link of await listCampaignLinks(workspaceId, campaignId)) {
@@ -200,7 +217,7 @@ export async function sendBatch({
           to: message.email,
           replyTo: campaign.replyTo ?? undefined,
           subject: content.subject,
-          ...withUnsubscribeLink(content, unsubscribe.page),
+          ...withPixel(withUnsubscribeLink(content, unsubscribe.page), message.id, trackOpens),
           headers: {
             ...listUnsubscribeHeaders(unsubscribe.oneClick),
             // Ties bounces and complaints back to this message (D22).

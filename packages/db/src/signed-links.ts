@@ -50,3 +50,15 @@ export function clickUrl(
 ) {
   return `${baseUrl.replace(/\/$/, "")}/c/${createClickToken(messageId, linkId)}`;
 }
+
+const trackingBase = () => (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
+
+/** The open pixel for one recipient's email. */
+export const openPixelUrl = (messageId: string) =>
+  `${trackingBase()}/o/${signId("open", messageId)}.gif`;
+export const readOpenToken = (token: string) => readSignedId("open", token.replace(/\.gif$/, ""));
+
+/** The hidden link only machines follow (bot detection). */
+export const honeypotUrl = (messageId: string) =>
+  `${trackingBase()}/h/${signId("honeypot", messageId)}`;
+export const readHoneypotToken = (token: string) => readSignedId("honeypot", token);

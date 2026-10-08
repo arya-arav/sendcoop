@@ -143,6 +143,8 @@ export const messages = pgTable(
     // Engagement, kept on the message for fast reports and A/B decisions:
     // the first click (D37) and attributed revenue (D43).
     clickedAt: timestamp({ withTimezone: true }),
+    /** First open by a person (machine opens don't count). */
+    openedAt: timestamp({ withTimezone: true }),
     revenue: numeric({ precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     /** Not before this (subscriber-timezone sends); null means right away. */
     sendAfter: timestamp({ withTimezone: true }),

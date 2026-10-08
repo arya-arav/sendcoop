@@ -3,6 +3,7 @@
 
 export { getDb, getSql, pingDatabase, type Db } from "./client";
 export * from "./affiliate-networks";
+export * from "./bot-detection";
 export * from "./custom-fields";
 export * from "./destination";
 export * from "./domain-verification";

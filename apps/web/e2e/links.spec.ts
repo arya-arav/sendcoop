@@ -25,7 +25,7 @@ test("a campaign's links are recorded, with affiliate links marked", async ({ pa
   await expect(page.getByRole("status")).toHaveText("Saved 1 domain.");
   await expect(page.getByLabel("Affiliate domains")).toHaveValue("mypartner.com");
   await page.getByLabel("utm_source").fill("newsletter");
-  await page.getByRole("button", { name: "Save tagging" }).click();
+  await page.getByRole("button", { name: "Save options" }).click();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
   const reader = uniqueEmail("links-reader");

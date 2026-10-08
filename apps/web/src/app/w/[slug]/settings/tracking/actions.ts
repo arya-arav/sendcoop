@@ -19,6 +19,7 @@ export async function saveAffiliateDomainsAction(slug: string, text: string) {
 
 const utmSchema = z.object({
   addUtm: z.boolean(),
+  trackOpens: z.boolean(),
   utmSource: z
     .string()
     .trim()

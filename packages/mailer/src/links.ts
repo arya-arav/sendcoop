@@ -90,3 +90,26 @@ export function rewriteLinks(
   });
   return { html, text };
 }
+
+/**
+ * Adds the open pixel and the hidden machines-only link at the end of an
+ * HTML email (plain-text emails get neither). The link is invisible and
+ * hidden from screen readers.
+ */
+export function withTrackingPixel(
+  html: string,
+  pixelUrl: string | null,
+  honeypotUrl: string | null,
+) {
+  if (!html.trim() || (!pixelUrl && !honeypotUrl)) return html;
+  const parts = [
+    honeypotUrl
+      ? `<a href="${honeypotUrl}" aria-hidden="true" tabindex="-1" style="display:none!important;font-size:0;line-height:0;max-height:0;overflow:hidden;mso-hide:all"></a>`
+      : "",
+    pixelUrl
+      ? `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;margin:0;padding:0" />`
+      : "",
+  ].join("");
+  const end = html.search(/<\/body>(?![\s\S]*<\/body>)/i);
+  return end === -1 ? html + parts : html.slice(0, end) + parts + html.slice(end);
+}

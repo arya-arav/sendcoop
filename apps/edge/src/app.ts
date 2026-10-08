@@ -3,7 +3,11 @@ import {
   decorateDestination,
   pingDatabase,
   readClickToken,
+  readHoneypotToken,
+  readOpenToken,
   recordClick,
+  recordHoneypot,
+  recordOpen,
   type ServiceName,
 } from "@sendcoop/db";
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
@@ -66,4 +70,30 @@ app.get("/c/:token", async (c) => {
   });
   c.header("cache-control", "no-store");
   return c.redirect(destination, 302);
+});
+
+// A 1x1 transparent GIF.
+const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+
+/** The open pixel: always answers with the image, whatever happens. */
+app.get("/o/:file", async (c) => {
+  const messageId = readOpenToken(c.req.param("file"));
+  if (messageId) {
+    await recordOpen({
+      messageId,
+      ip: clientIp(c),
+      userAgent: c.req.header("user-agent") ?? null,
+    }).catch((error: unknown) => console.error("[edge] open not recorded", error));
+  }
+  return c.body(PIXEL, 200, {
+    "content-type": "image/gif",
+    "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+  });
+});
+
+/** The hidden link only machines follow: their recent clicks on that email don't count. */
+app.get("/h/:token", async (c) => {
+  const messageId = readHoneypotToken(c.req.param("token"));
+  if (messageId) await recordHoneypot(messageId);
+  return c.body(null, 204);
 });

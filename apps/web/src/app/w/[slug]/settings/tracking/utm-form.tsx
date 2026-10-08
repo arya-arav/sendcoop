@@ -16,7 +16,7 @@ export function UtmForm({
 }: {
   slug: string;
   editable: boolean;
-  initial: { addUtm: boolean; utmSource: string };
+  initial: { addUtm: boolean; utmSource: string; trackOpens: boolean };
 }) {
   const [values, setValues] = useState(initial);
   const [saved, setSaved] = useState(false);
@@ -37,7 +37,7 @@ export function UtmForm({
     <Card>
       <CardHeader>
         <CardTitle>
-          <h2>Link tagging</h2>
+          <h2>Tracking options</h2>
         </CardTitle>
         <CardDescription>
           When someone clicks, ordinary links get UTM tags (so Google Analytics and UTMCAP see the
@@ -80,13 +80,33 @@ export function UtmForm({
                 link&apos;s text.
               </p>
             </div>
+            <div className="flex items-start gap-2">
+              <input
+                id="track-opens"
+                type="checkbox"
+                className="mt-1 size-4 accent-foreground"
+                checked={values.trackOpens}
+                aria-describedby="track-opens-hint"
+                onChange={(e) => {
+                  setValues((v) => ({ ...v, trackOpens: e.target.checked }));
+                  setSaved(false);
+                }}
+              />
+              <div className="grid gap-0.5">
+                <Label htmlFor="track-opens">Track opens</Label>
+                <span id="track-opens-hint" className="text-xs text-muted-foreground">
+                  A tiny image in HTML emails. Apple Mail and security scanners load it without
+                  anyone reading, so those opens are counted separately; clicks are more reliable.
+                </span>
+              </div>
+            </div>
           </fieldset>
           <FormError message={error} />
           {editable && (
             <div className="flex items-center justify-end gap-3">
               {saved && <span className="text-sm text-muted-foreground">Saved</span>}
               <Button type="submit" disabled={pending}>
-                {pending ? "Saving…" : "Save tagging"}
+                {pending ? "Saving…" : "Save options"}
               </Button>
             </div>
           )}

@@ -59,15 +59,19 @@ export async function listCampaignLinks(workspaceId: string, campaignId: string)
 
 export async function getUtmSettings(workspaceId: string) {
   const [row] = await getDb()
-    .select({ addUtm: trackingSettings.addUtm, utmSource: trackingSettings.utmSource })
+    .select({
+      addUtm: trackingSettings.addUtm,
+      utmSource: trackingSettings.utmSource,
+      trackOpens: trackingSettings.trackOpens,
+    })
     .from(trackingSettings)
     .where(eq(trackingSettings.workspaceId, workspaceId));
-  return row ?? { addUtm: true, utmSource: "sendcoop" };
+  return row ?? { addUtm: true, utmSource: "sendcoop", trackOpens: true };
 }
 
 export async function setUtmSettings(
   workspaceId: string,
-  settings: { addUtm: boolean; utmSource: string },
+  settings: { addUtm: boolean; utmSource: string; trackOpens?: boolean },
 ) {
   await getDb()
     .insert(trackingSettings)

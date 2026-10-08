@@ -57,6 +57,8 @@ export const trackingSettings = pgTable("tracking_settings", {
   /** Add utm_* tags to ordinary links (those already set are kept). */
   addUtm: boolean().notNull().default(true),
   utmSource: text().notNull().default("sendcoop"),
+  /** Add the open pixel to HTML emails. */
+  trackOpens: boolean().notNull().default(true),
   updatedAt: updatedAt(),
 });
 
@@ -95,3 +97,26 @@ export const clicks = pgTable(
 );
 
 export type Click = typeof clicks.$inferSelect;
+
+/**
+ * Each time the open pixel loads. Machine opens (Apple Mail Privacy
+ * Protection, scanners) are kept but flagged: they happen whether or not
+ * anyone reads the email.
+ */
+export const opens = pgTable(
+  "opens",
+  {
+    id: id(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    campaignId: uuid().references(() => campaigns.id, { onDelete: "set null" }),
+    messageId: uuid().references(() => messages.id, { onDelete: "set null" }),
+    subscriberId: uuid().references(() => subscribers.id, { onDelete: "set null" }),
+    ip: text(),
+    userAgent: text(),
+    isMachine: boolean().notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.workspaceId, t.id), index().on(t.campaignId), index().on(t.messageId)],
+);
