@@ -123,3 +123,12 @@ export async function setWebhookSigningSecret(
 export function webhookSigningSecret(config: Record<string, unknown>) {
   return typeof config.signingSecret === "string" ? decryptSecret(config.signingSecret) : null;
 }
+
+/** A signing secret we choose for the user to paste into the platform (WooCommerce). */
+export async function getOrCreateWebhookSigningSecret(workspaceId: string, kind: IntegrationKind) {
+  const existing = webhookSigningSecret(await getIntegrationConfig(workspaceId, kind));
+  if (existing) return existing;
+  const secret = newSecret(kind).slice(3); // no prefix: it isn't one of our keys
+  await setWebhookSigningSecret(workspaceId, kind, secret);
+  return secret;
+}

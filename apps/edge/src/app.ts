@@ -8,6 +8,7 @@ import {
   parsePostback,
   parseShopifyOrder,
   parseShopifyRefund,
+  parseWooOrder,
   pingDatabase,
   readClickToken,
   readHoneypotToken,
@@ -21,6 +22,7 @@ import {
   type ServiceName,
   verifyConversionSignature,
   verifyShopifyHmac,
+  verifyWooSignature,
   webhookSigningSecret,
 } from "@sendcoop/db";
 import { fillUrlTemplate, mergeValuesFor } from "@sendcoop/mailer/personalize";
@@ -33,7 +35,7 @@ const service: ServiceName = "edge";
 
 // Public, high-traffic endpoints: click redirects (D37), open pixel (D39),
 // postbacks (D42), the website pixel (D46), the conversion API (D47), Shopify
-// (D48). Kept small and fast: a click is one database round trip.
+// (D48), WooCommerce (D49). Kept small and fast: a click is one database round trip.
 export const app = new Hono();
 
 app.get("/health", async (c) => {
@@ -262,6 +264,42 @@ app.post("/wh/shopify/:key", async (c) => {
   }
   // Other topics: accepted, so Shopify doesn't retry them, and ignored.
   return c.text("ok ignored");
+});
+
+/** WooCommerce order webhooks (see woocommerce.ts). */
+app.post("/wh/woocommerce/:key", async (c) => {
+  const integration = await findIntegrationBySecret("woocommerce", c.req.param("key"));
+  if (!integration) return c.text("unknown webhook url", 404);
+  const body = await c.req.text();
+  // Saving a webhook in WooCommerce sends "webhook_id=<id>" to check the URL.
+  if (/^webhook_id=\d+$/.test(body.trim())) return c.text("ok ping");
+  const secret = webhookSigningSecret(integration.config);
+  if (!secret || !verifyWooSignature(secret, body, c.req.header("x-wc-webhook-signature"))) {
+    return c.text("invalid signature", 401);
+  }
+  const topic = c.req.header("x-wc-webhook-topic");
+  if (topic !== "order.created" && topic !== "order.updated") return c.text("ok ignored");
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return c.text("invalid json", 400);
+  }
+  const order = parseWooOrder(payload, c.req.header("x-wc-webhook-source") ?? null);
+  if (!order) return c.text("not an order", 422);
+
+  const { refunds, ...conversion } = order;
+  const { result } = await recordConversion(integration.workspaceId, {
+    ...conversion,
+    source: "woocommerce",
+    event: "sale",
+    network: null,
+    payload: { order: (payload as { number?: unknown }).number ?? null },
+  });
+  for (const refund of refunds) {
+    await refundConversion(integration.workspaceId, { txid: order.txid, ...refund });
+  }
+  return c.text(`ok ${result}`);
 });
 
 /** The website pixel (see pixel.ts). */

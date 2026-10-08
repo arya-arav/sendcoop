@@ -3,6 +3,7 @@ import {
   getAffiliateDomains,
   getIntegrationConfig,
   getIntegrationSecret,
+  getOrCreateWebhookSigningSecret,
   getUtmSettings,
   listRecentConversions,
   POSTBACK_TEMPLATES,
@@ -22,6 +23,7 @@ import { PostbackCard } from "./postback-card";
 import { RecentConversions } from "./recent-conversions";
 import { ShopifyCard } from "./shopify-card";
 import { UtmForm } from "./utm-form";
+import { WooCommerceCard } from "./woocommerce-card";
 
 export const metadata: Metadata = { title: "Tracking settings" };
 
@@ -39,6 +41,8 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
     apiSecret,
     shopifyKey,
     shopifyConfig,
+    wooKey,
+    wooSecret,
   ] = await Promise.all([
     getAffiliateDomains(workspace.id),
     getUtmSettings(workspace.id),
@@ -51,6 +55,8 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
     editable ? getIntegrationSecret(workspace.id, "api") : null,
     editable ? getIntegrationSecret(workspace.id, "shopify") : null,
     getIntegrationConfig(workspace.id, "shopify"),
+    editable ? getIntegrationSecret(workspace.id, "woocommerce") : null,
+    editable ? getOrCreateWebhookSigningSecret(workspace.id, "woocommerce") : null,
   ]);
   const tracking = (process.env.TRACKING_URL ?? "http://localhost:3001").replace(/\/$/, "");
   const postbackUrl = postbackKey
@@ -121,6 +127,10 @@ export default async function TrackingPage({ params }: { params: Promise<{ slug:
         slug={slug}
         webhookUrl={shopifyKey ? `${tracking}/wh/shopify/${shopifyKey}` : null}
         connected={Boolean(shopifyConfig.signingSecret)}
+      />
+      <WooCommerceCard
+        webhookUrl={wooKey ? `${tracking}/wh/woocommerce/${wooKey}` : null}
+        secret={wooSecret}
       />
       <RecentConversions slug={slug} editable={editable} conversions={recent} />
     </div>

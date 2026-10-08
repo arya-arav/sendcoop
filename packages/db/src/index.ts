@@ -10,6 +10,7 @@ export * from "./postback-params";
 export * from "./conversion-api";
 export * from "./pixel-params";
 export * from "./shopify";
+export * from "./woocommerce";
 export * from "./postback-templates";
 export * from "./domain-verification";
 export * from "./imports";
